@@ -61,3 +61,54 @@ def register_backup_job(
         misfire_grace_time=3600,
     )
     logger.info("Zarejestrowano codzienny job backupu bazy danych (3:00)")
+
+
+def register_shipping_reminder_job(
+    scheduler: AsyncIOScheduler,
+    job_coroutine: Callable[[], Awaitable[None]],
+) -> None:
+    """
+    Rejestruje codzienny job przypomnienia o niewysłanych zamówieniach.
+
+    Uruchamiany o 20:00 czasu polskiego (Europe/Warsaw).
+
+    Args:
+        scheduler: Instancja schedulera zwrócona przez create_scheduler().
+        job_coroutine: Bezargumentowa korutyna do wywołania codziennie.
+    """
+    scheduler.add_job(
+        job_coroutine,
+        trigger="cron",
+        hour=20,
+        minute=0,
+        id="shipping_reminder_job",
+        max_instances=1,
+        misfire_grace_time=1800,
+    )
+    logger.info("Zarejestrowano codzienny job przypomnienia o wysyłce (20:00)")
+
+
+def register_telegram_cleanup_job(
+    scheduler: AsyncIOScheduler,
+    job_coroutine: Callable[[], Awaitable[None]],
+) -> None:
+    """
+    Rejestruje codzienny job czyszczenia czatu Telegram.
+
+    Uruchamiany o 02:00 czasu polskiego (Europe/Warsaw) - usuwa wszystkie
+    wcześniejsze wiadomości bota i publikuje ponownie aktualne zamówienia.
+
+    Args:
+        scheduler: Instancja schedulera zwrócona przez create_scheduler().
+        job_coroutine: Bezargumentowa korutyna do wywołania codziennie.
+    """
+    scheduler.add_job(
+        job_coroutine,
+        trigger="cron",
+        hour=2,
+        minute=0,
+        id="telegram_cleanup_job",
+        max_instances=1,
+        misfire_grace_time=1800,
+    )
+    logger.info("Zarejestrowano codzienny job czyszczenia czatu Telegram (02:00)")

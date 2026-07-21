@@ -189,7 +189,25 @@ Najważniejsze komendy:
 
 Oferty marketplace są dopasowywane do produktów magazynowych po
 mapowaniu `/stock link` (obsługa zestawów wieloskładnikowych), a gdy go
-brak - po SKU równym identyfikatorowi produktu z oferty.
+brak - po SKU równym identyfikatorowi produktu z oferty. Odejmowanie
+składników zestawu jest w pełni transakcyjne (savepoint) - błąd przy
+którymkolwiek składniku wycofuje całą operację.
+
+## Automatyzacje
+
+TOOM wykonuje kilka zadań automatycznie, opartych na etapie realizacji
+zamówienia (`fulfillment_status` z Allegro: NEW → PROCESSING → SENT):
+
+- **SMS o pakowaniu** - gdy zamówienie wchodzi w etap pakowania
+  (PROCESSING), klient otrzymuje jednorazowy SMS. Domyślnie działa bramka
+  testowa (`SMS_PROVIDER=logging`) logująca treść; realnego operatora
+  podłącza się nową implementacją `SmsProvider`.
+- **Przypomnienie o wysyłce (20:00)** - jeśli któreś z dzisiejszych
+  zamówień nie zostało jeszcze wysłane, bot wysyła listę do spakowania.
+  Gdy wszystko wysłane (lub brak zamówień) - nie wysyła nic.
+- **Nocne czyszczenie czatu (02:00)** - usuwa wszystkie wcześniejsze
+  wiadomości bota i publikuje ponownie wyłącznie aktualne (nowe/pakowane)
+  zamówienia, aby rano czat pokazywał tylko to, co wymaga obsługi.
 
 ## Status projektu
 

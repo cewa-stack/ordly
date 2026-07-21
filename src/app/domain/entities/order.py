@@ -19,6 +19,12 @@ class Order:
     (np. numer zamówienia Allegro) - w połączeniu z `marketplace`
     tworzy unikalny klucz biznesowy, odzwierciedlony przez
     unique constraint w OrderModel.
+
+    `fulfillment_status` to etap fizycznej realizacji zamówienia
+    (nowe -> pakowane -> wysłane), niezależny od `status` (płatność).
+    To on zmienia się w miarę pakowania i nadawania paczki - dlatego
+    opierają się na nim przypomnienia o wysyłce i SMS o pakowaniu.
+    Może być None dla zamówień pobranych przed wdrożeniem tej funkcji.
     """
 
     external_id: str
@@ -29,6 +35,7 @@ class Order:
     currency: str
     status: str
     order_date: datetime
+    fulfillment_status: str | None = None
     products_summary: str = field(init=False)
 
     def __post_init__(self) -> None:

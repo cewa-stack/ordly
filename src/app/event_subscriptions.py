@@ -16,6 +16,7 @@ from app.core.event_bus.events import (
     NotificationSent,
     OrderCancelled,
     OrderCreated,
+    OrderPackingStarted,
     OrderReturnCreated,
     SyncFinished,
     SyncStarted,
@@ -108,8 +109,13 @@ def register_event_subscriptions(container: Container) -> None:
             )
 
             try:
-                stock_sync = container.stock_sync_service(session)
-                stock_outcome = await stock_sync.process_order_created(order)
+                # Savepoint gwarantuje atomowość odejmowania komponentów:
+                # błąd przy którymkolwiek składniku wycofuje całą operację
+                # (znacznik + wszystkie zmiany stanów), umożliwiając ponowną
+                # próbę przy następnej synchronizacji.
+                async with session.begin_nested():
+                    stock_sync = container.stock_sync_service(session)
+                    stock_outcome = await stock_sync.process_order_created(order)
                 if stock_outcome.processed:
                     await _record_stock_sync(event_repository, stock_outcome)
             except Exception:
@@ -152,8 +158,9 @@ def register_event_subscriptions(container: Container) -> None:
             )
 
             try:
-                stock_sync = container.stock_sync_service(session)
-                stock_outcome = await stock_sync.process_order_cancelled(order)
+                async with session.begin_nested():
+                    stock_sync = container.stock_sync_service(session)
+                    stock_outcome = await stock_sync.process_order_cancelled(order)
                 if stock_outcome.processed:
                     await _record_stock_sync(event_repository, stock_outcome)
             except Exception:
@@ -194,8 +201,9 @@ def register_event_subscriptions(container: Container) -> None:
             )
 
             try:
-                stock_sync = container.stock_sync_service(session)
-                stock_outcome = await stock_sync.process_return(order_return)
+                async with session.begin_nested():
+                    stock_sync = container.stock_sync_service(session)
+                    stock_outcome = await stock_sync.process_return(order_return)
                 if stock_outcome.processed:
                     await _record_stock_sync(event_repository, stock_outcome)
             except Exception:
@@ -203,6 +211,28 @@ def register_event_subscriptions(container: Container) -> None:
                     "Przywracanie stanów po zwrocie {} nie powiodło się",
                     order_return.external_id,
                 )
+
+    async def handle_order_packing_started(event: OrderPackingStarted) -> None:
+        """
+        Po wykryciu rozpoczęcia pakowania zamówienia: wysyła SMS do klienta
+        (przez SmsService, z gwarancją jednorazowości) i zapisuje wynik
+        w audycie. Błąd bramki SMS nie przerywa dalszej obsługi.
+        """
+        order = event.order
+        async with container.session_scope() as session:
+            sms_service = container.sms_service(session)
+            outcome = await sms_service.send_packing_started(order)
+
+            event_repository = SqliteEventRepository(session)
+            await event_repository.record(
+                event_type="OrderPackingStarted",
+                level="INFO",
+                payload={
+                    "external_id": order.external_id,
+                    "sms_sent": outcome.sent,
+                    "skipped_reason": outcome.skipped_reason,
+                },
+            )
 
     async def handle_low_stock_detected(event: LowStockDetected) -> None:
         """
@@ -264,6 +294,7 @@ def register_event_subscriptions(container: Container) -> None:
 
     container.event_bus.subscribe(OrderCreated, handle_order_created)
     container.event_bus.subscribe(OrderCancelled, handle_order_cancelled)
+    container.event_bus.subscribe(OrderPackingStarted, handle_order_packing_started)
     container.event_bus.subscribe(OrderReturnCreated, handle_order_return_created)
     container.event_bus.subscribe(LowStockDetected, handle_low_stock_detected)
     container.event_bus.subscribe(NotificationSent, handle_notification_sent)

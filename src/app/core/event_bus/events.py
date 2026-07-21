@@ -43,6 +43,16 @@ class OrderCancelled(DomainEvent):
 
 
 @dataclass(frozen=True, slots=True)
+class OrderPackingStarted(DomainEvent):
+    """
+    Emitowane, gdy status realizacji znanego zamówienia przeszedł na
+    etap pakowania (PROCESSING) - wyzwalacz SMS do klienta.
+    """
+
+    order: Order
+
+
+@dataclass(frozen=True, slots=True)
 class OrderReturnCreated(DomainEvent):
     """Emitowane, gdy synchronizacja wykryje nowy zwrot produktów z zamówienia."""
 

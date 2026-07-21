@@ -19,24 +19,34 @@ from app.core.config import Settings
 from app.core.event_bus.bus import EventBus
 from app.database.engine import create_engine, create_session_factory
 from app.domain.interfaces.marketplace_plugin import MarketplacePlugin
+from app.domain.interfaces.sms_provider import SmsProvider
 from app.infrastructure.plugins.allegro.config import AllegroConfig
 from app.infrastructure.plugins.allegro.plugin import AllegroPlugin
+from app.infrastructure.sms.logging_sms_provider import LoggingSmsProvider
 from app.infrastructure.telegram.telegram_notifier import TelegramNotifier
 from app.repositories.sqlite_event_repository import SqliteEventRepository
 from app.repositories.sqlite_inventory_repository import SqliteInventoryRepository
 from app.repositories.sqlite_order_repository import SqliteOrderRepository
 from app.repositories.sqlite_return_repository import SqliteReturnRepository
 from app.repositories.sqlite_shipment_repository import SqliteShipmentRepository
+from app.repositories.sqlite_sms_history_repository import SqliteSmsHistoryRepository
 from app.repositories.sqlite_stock_sync_repository import SqliteStockSyncRepository
+from app.repositories.sqlite_telegram_message_repository import (
+    SqliteTelegramMessageRepository,
+)
 from app.repositories.sqlite_token_store import SqliteTokenStore
 from app.services.backup_service import BackupService
+from app.services.component_resolver import ComponentResolver
 from app.services.events_service import EventsService
 from app.services.health_service import HealthService, SyncStatus
 from app.services.inventory_service import InventoryService
 from app.services.search_service import SearchService
+from app.services.shipping_reminder_service import ShippingReminderService
+from app.services.sms_service import SmsService
 from app.services.stats_service import StatsService
 from app.services.stock_sync_service import StockSyncService
 from app.services.sync_orders_service import SyncOrdersService
+from app.services.telegram_cleanup_service import TelegramCleanupService
 from app.services.tracking_service import TrackingService
 
 
@@ -149,9 +159,54 @@ class Container:
 
     def stock_sync_service(self, session: AsyncSession) -> StockSyncService:
         """Buduje StockSyncService dla automatycznej synchronizacji stanów."""
+        inventory_repository = SqliteInventoryRepository(session)
         return StockSyncService(
-            inventory_repository=SqliteInventoryRepository(session),
+            inventory_repository=inventory_repository,
             stock_sync_repository=SqliteStockSyncRepository(session),
+            component_resolver=ComponentResolver(inventory_repository),
+        )
+
+    def _build_sms_provider(self) -> SmsProvider:
+        """
+        Buduje bramkę SMS wskazaną w konfiguracji (SMS_PROVIDER).
+
+        Domyślnie 'logging' (tryb testowy). Kolejne bramki dodaje się tutaj,
+        rejestrując nową implementację SmsProvider - reszta systemu bez zmian.
+        """
+        provider_code = self._settings.sms.provider.lower()
+        if provider_code == "logging":
+            return LoggingSmsProvider(sender_name=self._settings.sms.sender_name)
+        raise ValueError(f"Nieobsługiwany dostawca SMS: {provider_code}")
+
+    def sms_service(self, session: AsyncSession) -> SmsService:
+        """Buduje SmsService dla subskrybenta zdarzenia OrderPackingStarted."""
+        return SmsService(
+            provider=self._build_sms_provider(),
+            history_repository=SqliteSmsHistoryRepository(session),
+        )
+
+    def shipping_reminder_service(
+        self, session: AsyncSession
+    ) -> ShippingReminderService:
+        """Buduje ShippingReminderService dla przypomnienia o 20:00."""
+        return ShippingReminderService(SqliteOrderRepository(session))
+
+    def telegram_message_repository(
+        self, session: AsyncSession
+    ) -> SqliteTelegramMessageRepository:
+        """Buduje repozytorium zapisanych wiadomości Telegram (nocne czyszczenie)."""
+        return SqliteTelegramMessageRepository(session)
+
+    def telegram_cleanup_service(
+        self, session: AsyncSession
+    ) -> TelegramCleanupService:
+        """Buduje TelegramCleanupService dla nocnego czyszczenia czatu (02:00)."""
+        return TelegramCleanupService(
+            bot=self._bot,
+            admin_chat_id=self._settings.telegram.admin_chat_id,
+            order_repository=SqliteOrderRepository(session),
+            message_repository=SqliteTelegramMessageRepository(session),
+            notifier=self.notifier(),
         )
 
     def notifier(self) -> TelegramNotifier:

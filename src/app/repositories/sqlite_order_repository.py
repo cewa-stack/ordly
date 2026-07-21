@@ -11,12 +11,19 @@ from sqlalchemy.orm import selectinload
 
 from app.database.models.order_model import OrderModel
 from app.database.models.product_model import ProductModel
+from app.database.models.shipment_model import ShipmentModel
 from app.domain.entities.customer import Customer
 from app.domain.entities.order import Order
 from app.domain.entities.product import Product
 from app.domain.exceptions.domain_exceptions import DuplicateOrderError
+from app.domain.fulfillment import (
+    ACTIVE_FULFILLMENT_STATUSES,
+    SHIPPED_FULFILLMENT_STATUSES,
+)
 from app.domain.interfaces.order_repository import OrderRepository
 from app.utils.time import utc_now
+
+_CANCELLED_STATUS = "CANCELLED"
 
 
 class SqliteOrderRepository(OrderRepository):
@@ -56,9 +63,11 @@ class SqliteOrderRepository(OrderRepository):
             external_id=order.external_id,
             buyer_login=order.buyer.login,
             buyer_email=order.buyer.email,
+            buyer_phone=order.buyer.phone_number,
             total_amount=order.total_amount,
             currency=order.currency,
             status=order.status,
+            fulfillment_status=order.fulfillment_status,
             order_date=order.order_date,
             raw_payload_json=None,
             products=[
@@ -94,6 +103,58 @@ class SqliteOrderRepository(OrderRepository):
         stmt = (
             select(OrderModel)
             .options(selectinload(OrderModel.products))
+            .order_by(OrderModel.order_date.desc())
+            .limit(limit)
+        )
+        result = await self._session.execute(stmt)
+        return [self._to_domain(m) for m in result.scalars().all()]
+
+    async def get_unshipped_since(self, since: datetime) -> list[Order]:
+        """
+        Zwraca niewysłane zamówienia utworzone od podanej daty.
+
+        Niewysłane = status realizacji nie jest SENT/PICKED_UP ORAZ brak
+        zapisanego numeru przewozowego. Zamówienia anulowane są pomijane.
+        Lewe złączenie z shipments pozwala wykryć numer przewozowy zapisany
+        wcześniej komendą /tracking (jedna przesyłka na zamówienie).
+        """
+        stmt = (
+            select(OrderModel)
+            .options(selectinload(OrderModel.products))
+            .outerjoin(ShipmentModel, ShipmentModel.order_id == OrderModel.id)
+            .where(
+                OrderModel.order_date >= since,
+                func.upper(OrderModel.status) != _CANCELLED_STATUS,
+                or_(
+                    OrderModel.fulfillment_status.is_(None),
+                    func.upper(OrderModel.fulfillment_status).not_in(
+                        list(SHIPPED_FULFILLMENT_STATUSES)
+                    ),
+                ),
+                ShipmentModel.tracking_number.is_(None),
+            )
+            .order_by(OrderModel.order_date.desc())
+        )
+        result = await self._session.execute(stmt)
+        return [self._to_domain(m) for m in result.scalars().all()]
+
+    async def get_active(self, limit: int) -> list[Order]:
+        """
+        Zwraca aktywne zamówienia (nowe lub pakowane), od najnowszego.
+
+        Filtr po statusie realizacji NEW/PROCESSING automatycznie pomija
+        zamówienia wysłane, anulowane oraz te bez znanego etapu realizacji
+        (fulfillment_status NULL nie należy do zbioru aktywnych).
+        """
+        stmt = (
+            select(OrderModel)
+            .options(selectinload(OrderModel.products))
+            .where(
+                func.upper(OrderModel.status) != _CANCELLED_STATUS,
+                func.upper(OrderModel.fulfillment_status).in_(
+                    list(ACTIVE_FULFILLMENT_STATUSES)
+                ),
+            )
             .order_by(OrderModel.order_date.desc())
             .limit(limit)
         )
@@ -157,6 +218,21 @@ class SqliteOrderRepository(OrderRepository):
         await self._session.execute(stmt)
         await self._session.flush()
 
+    async def update_fulfillment_status(
+        self, marketplace: str, external_id: str, fulfillment_status: str | None
+    ) -> None:
+        """Aktualizuje etap realizacji zamówienia wykryty podczas synchronizacji."""
+        stmt = (
+            update(OrderModel)
+            .where(
+                OrderModel.marketplace == marketplace,
+                OrderModel.external_id == external_id,
+            )
+            .values(fulfillment_status=fulfillment_status)
+        )
+        await self._session.execute(stmt)
+        await self._session.flush()
+
     async def mark_as_notified(self, marketplace: str, external_id: str) -> None:
         """Ustawia znacznik czasu wysłania powiadomienia dla danego zamówienia."""
         stmt = (
@@ -176,7 +252,11 @@ class SqliteOrderRepository(OrderRepository):
         return Order(
             external_id=model.external_id,
             marketplace=model.marketplace,
-            buyer=Customer(login=model.buyer_login, email=model.buyer_email),
+            buyer=Customer(
+                login=model.buyer_login,
+                email=model.buyer_email,
+                phone_number=model.buyer_phone,
+            ),
             products=[
                 Product(
                     external_id=p.external_product_id,
@@ -190,4 +270,5 @@ class SqliteOrderRepository(OrderRepository):
             currency=model.currency,
             status=model.status,
             order_date=model.order_date,
+            fulfillment_status=model.fulfillment_status,
         )

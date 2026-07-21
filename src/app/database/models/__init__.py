@@ -15,7 +15,9 @@ from app.database.models.product_model import ProductModel
 from app.database.models.return_model import ReturnModel
 from app.database.models.settings_model import SettingsModel
 from app.database.models.shipment_model import ShipmentModel
+from app.database.models.sms_message_model import SmsMessageModel
 from app.database.models.stock_sync_model import StockSyncModel
+from app.database.models.telegram_message_model import TelegramMessageModel
 from app.database.models.token_model import TokenModel
 
 __all__ = [
@@ -28,6 +30,8 @@ __all__ = [
     "ReturnModel",
     "SettingsModel",
     "ShipmentModel",
+    "SmsMessageModel",
     "StockSyncModel",
+    "TelegramMessageModel",
     "TokenModel",
 ]

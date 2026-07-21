@@ -38,6 +38,7 @@ class SyncResult:
     new_orders: tuple[Order, ...] = field(default=())
     cancelled_orders: tuple[Order, ...] = field(default=())
     new_returns: tuple[OrderReturn, ...] = field(default=())
+    packing_started_orders: tuple[Order, ...] = field(default=())
 
 
 @dataclass(frozen=True, slots=True)

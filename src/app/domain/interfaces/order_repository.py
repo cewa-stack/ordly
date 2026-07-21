@@ -43,6 +43,31 @@ class OrderRepository(ABC):
         raise NotImplementedError
 
     @abstractmethod
+    async def get_unshipped_since(self, since: datetime) -> list[Order]:
+        """
+        Zwraca zamówienia utworzone od podanej daty, które nie zostały
+        jeszcze wysłane.
+
+        Zamówienie uznaje się za wysłane, gdy jego status realizacji to
+        SENT/PICKED_UP lub gdy ma zapisany numer przewozowy. Zamówienia
+        anulowane są pomijane - nie wymagają wysyłki. Używane przez
+        przypomnienie o niewysłanych zamówieniach (20:00).
+        """
+        raise NotImplementedError
+
+    @abstractmethod
+    async def get_active(self, limit: int) -> list[Order]:
+        """
+        Zwraca aktywne zamówienia (nowe lub w trakcie pakowania),
+        posortowane od najnowszego.
+
+        Pomija zamówienia wysłane, anulowane i zwrócone. Używane przez
+        nocne czyszczenie czatu (02:00) do ponownej publikacji wyłącznie
+        aktualnych zamówień.
+        """
+        raise NotImplementedError
+
+    @abstractmethod
     async def search(self, query: str) -> list[Order]:
         """Wyszukuje zamówienia po numerze, kupującym lub nazwie produktu."""
         raise NotImplementedError
@@ -71,6 +96,18 @@ class OrderRepository(ABC):
 
         Wywoływane przez synchronizację, gdy marketplace zwróci inny
         status niż zapisany w bazie (np. anulowanie zamówienia).
+        """
+        raise NotImplementedError
+
+    @abstractmethod
+    async def update_fulfillment_status(
+        self, marketplace: str, external_id: str, fulfillment_status: str | None
+    ) -> None:
+        """
+        Aktualizuje status realizacji (fulfillment) istniejącego zamówienia.
+
+        Wywoływane przez synchronizację, gdy Allegro zwróci inny etap
+        realizacji niż zapisany w bazie (np. NEW -> PROCESSING -> SENT).
         """
         raise NotImplementedError
 

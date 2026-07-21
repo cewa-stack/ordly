@@ -8,6 +8,7 @@ from app.core.event_bus.bus import EventBus
 from app.core.event_bus.events import (
     OrderCancelled,
     OrderCreated,
+    OrderPackingStarted,
     OrderReturnCreated,
 )
 from app.domain.exceptions.domain_exceptions import MarketplaceUnavailableError
@@ -155,6 +156,87 @@ class TestSyncOrderCancellation:
         result = await service.sync_new_orders()
 
         assert result.cancelled_orders == ()
+
+
+class TestSyncPackingStarted:
+    """Testy wykrywania rozpoczęcia pakowania (zmiana etapu realizacji)."""
+
+    @pytest.mark.asyncio
+    async def test_przejscie_na_processing_emituje_packing_started(
+        self, fake_marketplace_plugin, fake_order_repository, sample_order
+    ):
+        """Zmiana fulfillment_status NEW -> PROCESSING powinna wyemitować zdarzenie."""
+        from dataclasses import replace
+
+        await fake_order_repository.save(
+            replace(sample_order, fulfillment_status="NEW")
+        )
+        processing = replace(sample_order, fulfillment_status="PROCESSING")
+        fake_marketplace_plugin.orders_to_return = [processing]
+        event_bus = EventBus()
+        received: list[OrderPackingStarted] = []
+
+        async def capture(event: OrderPackingStarted) -> None:
+            received.append(event)
+
+        event_bus.subscribe(OrderPackingStarted, capture)
+
+        service = SyncOrdersService(
+            fake_marketplace_plugin, fake_order_repository, event_bus
+        )
+        result = await service.sync_new_orders()
+        await service.publish_sync_events(result)
+
+        assert result.packing_started_orders == (processing,)
+        assert len(received) == 1
+        stored = await fake_order_repository.get_by_external_id(
+            sample_order.external_id
+        )
+        assert stored is not None and stored.fulfillment_status == "PROCESSING"
+
+    @pytest.mark.asyncio
+    async def test_przejscie_na_sent_nie_emituje_packing_started(
+        self, fake_marketplace_plugin, fake_order_repository, sample_order
+    ):
+        """Zmiana etapu na SENT aktualizuje bazę, ale nie wyzwala SMS o pakowaniu."""
+        from dataclasses import replace
+
+        await fake_order_repository.save(
+            replace(sample_order, fulfillment_status="NEW")
+        )
+        sent = replace(sample_order, fulfillment_status="SENT")
+        fake_marketplace_plugin.orders_to_return = [sent]
+        event_bus = EventBus()
+
+        service = SyncOrdersService(
+            fake_marketplace_plugin, fake_order_repository, event_bus
+        )
+        result = await service.sync_new_orders()
+
+        assert result.packing_started_orders == ()
+        stored = await fake_order_repository.get_by_external_id(
+            sample_order.external_id
+        )
+        assert stored is not None and stored.fulfillment_status == "SENT"
+
+    @pytest.mark.asyncio
+    async def test_nowe_zamowienie_nie_emituje_packing_started(
+        self, fake_marketplace_plugin, fake_order_repository, sample_order
+    ):
+        """Nowe zamówienie (nawet w PROCESSING) nie wyzwala SMS o pakowaniu."""
+        from dataclasses import replace
+
+        new_processing = replace(sample_order, fulfillment_status="PROCESSING")
+        fake_marketplace_plugin.orders_to_return = [new_processing]
+        event_bus = EventBus()
+
+        service = SyncOrdersService(
+            fake_marketplace_plugin, fake_order_repository, event_bus
+        )
+        result = await service.sync_new_orders()
+
+        assert result.new_orders_count == 1
+        assert result.packing_started_orders == ()
 
 
 class TestSyncCustomerReturns:

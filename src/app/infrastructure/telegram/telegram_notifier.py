@@ -8,6 +8,7 @@ from loguru import logger
 from app.domain.entities.order import Order
 from app.domain.entities.order_return import OrderReturn
 from app.domain.interfaces.notifier import Notifier
+from app.shared.dto.reminder_dto import ShippingReminderData
 
 
 class TelegramNotifier(Notifier):
@@ -92,6 +93,46 @@ class TelegramNotifier(Notifier):
             "Produkt dodano do listy zakupów.\n"
             "Rozważ zamówienie nowej dostawy."
         )
+        await self.send_text(text)
+
+    async def notify_shipping_reminder(self, data: ShippingReminderData) -> None:
+        """
+        Wysyła przypomnienie o zamówieniach wymagających dziś wysyłki.
+
+        Numery zamówień pochodzą z marketplace, więc są escapowane
+        (parse_mode=HTML).
+        """
+        listed = data.unshipped_orders[:20]
+        lines = "\n".join(
+            f"• Zamówienie {html.quote(order.external_id)}" for order in listed
+        )
+        more = ""
+        if data.unshipped_count > len(listed):
+            more = f"\n… oraz {data.unshipped_count - len(listed)} więcej"
+
+        text = (
+            "📦 <b>Dzisiejsze zamówienia wymagające wysyłki</b>\n\n"
+            f"Dzisiaj wpłynęło: {data.orders_today} zamówień\n"
+            f"Do wysłania pozostało: {data.unshipped_count}\n\n"
+            f"Lista:\n{lines}{more}\n\n"
+            "Przypomnienie:\n"
+            "Spakuj zamówienia i wygeneruj etykiety przewozowe."
+        )
+        await self.send_text(text)
+
+    async def notify_active_orders(self, orders: list[Order]) -> None:
+        """
+        Publikuje listę aktualnych zamówień po nocnym czyszczeniu czatu.
+
+        Numery zamówień i loginy kupujących pochodzą z marketplace, więc
+        są escapowane (parse_mode=HTML).
+        """
+        lines = "\n".join(
+            f"• Zamówienie {html.quote(order.external_id)} — "
+            f"{html.quote(order.buyer.login)}"
+            for order in orders
+        )
+        text = f"📦 <b>Nowe zamówienia</b>\n\n{lines}"
         await self.send_text(text)
 
     async def send_text(self, text: str) -> None:

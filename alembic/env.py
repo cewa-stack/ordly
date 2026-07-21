@@ -21,7 +21,9 @@ from app.database.models import (  # noqa: F401 - import wymagany dla autogenera
     ReturnModel,
     SettingsModel,
     ShipmentModel,
+    SmsMessageModel,
     StockSyncModel,
+    TelegramMessageModel,
     TokenModel,
 )
 

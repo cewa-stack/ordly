@@ -52,16 +52,21 @@ from app.bot.handlers import (
 )
 from app.bot.middlewares.auth_middleware import AdminOnlyMiddleware
 from app.bot.middlewares.di_middleware import ContainerMiddleware
+from app.bot.middlewares.message_tracking_middleware import MessageTrackingMiddleware
 from app.container import Container
 from app.core.config import get_settings
 from app.core.logging import configure_logging
 from app.event_subscriptions import register_event_subscriptions
 from app.scheduler.jobs.backup_job import run_backup_job
+from app.scheduler.jobs.shipping_reminder_job import run_shipping_reminder_job
 from app.scheduler.jobs.sync_orders_job import run_sync_orders_job
+from app.scheduler.jobs.telegram_cleanup_job import run_telegram_cleanup_job
 from app.scheduler.scheduler_setup import (
     create_scheduler,
     register_backup_job,
+    register_shipping_reminder_job,
     register_sync_orders_job,
+    register_telegram_cleanup_job,
 )
 
 
@@ -111,6 +116,12 @@ async def _run_application() -> None:
     dispatcher.update.middleware(AdminOnlyMiddleware(settings.telegram.admin_chat_id))
     dispatcher.update.middleware(ContainerMiddleware(container))
 
+    # Middleware sesji bota rejestruje ID każdej wysłanej wiadomości -
+    # niezbędne dla nocnego czyszczenia czatu (02:00).
+    bot.session.middleware(
+        MessageTrackingMiddleware(container, settings.telegram.admin_chat_id)
+    )
+
     scheduler = create_scheduler()
 
     async def scheduled_sync_job() -> None:
@@ -128,12 +139,29 @@ async def _run_application() -> None:
             build_backup_service=container.backup_service,
         )
 
+    async def scheduled_shipping_reminder_job() -> None:
+        """Wrapper przypomnienia o niewysłanych zamówieniach (20:00)."""
+        await run_shipping_reminder_job(
+            session_scope_factory=container.session_scope,
+            build_reminder_service=container.shipping_reminder_service,
+            notifier=container.notifier(),
+        )
+
+    async def scheduled_telegram_cleanup_job() -> None:
+        """Wrapper nocnego czyszczenia czatu Telegram (02:00)."""
+        await run_telegram_cleanup_job(
+            session_scope_factory=container.session_scope,
+            build_cleanup_service=container.telegram_cleanup_service,
+        )
+
     register_sync_orders_job(
         scheduler,
         scheduled_sync_job,
         interval_seconds=settings.scheduler.sync_orders_interval_seconds,
     )
     register_backup_job(scheduler, scheduled_backup_job)
+    register_shipping_reminder_job(scheduler, scheduled_shipping_reminder_job)
+    register_telegram_cleanup_job(scheduler, scheduled_telegram_cleanup_job)
 
     fastapi_app = _create_fastapi_app(container)
     uvicorn_config = uvicorn.Config(

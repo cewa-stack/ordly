@@ -13,6 +13,11 @@ from typing import TYPE_CHECKING, Any
 from aiogram import BaseMiddleware
 from aiogram.types import TelegramObject
 
+from app.bot.middlewares.session_context import (
+    reset_current_session,
+    set_current_session,
+)
+
 if TYPE_CHECKING:
     from app.container import Container
 
@@ -29,8 +34,18 @@ class ContainerMiddleware(BaseMiddleware):
         event: TelegramObject,
         data: dict[str, Any],
     ) -> Any:
-        """Otwiera sesję na czas obsługi jednej aktualizacji Telegram."""
+        """
+        Otwiera sesję na czas obsługi jednej aktualizacji Telegram.
+
+        Sesja jest też udostępniana przez ContextVar, aby middleware sesji
+        bota mógł zapisać ID odpowiedzi w tej samej transakcji (bez rywalizacji
+        o blokadę zapisu SQLite z sesją handlera).
+        """
         data["container"] = self._container
         async with self._container.session_scope() as session:
             data["session"] = session
-            return await handler(event, data)
+            token = set_current_session(session)
+            try:
+                return await handler(event, data)
+            finally:
+                reset_current_session(token)

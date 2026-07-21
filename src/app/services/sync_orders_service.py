@@ -16,12 +16,15 @@ aktualizacją niewidocznych jeszcze wierszy.
 
 from __future__ import annotations
 
+from dataclasses import dataclass
+
 from loguru import logger
 
 from app.core.event_bus.bus import EventBus
 from app.core.event_bus.events import (
     OrderCancelled,
     OrderCreated,
+    OrderPackingStarted,
     OrderReturnCreated,
     SyncFinished,
     SyncStarted,
@@ -34,6 +37,7 @@ from app.domain.exceptions.domain_exceptions import (
     MarketplaceUnavailableError,
     OrderNotFoundError,
 )
+from app.domain.fulfillment import is_packing_started
 from app.domain.interfaces.marketplace_plugin import MarketplacePlugin
 from app.domain.interfaces.order_repository import OrderRepository
 from app.domain.interfaces.return_repository import ReturnRepository
@@ -42,6 +46,14 @@ from app.shared.dto.stats_dto import SyncResult
 from app.utils.time import utc_now
 
 _CANCELLED_STATUS = "CANCELLED"
+
+
+@dataclass(frozen=True, slots=True)
+class _ExistingOrderChange:
+    """Wynik porównania znanego zamówienia ze stanem zwróconym przez marketplace."""
+
+    cancelled: bool = False
+    packing_started: bool = False
 
 
 class SyncOrdersService:
@@ -94,14 +106,17 @@ class SyncOrdersService:
 
         new_orders: list[Order] = []
         cancelled_orders: list[Order] = []
+        packing_started_orders: list[Order] = []
         for order in orders:
             already_exists = await self._order_repository.exists(
                 order.marketplace, order.external_id
             )
             if already_exists:
-                cancelled = await self._sync_existing_order_status(order)
-                if cancelled:
+                change = await self._sync_existing_order_status(order)
+                if change.cancelled:
                     cancelled_orders.append(order)
+                if change.packing_started:
+                    packing_started_orders.append(order)
                 continue
 
             try:
@@ -124,35 +139,59 @@ class SyncOrdersService:
             new_orders=tuple(new_orders),
             cancelled_orders=tuple(cancelled_orders),
             new_returns=tuple(new_returns),
+            packing_started_orders=tuple(packing_started_orders),
         )
 
-    async def _sync_existing_order_status(self, order: Order) -> bool:
+    async def _sync_existing_order_status(self, order: Order) -> _ExistingOrderChange:
         """
-        Porównuje status znanego zamówienia z bazą i utrwala zmianę.
+        Porównuje znane zamówienie ze stanem z marketplace i utrwala zmiany.
+
+        Śledzi dwa niezależne wymiary: status płatności (`status`,
+        wykrywa anulowanie) oraz etap realizacji (`fulfillment_status`,
+        wykrywa rozpoczęcie pakowania). Oba są utrwalane osobno.
 
         Returns:
-            True, jeśli zamówienie właśnie przeszło na status anulowany
-            (i należy o tym powiadomić), False w pozostałych przypadkach.
+            Flagi mówiące, czy zamówienie właśnie zostało anulowane
+            oraz czy właśnie weszło w etap pakowania.
         """
         stored = await self._order_repository.get_by_external_id(order.external_id)
-        if stored is None or stored.status == order.status:
-            return False
+        if stored is None:
+            return _ExistingOrderChange()
 
-        await self._order_repository.update_status(
-            order.marketplace, order.external_id, order.status
-        )
-        logger.info(
-            "Zamówienie {} zmieniło status: {} -> {}",
-            order.external_id,
-            stored.status,
-            order.status,
-        )
+        cancelled = False
+        if stored.status != order.status:
+            await self._order_repository.update_status(
+                order.marketplace, order.external_id, order.status
+            )
+            logger.info(
+                "Zamówienie {} zmieniło status: {} -> {}",
+                order.external_id,
+                stored.status,
+                order.status,
+            )
+            cancelled = (
+                order.status.upper() == _CANCELLED_STATUS
+                and stored.status.upper() != _CANCELLED_STATUS
+            )
 
-        just_cancelled = (
-            order.status.upper() == _CANCELLED_STATUS
-            and stored.status.upper() != _CANCELLED_STATUS
+        packing_started = False
+        if stored.fulfillment_status != order.fulfillment_status:
+            await self._order_repository.update_fulfillment_status(
+                order.marketplace, order.external_id, order.fulfillment_status
+            )
+            logger.info(
+                "Zamówienie {} zmieniło etap realizacji: {} -> {}",
+                order.external_id,
+                stored.fulfillment_status,
+                order.fulfillment_status,
+            )
+            packing_started = is_packing_started(
+                stored.fulfillment_status, order.fulfillment_status
+            )
+
+        return _ExistingOrderChange(
+            cancelled=cancelled, packing_started=packing_started
         )
-        return just_cancelled
 
     async def _sync_customer_returns(self) -> list[OrderReturn]:
         """
@@ -217,6 +256,11 @@ class SyncOrdersService:
         for order in result.cancelled_orders:
             await self._event_bus.publish(
                 OrderCancelled(occurred_at=utc_now(), order=order)
+            )
+
+        for order in result.packing_started_orders:
+            await self._event_bus.publish(
+                OrderPackingStarted(occurred_at=utc_now(), order=order)
             )
 
         for order_return in result.new_returns:

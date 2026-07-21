@@ -6,6 +6,7 @@ from abc import ABC, abstractmethod
 
 from app.domain.entities.order import Order
 from app.domain.entities.order_return import OrderReturn
+from app.shared.dto.reminder_dto import ShippingReminderData
 
 
 class Notifier(ABC):
@@ -37,6 +38,19 @@ class Notifier(ABC):
         self, name: str, sku: str, stock: int, min_stock: int
     ) -> None:
         """Wysyła ostrzeżenie o osiągnięciu minimalnego stanu magazynowego."""
+        raise NotImplementedError
+
+    @abstractmethod
+    async def notify_shipping_reminder(self, data: ShippingReminderData) -> None:
+        """Wysyła przypomnienie o zamówieniach wymagających dziś wysyłki (20:00)."""
+        raise NotImplementedError
+
+    @abstractmethod
+    async def notify_active_orders(self, orders: list[Order]) -> None:
+        """
+        Publikuje listę aktualnych (nowych/pakowanych) zamówień po nocnym
+        czyszczeniu czatu (02:00).
+        """
         raise NotImplementedError
 
     @abstractmethod

@@ -35,9 +35,13 @@ class OrderModel(Base, TimestampMixin):
     external_id: Mapped[str] = mapped_column(String(100), nullable=False, index=True)
     buyer_login: Mapped[str] = mapped_column(String(255), nullable=False)
     buyer_email: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    buyer_phone: Mapped[str | None] = mapped_column(String(50), nullable=True)
     total_amount: Mapped[Decimal] = mapped_column(nullable=False)
     currency: Mapped[str] = mapped_column(String(3), default="PLN", nullable=False)
     status: Mapped[str] = mapped_column(String(50), nullable=False)
+    fulfillment_status: Mapped[str | None] = mapped_column(
+        String(50), nullable=True, index=True
+    )
     order_date: Mapped[datetime] = mapped_column(nullable=False)
     notified_at: Mapped[datetime | None] = mapped_column(nullable=True, index=True)
     raw_payload_json: Mapped[str | None] = mapped_column(nullable=True)

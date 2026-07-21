@@ -54,6 +54,9 @@ def map_checkout_form_to_order(raw: dict[str, Any]) -> Order:
 
     total_raw = raw.get("summary", {}).get("totalToPay", {})
 
+    fulfillment_raw = raw.get("fulfillment") or {}
+    fulfillment_status = fulfillment_raw.get("status")
+
     return Order(
         external_id=raw["id"],
         marketplace="allegro",
@@ -63,6 +66,7 @@ def map_checkout_form_to_order(raw: dict[str, Any]) -> Order:
         currency=total_raw.get("currency", "PLN"),
         status=raw.get("status", "UNKNOWN"),
         order_date=_parse_datetime(raw.get("updatedAt") or raw.get("boughtAt")),
+        fulfillment_status=fulfillment_status,
     )
 
 

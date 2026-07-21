@@ -6,6 +6,10 @@ from dataclasses import replace
 from datetime import datetime
 
 from app.domain.entities.order import Order
+from app.domain.fulfillment import (
+    ACTIVE_FULFILLMENT_STATUSES,
+    SHIPPED_FULFILLMENT_STATUSES,
+)
 from app.domain.interfaces.order_repository import OrderRepository
 
 
@@ -36,6 +40,29 @@ class FakeOrderRepository(OrderRepository):
     async def get_recent(self, limit: int) -> list[Order]:
         return sorted(self._orders, key=lambda o: o.order_date, reverse=True)[:limit]
 
+    async def get_unshipped_since(self, since: datetime) -> list[Order]:
+        unshipped = [
+            o
+            for o in self._orders
+            if o.order_date >= since
+            and o.status.upper() != "CANCELLED"
+            and (
+                o.fulfillment_status is None
+                or o.fulfillment_status.upper() not in SHIPPED_FULFILLMENT_STATUSES
+            )
+        ]
+        return sorted(unshipped, key=lambda o: o.order_date, reverse=True)
+
+    async def get_active(self, limit: int) -> list[Order]:
+        active = [
+            o
+            for o in self._orders
+            if o.status.upper() != "CANCELLED"
+            and o.fulfillment_status is not None
+            and o.fulfillment_status.upper() in ACTIVE_FULFILLMENT_STATUSES
+        ]
+        return sorted(active, key=lambda o: o.order_date, reverse=True)[:limit]
+
     async def search(self, query: str) -> list[Order]:
         query_lower = query.lower()
         return [
@@ -60,6 +87,16 @@ class FakeOrderRepository(OrderRepository):
     ) -> None:
         self._orders = [
             replace(o, status=status)
+            if o.marketplace == marketplace and o.external_id == external_id
+            else o
+            for o in self._orders
+        ]
+
+    async def update_fulfillment_status(
+        self, marketplace: str, external_id: str, fulfillment_status: str | None
+    ) -> None:
+        self._orders = [
+            replace(o, fulfillment_status=fulfillment_status)
             if o.marketplace == marketplace and o.external_id == external_id
             else o
             for o in self._orders

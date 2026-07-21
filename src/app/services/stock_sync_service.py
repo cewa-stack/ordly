@@ -32,6 +32,7 @@ from app.domain.entities.order_return import OrderReturn
 from app.domain.entities.product import Product
 from app.domain.interfaces.inventory_repository import InventoryRepository
 from app.domain.interfaces.stock_sync_repository import StockSyncRepository
+from app.services.component_resolver import ComponentResolver
 from app.shared.dto.inventory_dto import StockSyncOutcome
 from app.utils.time import utc_now
 
@@ -47,15 +48,19 @@ class StockSyncService:
         self,
         inventory_repository: InventoryRepository,
         stock_sync_repository: StockSyncRepository,
+        component_resolver: ComponentResolver | None = None,
     ) -> None:
         """
         Args:
             inventory_repository: Repozytorium centralnego magazynu.
             stock_sync_repository: Rejestr znaczników synchronizacji
                 (ochrona przed podwójnym odjęciem).
+            component_resolver: Resolver składników oferty. Gdy None, tworzony
+                jest domyślny na bazie inventory_repository.
         """
         self._inventory = inventory_repository
         self._sync_markers = stock_sync_repository
+        self._resolver = component_resolver or ComponentResolver(inventory_repository)
 
     async def process_order_created(self, order: Order) -> StockSyncOutcome:
         """
@@ -197,7 +202,7 @@ class StockSyncService:
         unmatched: list[str] = []
 
         for product in products:
-            components = await self._resolve_components(marketplace, product)
+            components = await self._resolver.resolve(marketplace, product)
             if not components:
                 logger.warning(
                     "Brak mapowania magazynowego dla produktu '{}' ({}) - pomijam",
@@ -222,27 +227,6 @@ class StockSyncService:
                     low_stock.append(updated)
 
         return low_stock, unmatched
-
-    async def _resolve_components(
-        self, marketplace: str, product: Product
-    ) -> list[OfferComponent]:
-        """
-        Mapuje produkt z zamówienia na składniki magazynowe.
-
-        Kolejność: jawne mapowanie offer_links (obsługuje zestawy),
-        a gdy go brak - dopasowanie SKU równego identyfikatorowi
-        produktu z marketplace.
-        """
-        links = await self._inventory.get_offer_links(
-            marketplace, product.external_id
-        )
-        if links:
-            return links
-
-        item = await self._inventory.get_by_sku(product.external_id)
-        if item is not None:
-            return [OfferComponent(sku=item.sku, quantity=1)]
-        return []
 
     async def _apply_component_change(
         self,

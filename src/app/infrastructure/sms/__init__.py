@@ -1,0 +1,1 @@
+"""Implementacje bramek SMS (infrastruktura)."""

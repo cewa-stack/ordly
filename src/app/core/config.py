@@ -195,6 +195,25 @@ class BackupSettings(BaseSettings):
         return value
 
 
+class SmsSettings(BaseSettings):
+    """
+    Konfiguracja bramki SMS wysyłającej powiadomienia do klientów.
+
+    Domyślnie aktywny jest dostawca 'logging' (tryb testowy) - loguje
+    treść SMS zamiast realnej wysyłki. Podpięcie realnego operatora
+    sprowadza się do nowej implementacji SmsProvider i zmiany SMS_PROVIDER.
+    """
+
+    model_config = SettingsConfigDict(
+        env_file=".env",
+        env_file_encoding="utf-8",
+        extra="ignore",
+    )
+
+    provider: str = Field(default="logging", alias="SMS_PROVIDER")
+    sender_name: str = Field(default="TOOM", alias="SMS_SENDER_NAME")
+
+
 class LoggingSettings(BaseSettings):
     """Konfiguracja logowania (Loguru)."""
 
@@ -234,6 +253,7 @@ class Settings:
         self.database = DatabaseSettings()
         self.scheduler = SchedulerSettings()
         self.backup = BackupSettings()
+        self.sms = SmsSettings()
         self.logging = LoggingSettings()
 
 
