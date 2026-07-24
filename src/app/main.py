@@ -16,8 +16,11 @@ from contextlib import suppress
 import uvicorn
 from aiogram import Dispatcher
 from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
 from loguru import logger
 
+from app.api.errors import register_exception_handlers
 from app.api.router import api_router
 from app.bot.bot_instance import create_bot, create_dispatcher
 from app.bot.handlers import (
@@ -54,7 +57,7 @@ from app.bot.middlewares.auth_middleware import AdminOnlyMiddleware
 from app.bot.middlewares.di_middleware import ContainerMiddleware
 from app.bot.middlewares.message_tracking_middleware import MessageTrackingMiddleware
 from app.container import Container
-from app.core.config import get_settings
+from app.core.config import Settings, get_settings
 from app.core.logging import configure_logging
 from app.event_subscriptions import register_event_subscriptions
 from app.scheduler.jobs.backup_job import run_backup_job
@@ -87,11 +90,45 @@ def _register_bot_routers(dispatcher: Dispatcher) -> None:
         dispatcher.include_router(module.router)
 
 
-def _create_fastapi_app(container: Container) -> FastAPI:
+def _create_fastapi_app(container: Container, settings: Settings) -> FastAPI:
     """Tworzy instancję FastAPI z podłączonym kontenerem DI w stanie aplikacji."""
     app = FastAPI(title="TOOM API", docs_url="/docs")
     app.state.container = container
+    # TOOM Mobile uruchomiony jako PWA w przeglądarce woła to API z innego
+    # originu (inny port niż backend) - bez CORS przeglądarka blokuje odczyt
+    # odpowiedzi dla każdego zapytania z nagłówkiem Authorization (preflight).
+    # Bezpieczeństwo i tak zapewnia token (require_api_token), nie CORS -
+    # to jest osobisty, jednoużytkownikowy serwer w sieci domowej/Tailscale,
+    # nigdy nie wystawiony publicznie (patrz docs/01_app.md §4), więc otwarty
+    # `allow_origins` tutaj nie jest realnym ryzykiem.
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=["*"],
+        allow_methods=["*"],
+        allow_headers=["*"],
+    )
     app.include_router(api_router)
+    register_exception_handlers(app)
+
+    # TOOM Mobile jako PWA - serwowane z tego samego procesu/portu co API,
+    # żeby na Raspberry Pi wystarczył jeden systemd service i jeden wpis
+    # `tailscale serve` (patrz docs/01_app.md §6.5). Mount MUSI być
+    # zarejestrowany PO api_router - to jedyny sposób, żeby ścieżki API
+    # miały pierwszeństwo, a StaticFiles("/") działał jako fallback dla
+    # reszty (HTML, JS bundli, manifest.json, sw.js). Brak konfiguracji
+    # (web_app_dist_path=None, domyślnie) = backend serwuje tylko API,
+    # tak jak dotychczas.
+    dist_path = settings.api.web_app_dist_path
+    if dist_path is not None:
+        if dist_path.is_dir():
+            app.mount("/", StaticFiles(directory=dist_path, html=True), name="webapp")
+            logger.info("TOOM Mobile (PWA) serwowany z {}", dist_path)
+        else:
+            logger.warning(
+                "WEB_APP_DIST_PATH={} nie istnieje - backend serwuje wyłącznie API",
+                dist_path,
+            )
+
     return app
 
 
@@ -163,9 +200,12 @@ async def _run_application() -> None:
     register_shipping_reminder_job(scheduler, scheduled_shipping_reminder_job)
     register_telegram_cleanup_job(scheduler, scheduled_telegram_cleanup_job)
 
-    fastapi_app = _create_fastapi_app(container)
+    fastapi_app = _create_fastapi_app(container, settings)
     uvicorn_config = uvicorn.Config(
-        fastapi_app, host="127.0.0.1", port=8000, log_config=None
+        fastapi_app,
+        host=settings.api.host,
+        port=settings.api.port,
+        log_config=None,
     )
     uvicorn_server = uvicorn.Server(uvicorn_config)
 

@@ -37,8 +37,9 @@ class FakeOrderRepository(OrderRepository):
     async def get_by_external_id(self, external_id: str) -> Order | None:
         return next((o for o in self._orders if o.external_id == external_id), None)
 
-    async def get_recent(self, limit: int) -> list[Order]:
-        return sorted(self._orders, key=lambda o: o.order_date, reverse=True)[:limit]
+    async def get_recent(self, limit: int, offset: int = 0) -> list[Order]:
+        ordered = sorted(self._orders, key=lambda o: o.order_date, reverse=True)
+        return ordered[offset : offset + limit]
 
     async def get_unshipped_since(self, since: datetime) -> list[Order]:
         unshipped = [
@@ -81,6 +82,15 @@ class FakeOrderRepository(OrderRepository):
 
     async def count_all(self) -> int:
         return len(self._orders)
+
+    async def sum_amount_by_day(self, since: datetime) -> dict[str, float]:
+        totals: dict[str, float] = {}
+        for order in self._orders:
+            if order.order_date < since:
+                continue
+            key = order.order_date.strftime("%Y-%m-%d")
+            totals[key] = totals.get(key, 0.0) + float(order.total_amount)
+        return totals
 
     async def update_status(
         self, marketplace: str, external_id: str, status: str

@@ -38,8 +38,15 @@ class OrderRepository(ABC):
         raise NotImplementedError
 
     @abstractmethod
-    async def get_recent(self, limit: int) -> list[Order]:
-        """Zwraca ostatnie zamówienia posortowane od najnowszego."""
+    async def get_recent(self, limit: int, offset: int = 0) -> list[Order]:
+        """
+        Zwraca ostatnie zamówienia posortowane od najnowszego.
+
+        Args:
+            limit: Maksymalna liczba zwróconych zamówień.
+            offset: Liczba najnowszych zamówień do pominięcia (paginacja
+                listy w aplikacji mobilnej - komenda Telegram jej nie używa).
+        """
         raise NotImplementedError
 
     @abstractmethod
@@ -85,6 +92,16 @@ class OrderRepository(ABC):
     @abstractmethod
     async def count_all(self) -> int:
         """Zwraca łączną liczbę zamówień w bazie."""
+        raise NotImplementedError
+
+    @abstractmethod
+    async def sum_amount_by_day(self, since: datetime) -> dict[str, float]:
+        """
+        Zwraca sumę kwot zamówień pogrupowaną po dniu (klucz: `YYYY-MM-DD`)
+        od podanej daty do teraz. Dni bez zamówień nie pojawiają się w
+        wyniku - wywołujący uzupełnia braki zerami (patrz `DashboardService`,
+        używane do sparkline'a sprzedaży na ekranie Start aplikacji mobilnej).
+        """
         raise NotImplementedError
 
     @abstractmethod

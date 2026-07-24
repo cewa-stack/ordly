@@ -12,6 +12,7 @@ from app.database.models.inventory_movement_model import InventoryMovementModel
 from app.database.models.offer_link_model import OfferLinkModel
 from app.database.models.order_model import OrderModel
 from app.database.models.product_model import ProductModel
+from app.database.models.push_subscription_model import PushSubscriptionModel
 from app.database.models.return_model import ReturnModel
 from app.database.models.settings_model import SettingsModel
 from app.database.models.shipment_model import ShipmentModel
@@ -27,6 +28,7 @@ __all__ = [
     "OfferLinkModel",
     "OrderModel",
     "ProductModel",
+    "PushSubscriptionModel",
     "ReturnModel",
     "SettingsModel",
     "ShipmentModel",

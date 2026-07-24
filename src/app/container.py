@@ -19,14 +19,20 @@ from app.core.config import Settings
 from app.core.event_bus.bus import EventBus
 from app.database.engine import create_engine, create_session_factory
 from app.domain.interfaces.marketplace_plugin import MarketplacePlugin
+from app.domain.interfaces.notifier import Notifier
 from app.domain.interfaces.sms_provider import SmsProvider
+from app.infrastructure.composite_notifier import CompositeNotifier
 from app.infrastructure.plugins.allegro.config import AllegroConfig
 from app.infrastructure.plugins.allegro.plugin import AllegroPlugin
 from app.infrastructure.sms.logging_sms_provider import LoggingSmsProvider
 from app.infrastructure.telegram.telegram_notifier import TelegramNotifier
+from app.infrastructure.webpush.web_push_notifier import WebPushNotifier
 from app.repositories.sqlite_event_repository import SqliteEventRepository
 from app.repositories.sqlite_inventory_repository import SqliteInventoryRepository
 from app.repositories.sqlite_order_repository import SqliteOrderRepository
+from app.repositories.sqlite_push_subscription_repository import (
+    SqlitePushSubscriptionRepository,
+)
 from app.repositories.sqlite_return_repository import SqliteReturnRepository
 from app.repositories.sqlite_shipment_repository import SqliteShipmentRepository
 from app.repositories.sqlite_sms_history_repository import SqliteSmsHistoryRepository
@@ -37,6 +43,7 @@ from app.repositories.sqlite_telegram_message_repository import (
 from app.repositories.sqlite_token_store import SqliteTokenStore
 from app.services.backup_service import BackupService
 from app.services.component_resolver import ComponentResolver
+from app.services.dashboard_service import DashboardService
 from app.services.events_service import EventsService
 from app.services.health_service import HealthService, SyncStatus
 from app.services.inventory_service import InventoryService
@@ -157,6 +164,13 @@ class Container:
         """Buduje InventoryService dla komend /stock."""
         return InventoryService(SqliteInventoryRepository(session))
 
+    def dashboard_service(self, session: AsyncSession) -> DashboardService:
+        """Buduje DashboardService dla ekranu Start aplikacji mobilnej."""
+        return DashboardService(
+            order_repository=SqliteOrderRepository(session),
+            inventory_repository=SqliteInventoryRepository(session),
+        )
+
     def stock_sync_service(self, session: AsyncSession) -> StockSyncService:
         """Buduje StockSyncService dla automatycznej synchronizacji stanów."""
         inventory_repository = SqliteInventoryRepository(session)
@@ -209,10 +223,52 @@ class Container:
             notifier=self.notifier(),
         )
 
-    def notifier(self) -> TelegramNotifier:
-        """Buduje TelegramNotifier (bot TOOM) używany przez subskrybenta OrderCreated."""
-        return TelegramNotifier(
-            bot=self._bot, admin_chat_id=self._settings.telegram.admin_chat_id
+    def notifier(self) -> Notifier:
+        """
+        Buduje kanały powiadomień jako jeden `CompositeNotifier`.
+
+        Telegram jest zawsze aktywny. Web Push dołącza się automatycznie,
+        gdy w `.env` ustawiono oba klucze VAPID (`web_push.enabled`) -
+        brak kluczy oznacza po prostu, że nikt jeszcze nie skonfigurował
+        tego drugiego kanału, więc pomijamy go zamiast wysyłać donikąd.
+        """
+        notifiers: list[Notifier] = [
+            TelegramNotifier(
+                bot=self._bot, admin_chat_id=self._settings.telegram.admin_chat_id
+            )
+        ]
+        if self._settings.web_push.enabled:
+            notifiers.append(
+                WebPushNotifier(
+                    session_scope_factory=self.session_scope,
+                    vapid_private_key=self._settings.web_push.vapid_private_key.get_secret_value(),
+                    vapid_claim_email=self._settings.web_push.vapid_claim_email,
+                )
+            )
+        return CompositeNotifier(notifiers)
+
+    def push_subscription_repository(
+        self, session: AsyncSession
+    ) -> SqlitePushSubscriptionRepository:
+        """Buduje repozytorium subskrypcji Web Push dla endpointów API."""
+        return SqlitePushSubscriptionRepository(session)
+
+    def web_push_status(self) -> tuple[str, bool]:
+        """Zwraca (klucz publiczny VAPID, czy Web Push jest skonfigurowany) dla API."""
+        return self._settings.web_push.vapid_public_key, self._settings.web_push.enabled
+
+    def web_push_notifier(self) -> WebPushNotifier | None:
+        """
+        Buduje samodzielny `WebPushNotifier` (bez Telegrama) do testowej
+        wysyłki z endpointu `/api/v1/push/test`. Zwraca `None`, gdy Web
+        Push nie jest skonfigurowany (brak kluczy VAPID w `.env`).
+        """
+        if not self._settings.web_push.enabled:
+            return None
+        return WebPushNotifier(
+            session_scope_factory=self.session_scope,
+            vapid_private_key=self._settings.web_push.vapid_private_key.get_secret_value(),
+            vapid_claim_email=self._settings.web_push.vapid_claim_email,
         )
 
     async def dispose(self) -> None:

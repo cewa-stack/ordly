@@ -98,12 +98,13 @@ class SqliteOrderRepository(OrderRepository):
         model = result.scalar_one_or_none()
         return self._to_domain(model) if model else None
 
-    async def get_recent(self, limit: int) -> list[Order]:
+    async def get_recent(self, limit: int, offset: int = 0) -> list[Order]:
         """Zwraca ostatnie zamówienia posortowane malejąco po dacie zamówienia."""
         stmt = (
             select(OrderModel)
             .options(selectinload(OrderModel.products))
             .order_by(OrderModel.order_date.desc())
+            .offset(offset)
             .limit(limit)
         )
         result = await self._session.execute(stmt)
@@ -202,6 +203,17 @@ class SqliteOrderRepository(OrderRepository):
         stmt = select(func.count()).select_from(OrderModel)
         result = await self._session.execute(stmt)
         return result.scalar_one() or 0
+
+    async def sum_amount_by_day(self, since: datetime) -> dict[str, float]:
+        """Sumuje kwoty zamówień pogrupowane po dniu (`func.date` - SQLite)."""
+        day = func.date(OrderModel.order_date)
+        stmt = (
+            select(day, func.coalesce(func.sum(OrderModel.total_amount), 0))
+            .where(OrderModel.order_date >= since)
+            .group_by(day)
+        )
+        result = await self._session.execute(stmt)
+        return {str(row[0]): float(row[1]) for row in result.all()}
 
     async def update_status(
         self, marketplace: str, external_id: str, status: str

@@ -214,6 +214,68 @@ class SmsSettings(BaseSettings):
     sender_name: str = Field(default="TOOM", alias="SMS_SENDER_NAME")
 
 
+class ApiSettings(BaseSettings):
+    """
+    Konfiguracja TOOM API - warstwy REST używanej przez aplikację mobilną
+    TOOM Mobile (obok istniejącego bota Telegram).
+
+    `host` domyślnie nasłuchuje na wszystkich interfejsach (0.0.0.0), a nie
+    tylko na loopback - inaczej telefon nie połączy się z API nawet przez
+    Tailscale. Bezpieczeństwo w tym modelu zapewnia sieć (Tailscale/LAN,
+    patrz docs/01_app.md §4) oraz `api_token`, nie ograniczenie do
+    loopback.
+
+    `web_app_dist_path`, gdy ustawiona, wskazuje folder ze zbudowaną
+    wersją TOOM Mobile (`npx expo export -p web` w `mobile/`) - backend
+    serwuje go pod `/`, żeby telefon mógł otworzyć całą aplikację z
+    tego samego adresu co API (jeden proces, jeden port, jeden wpis
+    `tailscale serve` - patrz docs/01_app.md §6.5). Brak wartości (domyślnie)
+    oznacza, że backend serwuje wyłącznie API - tak jak dotychczas.
+    """
+
+    model_config = SettingsConfigDict(
+        env_file=".env",
+        env_file_encoding="utf-8",
+        extra="ignore",
+    )
+
+    api_token: SecretStr = Field(..., alias="TOOM_API_TOKEN")
+    host: str = Field(default="0.0.0.0", alias="TOOM_API_HOST")  # noqa: S104
+    port: int = Field(default=8000, alias="TOOM_API_PORT")
+    web_app_dist_path: Path | None = Field(default=None, alias="WEB_APP_DIST_PATH")
+
+
+class WebPushSettings(BaseSettings):
+    """
+    Konfiguracja drugiego (opcjonalnego) kanału powiadomień - Web Push do
+    TOOM Mobile uruchomionego jako PWA na iPhonie (obok bota Telegram).
+
+    Klucze VAPID generuje się raz, poleceniem opisanym w
+    `docs/01_app.md` (sekcja Web Push) - `webpush_enabled=False` (brak
+    kluczy) oznacza, że `WebPushNotifier` nie robi nic, a jedynym kanałem
+    powiadomień pozostaje Telegram.
+    """
+
+    model_config = SettingsConfigDict(
+        env_file=".env",
+        env_file_encoding="utf-8",
+        extra="ignore",
+    )
+
+    vapid_public_key: str = Field(default="", alias="VAPID_PUBLIC_KEY")
+    vapid_private_key: SecretStr = Field(default=SecretStr(""), alias="VAPID_PRIVATE_KEY")
+    vapid_claim_email: str = Field(
+        default="mailto:admin@example.com", alias="VAPID_CLAIM_EMAIL"
+    )
+
+    @property
+    def enabled(self) -> bool:
+        """Web Push jest aktywny tylko, gdy oba klucze VAPID są ustawione."""
+        return bool(self.vapid_public_key) and bool(
+            self.vapid_private_key.get_secret_value()
+        )
+
+
 class LoggingSettings(BaseSettings):
     """Konfiguracja logowania (Loguru)."""
 
@@ -255,6 +317,8 @@ class Settings:
         self.backup = BackupSettings()
         self.sms = SmsSettings()
         self.logging = LoggingSettings()
+        self.api = ApiSettings()
+        self.web_push = WebPushSettings()
 
 
 @lru_cache

@@ -16,6 +16,7 @@ dependencies = [
     "apscheduler>=3.10.0",
     "loguru>=0.7.0",
     "cryptography>=43.0.0",
+    "pywebpush>=2.0.0",
 ]
 
 [tool.uv]
@@ -59,7 +60,7 @@ disallow_untyped_defs = true
 exclude = ["tests/", "alembic/"]
 
 [[tool.mypy.overrides]]
-module = ["aiogram.*", "apscheduler.*"]
+module = ["aiogram.*", "apscheduler.*", "pywebpush.*", "py_vapid.*"]
 ignore_missing_imports = true
 
 [build-system]

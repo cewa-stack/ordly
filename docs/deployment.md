@@ -50,6 +50,14 @@ sudo reboot
 Po restarcie: `sudo systemctl status toom` powinno
 pokazywać `active (running)` bez ręcznej interwencji.
 
+## TOOM Mobile (PWA) razem z backendem
+
+Żeby appka mobilna działała 24/7 bez trzymania komputera włączonego,
+backend potrafi serwować jej zbudowaną (statyczną) wersję z tego samego
+portu co API — pełna instrukcja: [01_app.md §6.5](01_app.md#65-wdrożenie-247-na-raspberry-pi-bez-zależności-od-komputera).
+Skrót: `npx expo export -p web` w `mobile/`, skopiuj `dist/` na Pi,
+ustaw `WEB_APP_DIST_PATH` w `.env`, zrestartuj usługę.
+
 ## Wdrożenie przez Docker (alternatywa)
 
 ```bash

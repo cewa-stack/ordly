@@ -43,6 +43,16 @@ class InventoryService:
         """Zwraca wszystkie produkty magazynowe (komenda /stock)."""
         return await self._repository.get_all()
 
+    async def get_item(self, sku: str) -> InventoryItem:
+        """
+        Zwraca pojedynczy produkt magazynowy po SKU (ekran szczegółów w
+        aplikacji mobilnej).
+
+        Raises:
+            InventoryItemNotFoundError: Gdy produkt nie istnieje.
+        """
+        return await self._require_item(sku)
+
     async def create_item(
         self, sku: str, name: str, min_stock: int = 0
     ) -> InventoryItem:

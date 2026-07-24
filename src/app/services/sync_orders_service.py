@@ -276,9 +276,9 @@ class SyncOrdersService:
             )
         )
 
-    async def get_recent_orders(self, limit: int) -> list[Order]:
+    async def get_recent_orders(self, limit: int, offset: int = 0) -> list[Order]:
         """Zwraca ostatnie zamówienia (delegacja do repozytorium, użyta przez /orders)."""
-        return await self._order_repository.get_recent(limit)
+        return await self._order_repository.get_recent(limit, offset)
 
     async def get_order_by_external_id(self, external_id: str) -> Order:
         """Zwraca zamówienie po numerze lub rzuca OrderNotFoundError."""

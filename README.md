@@ -209,6 +209,24 @@ zamówienia (`fulfillment_status` z Allegro: NEW → PROCESSING → SENT):
   wiadomości bota i publikuje ponownie wyłącznie aktualne (nowe/pakowane)
   zamówienia, aby rano czat pokazywał tylko to, co wymaga obsługi.
 
+## Aplikacja mobilna (TOOM Mobile)
+
+Telegram jest stopniowo zastępowany dedykowaną aplikacją mobilną. Backend
+zyskuje w tym celu pełne REST API (`/api/v1/...`, zabezpieczone tokenem
+`TOOM_API_TOKEN`) obok istniejącego bota. Plan projektu i system
+projektowy aplikacji:
+
+- [docs/01_app.md](docs/01_app.md) — zakres, architektura, kontrakt API, fazy.
+- [docs/02_appdesign.md](docs/02_appdesign.md) — kolory, typografia, komponenty.
+
+Kod aplikacji: [`../mobile/`](../mobile/) (osobny projekt Expo/TypeScript,
+poza tym repozytorium Python).
+
+Drugi, opcjonalny kanał powiadomień obok Telegrama: **Web Push** do TOOM
+Mobile uruchomionego jako PWA (za darmo, bez konta Apple Developer) -
+`WebPushNotifier` + `CompositeNotifier`, konfiguracja kluczy VAPID opisana
+w [docs/01_app.md](docs/01_app.md) §5a.
+
 ## Status projektu
 
-✅ W pełni funkcjonalny (Etapy 1-16 ukończone)
+✅ Backend (Etapy 1-16) w pełni funkcjonalny · 🚧 TOOM API + TOOM Mobile w budowie
