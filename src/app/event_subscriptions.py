@@ -2,7 +2,7 @@
 Rejestracja subskrybentów Event Busa - "co się dzieje po zdarzeniu X".
 
 Ten moduł jest jedynym miejscem spinającym zdarzenia domenowe
-z konkretnymi akcjami (wysyłka Telegram przez bota TOOM, zapis
+z konkretnymi akcjami (wysyłka Telegram przez bota ORDLY, zapis
 do audytu). Wywoływane raz, przy starcie aplikacji, w app/main.py.
 """
 
@@ -67,7 +67,7 @@ def register_event_subscriptions(container: Container) -> None:
     async def handle_order_created(event: OrderCreated) -> None:
         """
         Po zapisaniu nowego zamówienia: wysyła powiadomienie Telegram
-        (TOOM), oznacza zamówienie jako powiadomione, automatycznie
+        (ORDLY), oznacza zamówienie jako powiadomione, automatycznie
         odejmuje sprzedane produkty z magazynu i zapisuje fakt w audycie.
         """
         order = event.order
@@ -130,7 +130,7 @@ def register_event_subscriptions(container: Container) -> None:
     async def handle_order_cancelled(event: OrderCancelled) -> None:
         """
         Po wykryciu anulowania zamówienia: wysyła powiadomienie Telegram
-        (TOOM) i zapisuje fakt w audycie.
+        (ORDLY) i zapisuje fakt w audycie.
         """
         order = event.order
         notifier = container.notifier()
@@ -172,7 +172,7 @@ def register_event_subscriptions(container: Container) -> None:
     async def handle_order_return_created(event: OrderReturnCreated) -> None:
         """
         Po wykryciu nowego zwrotu klienta: wysyła powiadomienie Telegram
-        (TOOM) i zapisuje fakt w audycie.
+        (ORDLY) i zapisuje fakt w audycie.
         """
         order_return = event.order_return
         notifier = container.notifier()
@@ -237,7 +237,7 @@ def register_event_subscriptions(container: Container) -> None:
     async def handle_low_stock_detected(event: LowStockDetected) -> None:
         """
         Po osiągnięciu minimalnego stanu magazynowego: wysyła ostrzeżenie
-        Telegram (TOOM) i zapisuje fakt w audycie. Produkt jest już na
+        Telegram (ORDLY) i zapisuje fakt w audycie. Produkt jest już na
         liście zakupów (lista wynika bezpośrednio ze stanów w bazie).
         """
         notifier = container.notifier()

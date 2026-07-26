@@ -115,7 +115,7 @@ class AllegroSettings(BaseSettings):
 
 
 class TelegramSettings(BaseSettings):
-    """Konfiguracja bota Telegram (aiogram) - TOOM."""
+    """Konfiguracja bota Telegram (aiogram) - ORDLY."""
 
     model_config = SettingsConfigDict(
         env_file=".env",
@@ -137,7 +137,7 @@ class DatabaseSettings(BaseSettings):
     )
 
     database_url: str = Field(
-        default="sqlite+aiosqlite:///./data/toom.db",
+        default="sqlite+aiosqlite:///./data/ordly.db",
         alias="DATABASE_URL",
     )
     echo: bool = Field(default=False, alias="DATABASE_ECHO")
@@ -211,13 +211,13 @@ class SmsSettings(BaseSettings):
     )
 
     provider: str = Field(default="logging", alias="SMS_PROVIDER")
-    sender_name: str = Field(default="TOOM", alias="SMS_SENDER_NAME")
+    sender_name: str = Field(default="ORDLY", alias="SMS_SENDER_NAME")
 
 
 class ApiSettings(BaseSettings):
     """
-    Konfiguracja TOOM API - warstwy REST używanej przez aplikację mobilną
-    TOOM Mobile (obok istniejącego bota Telegram).
+    Konfiguracja ORDLY API - warstwy REST używanej przez aplikację mobilną
+    ORDLY Mobile (obok istniejącego bota Telegram).
 
     `host` domyślnie nasłuchuje na wszystkich interfejsach (0.0.0.0), a nie
     tylko na loopback - inaczej telefon nie połączy się z API nawet przez
@@ -226,7 +226,7 @@ class ApiSettings(BaseSettings):
     loopback.
 
     `web_app_dist_path`, gdy ustawiona, wskazuje folder ze zbudowaną
-    wersją TOOM Mobile (`npx expo export -p web` w `mobile/`) - backend
+    wersją ORDLY Mobile (`npx expo export -p web` w `mobile/`) - backend
     serwuje go pod `/`, żeby telefon mógł otworzyć całą aplikację z
     tego samego adresu co API (jeden proces, jeden port, jeden wpis
     `tailscale serve` - patrz docs/01_app.md §6.5). Brak wartości (domyślnie)
@@ -239,16 +239,16 @@ class ApiSettings(BaseSettings):
         extra="ignore",
     )
 
-    api_token: SecretStr = Field(..., alias="TOOM_API_TOKEN")
-    host: str = Field(default="0.0.0.0", alias="TOOM_API_HOST")  # noqa: S104
-    port: int = Field(default=8000, alias="TOOM_API_PORT")
+    api_token: SecretStr = Field(..., alias="ORDLY_API_TOKEN")
+    host: str = Field(default="0.0.0.0", alias="ORDLY_API_HOST")  # noqa: S104
+    port: int = Field(default=8000, alias="ORDLY_API_PORT")
     web_app_dist_path: Path | None = Field(default=None, alias="WEB_APP_DIST_PATH")
 
 
 class WebPushSettings(BaseSettings):
     """
     Konfiguracja drugiego (opcjonalnego) kanału powiadomień - Web Push do
-    TOOM Mobile uruchomionego jako PWA na iPhonie (obok bota Telegram).
+    ORDLY Mobile uruchomionego jako PWA na iPhonie (obok bota Telegram).
 
     Klucze VAPID generuje się raz, poleceniem opisanym w
     `docs/01_app.md` (sekcja Web Push) - `webpush_enabled=False` (brak

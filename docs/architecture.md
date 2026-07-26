@@ -1,4 +1,4 @@
-# Architektura projektu - TOOM
+# Architektura projektu - ORDLY
 
 Pełny opis architektury Clean Architecture + Plugin Architecture
 zastosowanej w projekcie. Kluczowe punkty:
@@ -20,7 +20,7 @@ Domain nigdy nie zależy od infrastructure. Zawsze odwrotnie.
 | services | Logika aplikacyjna (use cases) | `sync_orders_service.py` |
 | infrastructure | Integracje zewnętrzne (szczegóły) | `plugins/allegro/`, `telegram/` |
 | repositories | Implementacje dostępu do danych | `sqlite_order_repository.py` |
-| bot/api | Warstwa prezentacji (bot TOOM + REST API) | `bot/handlers/`, `api/endpoints/` |
+| bot/api | Warstwa prezentacji (bot ORDLY + REST API) | `bot/handlers/`, `api/endpoints/` |
 | scheduler | Wyzwalacze cykliczne | `jobs/sync_orders_job.py` |
 
 ## Event Bus

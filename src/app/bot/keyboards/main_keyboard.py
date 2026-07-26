@@ -1,4 +1,4 @@
-"""Klawiatury inline/reply używane przez bota TOOM."""
+"""Klawiatury inline/reply używane przez bota ORDLY."""
 
 from __future__ import annotations
 

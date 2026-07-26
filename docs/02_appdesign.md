@@ -1,4 +1,4 @@
-# TOOM Mobile — system projektowy
+# ORDLY Mobile — system projektowy
 
 > Dokument źródłowy dla wyglądu aplikacji. Zatwierdzony kierunek: **"Bento
 > v2"** — siatka kafelków różnej wielkości na ekranie Start, reszta ekranów
@@ -179,7 +179,7 @@ Prawdziwa apka musi obsłużyć:
 - **Pull-to-refresh:** natywny wskaźnik RN przefarbowany na `lime` na
   tle `ink`.
 - **Brak połączenia z API** (RPi offline / Tailscale rozłączony): baner na
-  górze ekranu ("Brak połączenia z TOOM") + dane z cache `react-query`
+  górze ekranu ("Brak połączenia z ORDLY") + dane z cache `react-query`
   wyszarzone (opacity 0.6) zamiast zniknięcia całego ekranu.
 - **401 (zły/wygasły token):** przekierowanie do ekranu logowania,
   komunikat "Sesja wygasła, zaloguj się ponownie".

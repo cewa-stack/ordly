@@ -1,21 +1,21 @@
-# Branding - TOOM
+# Branding - ORDLY
 
-Oficjalna nazwa projektu: **TOOM**. Żadne wcześniejsze nazwy projektu
+Oficjalna nazwa projektu: **ORDLY**. Żadne wcześniejsze nazwy projektu
 nie mogą pojawiać się w kodzie, dokumentacji ani interfejsie użytkownika.
 
 ## Nazewnictwo
 
 | Element | Oficjalna nazwa |
 |---|---|
-| Projekt | TOOM |
-| Bot Telegram | TOOM |
-| Panel WWW | TOOM Dashboard |
-| Backend | TOOM Core |
-| Plugin System | TOOM Plugins |
-| AI | TOOM Intelligence |
-| CLI | TOOM CLI |
-| API | TOOM API |
-| Database | TOOM Database |
+| Projekt | ORDLY |
+| Bot Telegram | ORDLY |
+| Panel WWW | ORDLY Dashboard |
+| Backend | ORDLY Core |
+| Plugin System | ORDLY Plugins |
+| AI | ORDLY Intelligence |
+| CLI | ORDLY CLI |
+| API | ORDLY API |
+| Database | ORDLY Database |
 
 ## Paleta kolorów
 
@@ -41,6 +41,6 @@ kod i dokumentacja odwołują się do nich po stałych nazwach
 
 ## Komunikaty
 
-Każdy komunikat skierowany do użytkownika używa nazwy TOOM, np.:
+Każdy komunikat skierowany do użytkownika używa nazwy ORDLY, np.:
 
-> TOOM został uruchomiony.
+> ORDLY został uruchomiony.

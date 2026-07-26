@@ -18,7 +18,7 @@ class InventoryItemModel(Base, TimestampMixin):
     """
     Tabela `inventory_items`.
 
-    Centralny magazyn TOOM - jeden wiersz to jeden fizyczny produkt
+    Centralny magazyn ORDLY - jeden wiersz to jeden fizyczny produkt
     (SKU), niezależny od ofert marketplace, na których jest sprzedawany.
     """
 

@@ -3,7 +3,7 @@ Tworzenie instancji bota i dispatchera aiogram.
 
 Ten moduł jest jedynym miejscem tworzenia obiektu Bot - reszta
 aplikacji otrzymuje gotowe instancje przez Dependency Injection.
-Bot występuje pod nazwą "TOOM".
+Bot występuje pod nazwą "ORDLY".
 """
 
 from __future__ import annotations
@@ -17,7 +17,7 @@ from app.core.config import TelegramSettings
 
 def create_bot(settings: TelegramSettings) -> Bot:
     """
-    Tworzy instancję bota Telegram (TOOM) skonfigurowaną z domyślnym
+    Tworzy instancję bota Telegram (ORDLY) skonfigurowaną z domyślnym
     HTML parse mode.
 
     Args:

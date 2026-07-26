@@ -1,22 +1,22 @@
-# TOOM Mobile — plan projektu
+# ORDLY Mobile — plan projektu
 
 > Dokument żywy. Każda decyzja architektoniczna dotycząca aplikacji mobilnej
-> TOOM ma trafiać najpierw tutaj, zanim trafi do kodu. Jeśli coś tu opisane
+> ORDLY ma trafiać najpierw tutaj, zanim trafi do kodu. Jeśli coś tu opisane
 > przestaje być prawdą (zmiana decyzji, zmiana zakresu), ten plik ma zostać
 > zaktualizowany w tym samym commicie/zadaniu, a nie "przy okazji później".
 
 ## 1. Cel
 
-Zastąpienie Telegrama jako interfejsu użytkownika dla TOOM dedykowaną
-aplikacją mobilną ("TOOM Mobile"). TOOM Core (backend: FastAPI + aiogram +
+Zastąpienie Telegrama jako interfejsu użytkownika dla ORDLY dedykowaną
+aplikacją mobilną ("ORDLY Mobile"). ORDLY Core (backend: FastAPI + aiogram +
 SQLAlchemy, opisany w [architecture.md](architecture.md)) pozostaje bez
-zmian koncepcyjnych — dochodzi do niego jedna nowa warstwa: **TOOM API**,
+zmian koncepcyjnych — dochodzi do niego jedna nowa warstwa: **ORDLY API**,
 czyli pełne REST API wystawiające funkcje, które dziś istnieją wyłącznie
 jako handlery komend Telegram.
 
 Telegram **nie znika w Fazie 1** — zostaje jako awaryjny kanał powiadomień,
-dopóki TOOM Mobile nie ma powiadomień push (patrz Faza 2). Nazwy, branding,
-paleta kolorów i logo TOOM pozostają identyczne we wszystkich kanałach —
+dopóki ORDLY Mobile nie ma powiadomień push (patrz Faza 2). Nazwy, branding,
+paleta kolorów i logo ORDLY pozostają identyczne we wszystkich kanałach —
 zasady w [branding.md](branding.md).
 
 ## 2. Dlaczego nie da się tego zrobić "tylko frontendem"
@@ -30,10 +30,10 @@ Telegramem zamiast z użytkownikiem — potrzebuje własnego REST API.
 
 Z tego wynika, że projekt ma **dwa równoległe tory pracy**:
 
-1. **TOOM API** — nowa warstwa REST w istniejącym repo backendu
+1. **ORDLY API** — nowa warstwa REST w istniejącym repo backendu
    (`src/`), używająca tych samych serwisów co bot (`Container` z
    `app/container.py`), bez duplikowania logiki biznesowej.
-2. **TOOM Mobile** — nowa aplikacja (osobny projekt, patrz §6).
+2. **ORDLY Mobile** — nowa aplikacja (osobny projekt, patrz §6).
 
 ## 3. Zasady (niepodlegające dyskusji)
 
@@ -43,20 +43,20 @@ Z tego wynika, że projekt ma **dwa równoległe tory pracy**:
   `EventsService`, `HealthService`), które dziś wołają handlery bota.
   Jeśli czegoś serwisom brakuje, dokładamy metodę do serwisu — nigdy logiki
   wprost w endpointzie.
-- **TOOM jest osobistym asystentem jednej osoby** (patrz
+- **ORDLY jest osobistym asystentem jednej osoby** (patrz
   `AdminOnlyMiddleware` w bocie) — API dziedziczy tę zasadę: jeden token
   dostępowy, żadnej rejestracji, żadnych kont wielu użytkowników.
 - **Zero nowych zależności zewnętrznych bez potrzeby.** Backend zostaje na
   FastAPI + SQLAlchemy + Pydantic, zgodnie z istniejącym stackiem.
 - **Branding jeden do jednego z `branding.md`.** Neon Lime `#C6FF00`, tło
-  `#111111`, logo TOOM — bez wariacji "na telefon".
+  `#111111`, logo ORDLY — bez wariacji "na telefon".
 - **Styl UI: zatwierdzony wariant "Bento v2"** (patrz
   [02_appdesign.md](02_appdesign.md)) — ostateczna specyfikacja komponentów
   i typografii żyje w tamtym pliku, nie tutaj.
 
 ## 4. Zdalny dostęp — Raspberry Pi ↔ telefon
 
-TOOM Core działa na Raspberry Pi w sieci domowej i **nie jest** wystawiony
+ORDLY Core działa na Raspberry Pi w sieci domowej i **nie jest** wystawiony
 publicznie do internetu (brak port-forwardingu, brak certyfikatu TLS na
 routerze). Żeby telefon (poza siecią domową) mógł się połączyć, potrzebny
 jest jeden z poniższych mechanizmów — **to decyzja użytkownika, wymaga
@@ -70,7 +70,7 @@ konta w zewnętrznej usłudze, więc nie mogę tego skonfigurować sam**:
 
 **Rekomendacja: Tailscale.** Instalujesz `tailscale` na Raspberry Pi i na
 telefonie, logujesz się tym samym kontem — apka łączy się z API pod adresem
-`http://100.x.x.x:8000` (albo nazwą MagicDNS, np. `toom-pi:8000`). TOOM API
+`http://100.x.x.x:8000` (albo nazwą MagicDNS, np. `ordly-pi:8000`). ORDLY API
 w takim modelu **nie musi** samo obsługiwać TLS — ruch jest już szyfrowany
 przez WireGuard.
 
@@ -78,11 +78,11 @@ przez WireGuard.
 > RPi). Adres API jest polem konfiguracyjnym w apce (patrz §6.4), więc nie
 > blokuje to prac nad kodem.
 
-## 5. TOOM API — kontrakt
+## 5. ORDLY API — kontrakt
 
 Prefiks: `/api/v1`. Wszystkie endpointy poza `/api/v1/health` wymagają
-nagłówka `Authorization: Bearer <TOOM_API_TOKEN>` (token generowany raz,
-zapisany w `.env` backendu jako `TOOM_API_TOKEN`, wklejany ręcznie w apce
+nagłówka `Authorization: Bearer <ORDLY_API_TOKEN>` (token generowany raz,
+zapisany w `.env` backendu jako `ORDLY_API_TOKEN`, wklejany ręcznie w apce
 przy pierwszym uruchomieniu — analogicznie do wklejania tokena bota w
 BotFatherze). Brak/zły token → `401`. Zły format żądania → `422`
 (natywna walidacja Pydantic/FastAPI). Błąd domenowy (np.
@@ -117,8 +117,8 @@ kopii typów, żeby nie rozjeżdżały się z rzeczywistością.
 
 ## 5a. Web Push (PWA) — drugi kanał powiadomień
 
-Poza Telegramem, TOOM ma teraz drugi, opcjonalny kanał powiadomień:
-**Web Push** (RFC 8030) do TOOM Mobile uruchomionego jako PWA w
+Poza Telegramem, ORDLY ma teraz drugi, opcjonalny kanał powiadomień:
+**Web Push** (RFC 8030) do ORDLY Mobile uruchomionego jako PWA w
 przeglądarce. Powód: natywny push na iOS wymaga płatnego konta Apple
 Developer (99$/rok) — Web Push do przeglądarki działa **za darmo**, bez
 żadnej zewnętrznej usługi (nie jest to Pushover/ntfy/Firebase — to
@@ -163,12 +163,12 @@ PWA w trybie standalone. Włączanie/wyłączanie i test wysyłki: karta
 widoczna wyłącznie w kompilacji web.
 
 **Jak uruchomić PWA na iPhonie**: zbuduj i wystaw wersję web backendu tak,
-żeby telefon mógł ją otworzyć w Safari pod tym samym adresem co TOOM API
+żeby telefon mógł ją otworzyć w Safari pod tym samym adresem co ORDLY API
 (Tailscale) — `npx expo export -p web` w `mobile/`, wynik wystawiony jako
 pliki statyczne (np. przez `StaticFiles` w FastAPI albo osobny serwer),
 otwórz w Safari, "Udostępnij → Dodaj do ekranu początkowego".
 
-## 6. TOOM Mobile — aplikacja
+## 6. ORDLY Mobile — aplikacja
 
 ### 6.1 Lokalizacja w repo
 
@@ -178,12 +178,12 @@ inny runtime i inny cykl wydań (App Store/Play Store) — dostaje **osobny
 katalog na tym samym poziomie co `src/`**:
 
 ```
-toom/
+ordly/
 ├── docker/
 ├── docs/            <- dokumentacja ogólna repo (ten poziom)
 ├── scripts/
-├── src/             <- TOOM Core + TOOM API (Python, osobne repo git)
-├── mobile/          <- TOOM Mobile (Expo/React Native, TypeScript) - NOWY
+├── src/             <- ORDLY Core + ORDLY API (Python, osobne repo git)
+├── mobile/          <- ORDLY Mobile (Expo/React Native, TypeScript) - NOWY
 └── tests/
 ```
 
@@ -234,18 +234,18 @@ miesza się z `uv`/`pytest` backendu.
 Adres API **nie jest** zaszyty na sztywno w kodzie (RPi w sieci Tailscale
 ma zmienny, prywatny adres zależny od instalacji użytkownika) — jest polem
 w ekranie logowania, zapisywanym lokalnie. Domyślna wartość placeholder:
-`http://toom-pi:8000` (MagicDNS Tailscale).
+`http://ordly-pi:8000` (MagicDNS Tailscale).
 
 ### 6.5 Wdrożenie 24/7 na Raspberry Pi (bez zależności od komputera)
 
 Cel: telefon ma się łączyć wyłącznie z Raspberry Pi — appka webowa (PWA)
-**i** TOOM API mają działać z tego samego procesu/portu, żeby wystarczył
+**i** ORDLY API mają działać z tego samego procesu/portu, żeby wystarczył
 jeden `systemd` service i jeden wpis `tailscale serve` (bez trzymania
 `npx expo start` wiecznie odpalonego na czyimś komputerze).
 
 **Backend** (`app/main.py`, `_create_fastapi_app`): gdy zmienna
 `WEB_APP_DIST_PATH` w `.env` wskazuje na folder ze zbudowaną wersją
-TOOM Mobile, backend montuje go jako `StaticFiles("/")` **po**
+ORDLY Mobile, backend montuje go jako `StaticFiles("/")` **po**
 zarejestrowaniu `api_router` — dzięki kolejności rejestracji ścieżki API
 (`/api/v1/*`, `/health`, `/docs`) mają pierwszeństwo, a mount na `/` łapie
 resztę (HTML, JS bundle, `manifest.json`, `sw.js`, `icon.png`) jako
@@ -264,13 +264,13 @@ zmiany zachowania.
    Wynik ląduje w `mobile/dist/`.
 2. Skopiuj `mobile/dist/` na Raspberry Pi, np.:
    ```bash
-   scp -r mobile/dist pi@<host>:~/toom/webapp_dist
+   scp -r mobile/dist pi@<host>:~/ordly/webapp_dist
    ```
 3. W `.env` na Raspberry Pi ustaw:
    ```
-   WEB_APP_DIST_PATH=/home/pi/toom/webapp_dist
+   WEB_APP_DIST_PATH=/home/pi/ordly/webapp_dist
    ```
-4. Zrestartuj usługę (`sudo systemctl restart toom`).
+4. Zrestartuj usługę (`sudo systemctl restart ordly`).
 5. `tailscale serve --bg --https=443 http://localhost:8000` — **jeden**
    wpis wystarcza teraz na wszystko (wcześniej, w wersji deweloperskiej z
    osobnym `npx expo start --web`, potrzebne były dwa porty/dwa wpisy).
@@ -289,14 +289,14 @@ to tylko pliki statyczne, restart usługi nie jest nawet konieczny (chyba
 | Faza | Zakres | Status |
 |---|---|---|
 | **0** | Wybór stylu UI (mockup) | ✅ zatwierdzone — wariant "Bento v2" |
-| **1** | TOOM API (wszystkie endpointy z §5) + TOOM Mobile: ekrany Start / Zamówienia / Magazyn / Statystyki, logowanie tokenem, dane live | 🚧 w budowie |
+| **1** | ORDLY API (wszystkie endpointy z §5) + ORDLY Mobile: ekrany Start / Zamówienia / Magazyn / Statystyki, logowanie tokenem, dane live | 🚧 w budowie |
 | **2** | Powiadomienia push jako odpowiednik dzisiejszych powiadomień Telegram (`TelegramNotifier`) | 🚧 częściowo: **Web Push (PWA) zrobiony** (`WebPushNotifier` + `CompositeNotifier`, patrz §5a) — darmowy, działa już dziś na iOS/Android przez przeglądarkę. Natywny push (Expo Push) do zbudowanej binarki (EAS Build) wciąż ⏳ nie zaczęty — potrzebny tylko, jeśli/gdy zdecydujemy się na płatny build zamiast PWA. |
 | **3** | Tryb offline (cache `react-query` + wskaźnik "dane sprzed X min" gdy brak połączenia z RPi) | ⏳ zaplanowane, nie zaczęte |
 | **4** | Wygaszenie Telegrama jako głównego kanału (zostaje jako fallback powiadomień awaryjnych, np. gdy push się nie dostarczy) | ⏳ zależne od Fazy 2 |
 
 ## 8. Co NIE wchodzi w zakres (świadomie)
 
-- Wielu użytkowników/kont — TOOM jest i zostaje asystentem jednej osoby.
+- Wielu użytkowników/kont — ORDLY jest i zostaje asystentem jednej osoby.
 - Publiczne wystawienie API do internetu bez VPN.
 - Zmiana logiki biznesowej backendu — API tylko ją **udostępnia**.
 - Natywne moduły spoza Expo Managed Workflow, chyba że coś wymusi "eject"

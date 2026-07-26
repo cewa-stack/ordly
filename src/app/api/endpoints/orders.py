@@ -63,7 +63,7 @@ async def trigger_sync(
     except MarketplaceUnavailableError:
         raise
     except Exception:
-        logger.exception("Błąd podczas synchronizacji wywołanej przez TOOM API")
+        logger.exception("Błąd podczas synchronizacji wywołanej przez ORDLY API")
         raise
 
     return sync_result_out(result)

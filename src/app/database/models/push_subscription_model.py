@@ -13,7 +13,7 @@ class PushSubscriptionModel(Base, TimestampMixin):
     Tabela `push_subscriptions`.
 
     Jeden wiersz na jedną aktywną subskrypcję przeglądarki/urządzenia
-    (TOOM Mobile uruchomiony jako PWA). `endpoint` bywa długim URL-em
+    (ORDLY Mobile uruchomiony jako PWA). `endpoint` bywa długim URL-em
     (dostawcy push jak FCM/Mozilla potrafią zwracać >200 znaków),
     stąd szeroka kolumna.
     """

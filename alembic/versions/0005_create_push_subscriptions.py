@@ -5,7 +5,7 @@ Revises: 0004
 Create Date: 2026-07-24 09:00:00
 
 Dodaje tabelę push_subscriptions - przechowuje subskrypcje Web Push
-(RFC 8030) zgłoszone przez TOOM Mobile uruchomiony jako PWA (drugi,
+(RFC 8030) zgłoszone przez ORDLY Mobile uruchomiony jako PWA (drugi,
 opcjonalny kanał powiadomień obok bota Telegram).
 """
 

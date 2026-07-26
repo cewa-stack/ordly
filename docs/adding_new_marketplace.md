@@ -65,7 +65,7 @@ Napisz `tests/unit/plugins/test_amazon_mapper.py` analogicznie do
 
 - `domain/` (encje i interfejsy)
 - `services/` (cała logika biznesowa)
-- `bot/handlers/` (komendy Telegram bota TOOM)
+- `bot/handlers/` (komendy Telegram bota ORDLY)
 - `scheduler/` (job synchronizacji)
 
 Jeśli podczas dodawania nowego marketplace musisz zmodyfikować
