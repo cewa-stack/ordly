@@ -11,7 +11,7 @@ from app.bot.formatting import header
 router = Router(name="help")
 
 _HELP_TEXT = (
-    f"{header('📖', 'TOOM - DOSTĘPNE KOMENDY')}\n\n"
+    f"{header('📖', 'ORDLY - DOSTĘPNE KOMENDY')}\n\n"
     "🛒 <b>Zamówienia</b>\n"
     "/orders — lista ostatnich zamówień\n"
     "/order [numer] — szczegóły zamówienia\n"

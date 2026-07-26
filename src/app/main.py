@@ -1,5 +1,5 @@
 """
-Punkt wejścia aplikacji TOOM.
+Punkt wejścia aplikacji ORDLY.
 
 Spina wszystkie moduły: konfigurację, logowanie, kontener DI, bota
 Telegram, scheduler i API HTTP - i uruchamia je współbieżnie w jednym
@@ -92,9 +92,9 @@ def _register_bot_routers(dispatcher: Dispatcher) -> None:
 
 def _create_fastapi_app(container: Container, settings: Settings) -> FastAPI:
     """Tworzy instancję FastAPI z podłączonym kontenerem DI w stanie aplikacji."""
-    app = FastAPI(title="TOOM API", docs_url="/docs")
+    app = FastAPI(title="ORDLY API", docs_url="/docs")
     app.state.container = container
-    # TOOM Mobile uruchomiony jako PWA w przeglądarce woła to API z innego
+    # ORDLY Mobile uruchomiony jako PWA w przeglądarce woła to API z innego
     # originu (inny port niż backend) - bez CORS przeglądarka blokuje odczyt
     # odpowiedzi dla każdego zapytania z nagłówkiem Authorization (preflight).
     # Bezpieczeństwo i tak zapewnia token (require_api_token), nie CORS -
@@ -110,7 +110,7 @@ def _create_fastapi_app(container: Container, settings: Settings) -> FastAPI:
     app.include_router(api_router)
     register_exception_handlers(app)
 
-    # TOOM Mobile jako PWA - serwowane z tego samego procesu/portu co API,
+    # ORDLY Mobile jako PWA - serwowane z tego samego procesu/portu co API,
     # żeby na Raspberry Pi wystarczył jeden systemd service i jeden wpis
     # `tailscale serve` (patrz docs/01_app.md §6.5). Mount MUSI być
     # zarejestrowany PO api_router - to jedyny sposób, żeby ścieżki API
@@ -122,7 +122,7 @@ def _create_fastapi_app(container: Container, settings: Settings) -> FastAPI:
     if dist_path is not None:
         if dist_path.is_dir():
             app.mount("/", StaticFiles(directory=dist_path, html=True), name="webapp")
-            logger.info("TOOM Mobile (PWA) serwowany z {}", dist_path)
+            logger.info("ORDLY Mobile (PWA) serwowany z {}", dist_path)
         else:
             logger.warning(
                 "WEB_APP_DIST_PATH={} nie istnieje - backend serwuje wyłącznie API",
@@ -140,7 +140,7 @@ async def _run_application() -> None:
     configure_logging(settings.logging, settings.app.debug)
 
     logger.info("=" * 60)
-    logger.info("Uruchamianie TOOM")
+    logger.info("Uruchamianie ORDLY")
     logger.info("=" * 60)
 
     bot = create_bot(settings.telegram)
@@ -240,11 +240,11 @@ async def _run_application() -> None:
     )
     api_task = asyncio.create_task(uvicorn_server.serve())
 
-    logger.info("TOOM został w pełni uruchomiony i jest gotowy do pracy")
+    logger.info("ORDLY został w pełni uruchomiony i jest gotowy do pracy")
 
     await stop_event.wait()
 
-    logger.info("Zamykanie aplikacji TOOM...")
+    logger.info("Zamykanie aplikacji ORDLY...")
 
     scheduler.shutdown(wait=False)
 

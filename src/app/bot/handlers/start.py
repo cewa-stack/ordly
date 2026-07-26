@@ -16,7 +16,7 @@ router = Router(name="start")
 async def handle_start(message: Message) -> None:
     """Wysyła wiadomość powitalną wraz z głównym menu."""
     text = (
-        f"{header('🤖', 'TOOM')}\n\n"
+        f"{header('🤖', 'ORDLY')}\n\n"
         "Personal Commerce Intelligence Platform.\n"
         "Monitoruję Twoje zamówienia 24/7 i powiadomię Cię "
         "natychmiast o każdym nowym zamówieniu.\n\n"

@@ -18,7 +18,7 @@ from app.domain.interfaces.sms_provider import SmsProvider
 class LoggingSmsProvider(SmsProvider):
     """Symuluje wysyłkę SMS, zapisując treść do logów aplikacji."""
 
-    def __init__(self, sender_name: str = "TOOM") -> None:
+    def __init__(self, sender_name: str = "ORDLY") -> None:
         """
         Args:
             sender_name: Nazwa nadawcy, która trafiłaby na SMS u realnego

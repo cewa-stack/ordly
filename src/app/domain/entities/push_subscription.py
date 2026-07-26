@@ -10,7 +10,7 @@ from datetime import datetime
 class PushSubscription:
     """
     Subskrypcja Web Push (RFC 8030) zwrócona przez `PushManager.subscribe()`
-    w przeglądarce (TOOM Mobile uruchomiony jako PWA na iOS/Android/desktop).
+    w przeglądarce (ORDLY Mobile uruchomiony jako PWA na iOS/Android/desktop).
 
     `endpoint` jest unikalnym kluczem biznesowym - jedna przeglądarka/
     urządzenie ma jeden aktywny endpoint na raz; ponowna subskrypcja z tym

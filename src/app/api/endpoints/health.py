@@ -19,7 +19,7 @@ async def health_check(
     session: Annotated[AsyncSession, Depends(get_session)],
 ) -> dict:
     """
-    Zwraca status zdrowia aplikacji (TOOM) w JSON.
+    Zwraca status zdrowia aplikacji (ORDLY) w JSON.
     """
     health_service = container.health_service(session)
     status = await health_service.check()

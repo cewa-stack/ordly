@@ -1,14 +1,14 @@
 """
 Agregacja wszystkich routerów FastAPI w jeden router aplikacji.
 
-TOOM API dla aplikacji mobilnej żyje pod prefiksem `/api/v1` i wymaga
+ORDLY API dla aplikacji mobilnej żyje pod prefiksem `/api/v1` i wymaga
 tokena (`require_api_token`) na każdym endpointzie poza `/api/v1/health` -
 zdrowie API musi być sprawdzalne z ekranu logowania w apce, zanim
 użytkownik w ogóle wklei token.
 
 Istniejące endpointy `/health` i `/backup/trigger` (bez prefiksu) zostają
 bez zmian - są używane lokalnie (monitoring, backup) od czasu, zanim
-powstało TOOM API, i nie są częścią kontraktu aplikacji mobilnej
+powstało ORDLY API, i nie są częścią kontraktu aplikacji mobilnej
 (zob. docs/01_app.md, sekcja 5).
 """
 
@@ -34,7 +34,7 @@ api_router = APIRouter()
 api_router.include_router(health.router, tags=["health"])
 api_router.include_router(backup.router, tags=["backup"])
 
-# TOOM API (aplikacja mobilna) - wersjonowane, zabezpieczone tokenem.
+# ORDLY API (aplikacja mobilna) - wersjonowane, zabezpieczone tokenem.
 mobile_api_router = APIRouter(prefix="/api/v1")
 mobile_api_router.include_router(health.router, tags=["mobile-health"])
 mobile_api_router.include_router(

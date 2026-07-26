@@ -1,7 +1,7 @@
 """
-Autoryzacja TOOM API - pojedynczy token dla jedynego użytkownika.
+Autoryzacja ORDLY API - pojedynczy token dla jedynego użytkownika.
 
-Odpowiednik `AdminOnlyMiddleware` z bota Telegram: TOOM jest osobistym
+Odpowiednik `AdminOnlyMiddleware` z bota Telegram: ORDLY jest osobistym
 asystentem jednej osoby, więc API nie ma kont ani ról - jeden długożyjący
 token, wygenerowany raz i wklejony w aplikacji mobilnej, wystarcza.
 """
@@ -23,7 +23,7 @@ async def require_api_token(
 ) -> None:
     """
     Weryfikuje nagłówek `Authorization: Bearer <token>` względem
-    `TOOM_API_TOKEN` skonfigurowanego w `.env`.
+    `ORDLY_API_TOKEN` skonfigurowanego w `.env`.
 
     Używa `hmac.compare_digest`, aby porównanie tokena było odporne na
     ataki czasowe (timing attack) - zwykłe `==` na stringach nie daje

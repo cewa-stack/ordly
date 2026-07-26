@@ -1,6 +1,6 @@
-# TOOM - zasoby marki
+# ORDLY - zasoby marki
 
-Miejsce na oficjalne logo TOOM. Aby podmienić logo w całym projekcie,
+Miejsce na oficjalne logo ORDLY. Aby podmienić logo w całym projekcie,
 wystarczy umieścić tutaj pliki o poniższych nazwach - żadne zmiany w
 kodzie nie są wymagane.
 
@@ -9,7 +9,7 @@ kodzie nie są wymagane.
 | Plik | Zastosowanie |
 |---|---|
 | `logo.png` | README, GitHub, dokumentacja (zalecane min. 640 px szerokości) |
-| `logo.svg` | Panel WWW (TOOM Dashboard), materiały wektorowe |
+| `logo.svg` | Panel WWW (ORDLY Dashboard), materiały wektorowe |
 | `avatar.png` | Awatar bota Telegram (kwadrat, min. 512x512 px) |
 | `favicon.ico` | Favicon panelu WWW |
 

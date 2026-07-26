@@ -1,5 +1,5 @@
 """
-Serwis magazynowy (Inventory Management System) - centralny magazyn TOOM.
+Serwis magazynowy (Inventory Management System) - centralny magazyn ORDLY.
 
 Obsługuje przegląd stanów, ręczne korekty z pełną historią zmian,
 listę zakupów, prognozę wyczerpania zapasów oraz raport magazynowy.

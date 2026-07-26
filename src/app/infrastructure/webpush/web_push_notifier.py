@@ -1,6 +1,6 @@
 """
 Implementacja Notifier wysyłająca powiadomienia przez Web Push (RFC 8030)
-do TOOM Mobile uruchomionego jako PWA (drugi kanał obok Telegrama,
+do ORDLY Mobile uruchomionego jako PWA (drugi kanał obok Telegrama,
 przeznaczony głównie na iPhone'a, gdzie natywny push wymaga płatnego
 konta Apple Developer).
 """
@@ -109,7 +109,7 @@ class WebPushNotifier(Notifier):
 
     async def send_text(self, text: str) -> None:
         """Wysyła dowolną wiadomość tekstową (np. alert o błędzie)."""
-        await self._broadcast("TOOM", text)
+        await self._broadcast("ORDLY", text)
 
     async def _broadcast(self, title: str, body: str) -> None:
         """Wysyła jedno powiadomienie do wszystkich zapisanych subskrypcji."""

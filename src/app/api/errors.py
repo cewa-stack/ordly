@@ -1,6 +1,6 @@
 """
 Mapowanie wyjątków domenowych na odpowiedzi HTTP - jedno miejsce dla
-całego TOOM API, żeby endpointy nie powtarzały tych samych bloków
+całego ORDLY API, żeby endpointy nie powtarzały tych samych bloków
 try/except (tak jak dziś robią to handlery Telegrama, gdzie każdy
 komunikat jest formatowany osobno na potrzeby czatu).
 """

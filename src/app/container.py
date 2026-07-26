@@ -72,7 +72,7 @@ class Container:
 
         Args:
             settings: Zwalidowana konfiguracja aplikacji.
-            bot: Instancja bota aiogram (TOOM).
+            bot: Instancja bota aiogram (ORDLY).
         """
         self._settings = settings
         self._bot = bot

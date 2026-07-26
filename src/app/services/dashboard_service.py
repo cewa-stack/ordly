@@ -1,4 +1,4 @@
-"""Serwis agregujący dane na potrzeby ekranu Start aplikacji TOOM Mobile."""
+"""Serwis agregujący dane na potrzeby ekranu Start aplikacji ORDLY Mobile."""
 
 from __future__ import annotations
 

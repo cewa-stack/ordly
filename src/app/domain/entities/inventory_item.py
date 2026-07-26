@@ -9,7 +9,7 @@ from decimal import Decimal
 @dataclass(frozen=True, slots=True)
 class InventoryItem:
     """
-    Produkt w centralnym magazynie TOOM, niezależny od marketplace.
+    Produkt w centralnym magazynie ORDLY, niezależny od marketplace.
 
     `sku` jest unikalnym kluczem biznesowym produktu - to po nim
     odwołują się komendy /stock oraz mapowania ofert marketplace.

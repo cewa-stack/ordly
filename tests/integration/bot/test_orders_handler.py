@@ -1,6 +1,6 @@
 """
 Testy integracyjne handlera /orders - weryfikują, że komenda Telegram
-(bot TOOM) poprawnie wywołuje serwis i formatuje odpowiedź, bez
+(bot ORDLY) poprawnie wywołuje serwis i formatuje odpowiedź, bez
 łączenia się z prawdziwym Telegram API.
 """
 

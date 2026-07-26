@@ -1,5 +1,5 @@
 """
-Endpointy HTTP /api/v1/push/* - subskrypcja Web Push dla TOOM Mobile
+Endpointy HTTP /api/v1/push/* - subskrypcja Web Push dla ORDLY Mobile
 uruchomionego jako PWA (drugi kanał powiadomień obok bota Telegram,
 patrz docs/01_app.md sekcja Web Push).
 """
@@ -97,5 +97,5 @@ async def send_test_push(
             detail="Brak aktywnych subskrypcji - włącz powiadomienia push w Ustawieniach najpierw.",
         )
 
-    await notifier.send_text("To jest testowe powiadomienie z TOOM.")
+    await notifier.send_text("To jest testowe powiadomienie z ORDLY.")
     return {"status": "ok", "sent_to": len(subscriptions)}

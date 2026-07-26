@@ -2,7 +2,7 @@
 Middleware autoryzacji - odrzuca wszystkie wiadomości spoza
 skonfigurowanego chat_id administratora.
 
-TOOM jest osobistym asystentem jednej osoby, nie publicznym botem -
+ORDLY jest osobistym asystentem jednej osoby, nie publicznym botem -
 middleware chroni przed sytuacją, w której ktoś inny (np. znający
 wyciekły token) próbowałby wydawać komendy.
 """

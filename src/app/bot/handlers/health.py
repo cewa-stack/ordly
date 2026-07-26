@@ -25,7 +25,7 @@ async def handle_health(message: Message, container: Container, session: AsyncSe
     marketplace_icon = "✅" if status.marketplace_connection_ok else "❌"
 
     await message.answer(
-        f"{header(title_emoji, 'STATUS TOOM')}\n\n"
+        f"{header(title_emoji, 'STATUS ORDLY')}\n\n"
         f"⏱ Uptime: {status.uptime_human}\n"
         f"🔄 Ostatnia synchronizacja: {status.last_sync_human}\n\n"
         f"{db_icon} Baza danych\n"

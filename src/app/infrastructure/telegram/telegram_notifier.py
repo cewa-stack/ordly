@@ -1,4 +1,4 @@
-"""Implementacja Notifier wysyłająca powiadomienia przez Telegram (bot TOOM)."""
+"""Implementacja Notifier wysyłająca powiadomienia przez Telegram (bot ORDLY)."""
 
 from __future__ import annotations
 
@@ -17,7 +17,7 @@ class TelegramNotifier(Notifier):
     def __init__(self, bot: Bot, admin_chat_id: int) -> None:
         """
         Args:
-            bot: Skonfigurowana instancja bota aiogram (TOOM).
+            bot: Skonfigurowana instancja bota aiogram (ORDLY).
             admin_chat_id: Chat ID, na który wysyłane są wszystkie powiadomienia.
         """
         self._bot = bot

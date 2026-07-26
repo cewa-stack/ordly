@@ -1,7 +1,7 @@
 """
 Serwis nocnego czyszczenia czatu Telegram (job 02:00).
 
-Usuwa wszystkie wcześniejsze wiadomości wysłane przez bota TOOM, a
+Usuwa wszystkie wcześniejsze wiadomości wysłane przez bota ORDLY, a
 następnie publikuje ponownie wyłącznie aktualne (nowe/pakowane)
 zamówienia. Dzięki temu rano na czacie widoczne są tylko zamówienia
 wymagające obsługi, bez starych, nieaktualnych wiadomości.

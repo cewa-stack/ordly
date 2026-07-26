@@ -13,7 +13,7 @@ class Notifier(ABC):
     """
     Kontrakt wysyłki powiadomień o zdarzeniach biznesowych.
 
-    Dzisiaj jedyną implementacją jest Telegram (bot TOOM), ale
+    Dzisiaj jedyną implementacją jest Telegram (bot ORDLY), ale
     interfejs pozwala w przyszłości dodać np. e-mail lub push bez
     zmiany logiki w services/.
     """

@@ -51,7 +51,7 @@ class BackupService:
         """
         self._backup_directory.mkdir(parents=True, exist_ok=True)
         timestamp = utc_now().strftime("%Y%m%d_%H%M%S")
-        backup_path = self._backup_directory / f"toom_{timestamp}.db"
+        backup_path = self._backup_directory / f"ordly_{timestamp}.db"
 
         try:
             await self._session.execute(
@@ -75,7 +75,7 @@ class BackupService:
         cutoff = utc_now() - timedelta(days=self._retention_days)
         removed_count = 0
 
-        for backup_file in self._backup_directory.glob("toom_*.db"):
+        for backup_file in self._backup_directory.glob("ordly_*.db"):
             file_mtime = datetime.fromtimestamp(
                 backup_file.stat().st_mtime, UTC
             ).replace(tzinfo=None)
@@ -95,7 +95,7 @@ class BackupService:
         if not self._backup_directory.exists():
             return []
         return sorted(
-            self._backup_directory.glob("toom_*.db"),
+            self._backup_directory.glob("ordly_*.db"),
             key=lambda p: p.stat().st_mtime,
             reverse=True,
         )

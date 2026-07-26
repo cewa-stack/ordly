@@ -1,5 +1,5 @@
 """
-Schematy Pydantic dla TOOM API (aplikacja mobilna TOOM Mobile).
+Schematy Pydantic dla ORDLY API (aplikacja mobilna ORDLY Mobile).
 
 Zasada: schematy tylko opisują kształt JSON i mapują encje domenowe na
 odpowiedź HTTP (funkcje `*_out`) - żadnej logiki biznesowej. Logika żyje

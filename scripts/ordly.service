@@ -1,12 +1,12 @@
 [Unit]
-Description=TOOM - osobisty asystent sprzedazy 24/7
+Description=ORDLY - osobisty asystent sprzedazy 24/7
 After=network-online.target
 Wants=network-online.target
 
 [Service]
 Type=simple
 User=pi
-WorkingDirectory=/home/pi/toom
+WorkingDirectory=/home/pi/ordly
 ExecStart=/home/pi/.local/bin/uv run python -m app.main
 Restart=always
 RestartSec=10
@@ -22,7 +22,7 @@ CPUQuota=150%
 # Ograniczenia bezpieczenstwa
 NoNewPrivileges=true
 ProtectSystem=full
-ReadWritePaths=/home/pi/toom
+ReadWritePaths=/home/pi/ordly
 
 [Install]
 WantedBy=multi-user.target
