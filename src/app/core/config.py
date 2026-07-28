@@ -244,6 +244,15 @@ class ApiSettings(BaseSettings):
     port: int = Field(default=8000, alias="ORDLY_API_PORT")
     web_app_dist_path: Path | None = Field(default=None, alias="WEB_APP_DIST_PATH")
 
+    # Login/hasło jako przyjazna dla człowieka brama do `api_token` -
+    # ekran logowania w ORDLY Mobile przyjmuje login+hasło zamiast tokena,
+    # a `/api/v1/auth/login` po weryfikacji zwraca ten sam `api_token`,
+    # który jest już wymagany przez `require_api_token` na reszcie API.
+    # Domyślne admin/admin działa "z pudełka" na pierwsze uruchomienie -
+    # ZMIEŃ w `.env` przed wystawieniem urządzenia poza zaufaną sieć.
+    admin_username: str = Field(default="admin", alias="ORDLY_ADMIN_USERNAME")
+    admin_password: SecretStr = Field(default=SecretStr("admin"), alias="ORDLY_ADMIN_PASSWORD")
+
 
 class WebPushSettings(BaseSettings):
     """
