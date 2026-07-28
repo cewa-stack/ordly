@@ -18,6 +18,7 @@ from fastapi import APIRouter, Depends
 
 from app.api.auth import require_api_token
 from app.api.endpoints import (
+    auth,
     backup,
     dashboard,
     health,
@@ -37,6 +38,9 @@ api_router.include_router(backup.router, tags=["backup"])
 # ORDLY API (aplikacja mobilna) - wersjonowane, zabezpieczone tokenem.
 mobile_api_router = APIRouter(prefix="/api/v1")
 mobile_api_router.include_router(health.router, tags=["mobile-health"])
+# /auth/login jest jedynym wyjątkiem bez require_api_token - to jedyny
+# sposób, żeby telefon w ogóle zdobył token (patrz app/api/endpoints/auth.py).
+mobile_api_router.include_router(auth.router, tags=["mobile-auth"])
 mobile_api_router.include_router(
     dashboard.router, tags=["mobile-dashboard"], dependencies=[Depends(require_api_token)]
 )

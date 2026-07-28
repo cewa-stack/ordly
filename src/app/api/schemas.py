@@ -27,6 +27,28 @@ StockStatus = Literal["ok", "warning", "critical"]
 
 
 # --------------------------------------------------------------------------
+# Logowanie
+# --------------------------------------------------------------------------
+
+
+class LoginIn(BaseModel):
+    """Ciało żądania `POST /api/v1/auth/login`."""
+
+    username: str = Field(min_length=1)
+    password: str = Field(min_length=1)
+
+
+class LoginOut(BaseModel):
+    """
+    Odpowiedź `POST /api/v1/auth/login` - token identyczny z tym, którego
+    oczekuje `require_api_token` na reszcie ORDLY API, więc aplikacja
+    mobilna używa go bez żadnej dodatkowej logiki.
+    """
+
+    token: str
+
+
+# --------------------------------------------------------------------------
 # Zamówienia
 # --------------------------------------------------------------------------
 
