@@ -71,9 +71,15 @@ async def login(request: Request, payload: LoginIn) -> LoginOut:
         )
 
     settings = get_settings().api
-    username_ok = hmac.compare_digest(payload.username, settings.admin_username)
+    # `hmac.compare_digest` na stringach akceptuje wyłącznie znaki ASCII
+    # (rzuca TypeError na "ą", "ł", "ę" itd.) - login i hasło kodujemy do
+    # UTF-8 i porównujemy bajty, żeby polskie znaki w haśle działały.
+    username_ok = hmac.compare_digest(
+        payload.username.encode("utf-8"), settings.admin_username.encode("utf-8")
+    )
     password_ok = hmac.compare_digest(
-        payload.password, settings.admin_password.get_secret_value()
+        payload.password.encode("utf-8"),
+        settings.admin_password.get_secret_value().encode("utf-8"),
     )
 
     if not (username_ok and password_ok):
