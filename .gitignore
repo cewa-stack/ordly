@@ -5,22 +5,18 @@
 *.pem
 *.key
 
-# Python
+# Python (backend/)
 __pycache__/
 *.py[cod]
 *$py.class
 *.so
 .Python
-build/
-dist/
-*.egg-info/
-.eggs/
-
-# Wirtualne środowiska
 .venv/
 venv/
 env/
 .uv/
+*.egg-info/
+.eggs/
 
 # Baza danych (nie commitujemy danych produkcyjnych)
 *.db
@@ -28,19 +24,33 @@ env/
 *.db-shm
 *.sqlite
 *.sqlite3
-data/*.db
-backups/*.db
+backend/data/*.db
+backend/backups/*.db
 
 # Logi
 *.log
-logs/
+backend/logs/
 
-# Narzędzia jakości kodu / cache
+# Narzędzia jakości kodu / cache (Python)
 .mypy_cache/
 .ruff_cache/
 .pytest_cache/
 .coverage
 htmlcov/
+
+# Node (desktop/, mobile/)
+node_modules/
+npm-debug.log*
+
+# Build/dist (desktop, mobile, backend)
+dist/
+build/
+out/
+.expo/
+web-build/
+
+# Docker (lokalne override'y, jeśli powstaną)
+docker-compose.override.yml
 
 # IDE
 .vscode/
@@ -51,6 +61,4 @@ htmlcov/
 # System
 .DS_Store
 Thumbs.db
-
-# Docker (lokalne override'y, jeśli powstaną)
-docker-compose.override.yml
+.claude/

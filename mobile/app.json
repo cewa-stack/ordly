@@ -1,0 +1,47 @@
+﻿{
+  "expo": {
+    "name": "ORDLY",
+    "slug": "ordly-mobile",
+    "version": "0.1.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "dark",
+    "backgroundColor": "#0D1117",
+    "splash": {
+      "backgroundColor": "#0D1117",
+      "resizeMode": "contain"
+    },
+    "assetBundlePatterns": ["**/*"],
+    "ios": {
+      "supportsTablet": false,
+      "bundleIdentifier": "pl.ordly.mobile",
+      "infoPlist": {
+        "NSFaceIDUsageDescription": "ORDLY używa Face ID do szybkiego i bezpiecznego odblokowania aplikacji zamiast wpisywania hasła za każdym razem."
+      }
+    },
+    "android": {
+      "package": "pl.ordly.mobile",
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/icon.png",
+        "backgroundColor": "#0D1117"
+      }
+    },
+    "web": {
+      "bundler": "metro",
+      "favicon": "./assets/icon.png",
+      "backgroundColor": "#0D1117",
+      "themeColor": "#0D1117",
+      "display": "standalone",
+      "name": "ORDLY"
+    },
+    "plugins": [
+      "expo-secure-store",
+      [
+        "expo-local-authentication",
+        {
+          "faceIDPermission": "ORDLY używa Face ID do szybkiego i bezpiecznego odblokowania aplikacji zamiast wpisywania hasła za każdym razem."
+        }
+      ]
+    ]
+  }
+}

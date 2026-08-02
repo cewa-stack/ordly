@@ -1,0 +1,85 @@
+/**
+ * Jedyny most miedzy rendererem a main procesem. Renderer nigdy nie
+ * dostaje surowego tokenu ORDLY API - woła te metody, main proces
+ * wykonuje realne żądanie HTTP z tokenem doklejonym po swojej stronie.
+ */
+import { contextBridge, ipcRenderer } from "electron";
+
+const ordly = {
+  auth: {
+    getSession: () => ipcRenderer.invoke("ordly:auth:getSession"),
+    login: (baseUrl: string, username: string, password: string) =>
+      ipcRenderer.invoke("ordly:auth:login", baseUrl, username, password),
+    logout: () => ipcRenderer.invoke("ordly:auth:logout"),
+  },
+  stock: {
+    list: () => ipcRenderer.invoke("ordly:stock:list"),
+    adjust: (
+      sku: string,
+      payload: { op: "set" | "add" | "remove" | "min"; quantity: number; reason?: string }
+    ) => ipcRenderer.invoke("ordly:stock:adjust", sku, payload),
+  },
+  orders: {
+    list: () => ipcRenderer.invoke("ordly:orders:list"),
+    sync: () => ipcRenderer.invoke("ordly:orders:sync"),
+  },
+  returns: {
+    list: () => ipcRenderer.invoke("ordly:returns:list"),
+  },
+  issues: {
+    list: () => ipcRenderer.invoke("ordly:issues:list"),
+    messages: (issueId: string) => ipcRenderer.invoke("ordly:issues:messages", issueId),
+    reply: (issueId: string, text: string) =>
+      ipcRenderer.invoke("ordly:issues:reply", issueId, text),
+  },
+  stats: {
+    get: () => ipcRenderer.invoke("ordly:stats:get"),
+    stockReport: () => ipcRenderer.invoke("ordly:stats:stockReport"),
+    shoppingList: () => ipcRenderer.invoke("ordly:stats:shoppingList"),
+  },
+  olx: {
+    list: () => ipcRenderer.invoke("ordly:olx:list"),
+    save: (input: {
+      id?: string;
+      title: string;
+      price: number;
+      stock: number;
+      url: string;
+      linkedSku?: string;
+    }) => ipcRenderer.invoke("ordly:olx:save", input),
+    delete: (id: string) => ipcRenderer.invoke("ordly:olx:delete", id),
+    importCsv: () => ipcRenderer.invoke("ordly:olx:importCsv"),
+  },
+  mailbox: {
+    list: (filters: { source?: "allegro" | "olx" | "other"; unreadOnly?: boolean } = {}) =>
+      ipcRenderer.invoke("ordly:mailbox:list", filters),
+    markRead: (messageId: string) => ipcRenderer.invoke("ordly:mailbox:markRead", messageId),
+  },
+  wholesalers: {
+    list: () => ipcRenderer.invoke("ordly:wholesalers:list"),
+    save: (input: {
+      id?: string;
+      name: string;
+      email: string;
+      contactPerson?: string;
+      linkedSkus: string[];
+    }) => ipcRenderer.invoke("ordly:wholesalers:save", input),
+    delete: (id: string) => ipcRenderer.invoke("ordly:wholesalers:delete", id),
+    history: () => ipcRenderer.invoke("ordly:wholesalers:history"),
+    sendOrder: (payload: {
+      wholesalerId: string;
+      wholesalerName: string;
+      to: string;
+      subject: string;
+      body: string;
+      itemsSummary: string;
+    }) => ipcRenderer.invoke("ordly:wholesalers:sendOrder", payload),
+  },
+  window: {
+    minimize: () => ipcRenderer.invoke("ordly:window:minimize"),
+    maximize: () => ipcRenderer.invoke("ordly:window:maximize"),
+    close: () => ipcRenderer.invoke("ordly:window:close"),
+  },
+};
+
+contextBridge.exposeInMainWorld("ordly", ordly);

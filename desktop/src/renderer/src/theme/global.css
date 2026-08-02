@@ -1,0 +1,246 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/**
+ * Tokeny kolorow 1:1 z mobile/src/theme/colors.ts. Nie dodawaj tu
+ * kolorow "na oko" - najpierw zmiana w mobile/src/theme/colors.ts,
+ * potem tutaj.
+ */
+:root {
+  --ordly-primary: #56e0d0;
+  --ordly-secondary: #4abfaf;
+  --ordly-accent: #7ff7ea;
+
+  --ordly-background: #0d1117;
+  --ordly-surface: #161b22;
+  --ordly-surface-raised: #1b222b;
+  --ordly-border: #2a2f38;
+
+  --ordly-success: #35d07f;
+  --ordly-warning: #f5b942;
+  --ordly-danger: #ff5c5c;
+
+  --ordly-text: #ffffff;
+  --ordly-text-secondary: #9ca3af;
+  --ordly-text-dim: #6b7280;
+
+  --ordly-on-primary: #0d1117;
+
+  --ordly-primary-tint: rgba(86, 224, 208, 0.12);
+  --ordly-success-tint: rgba(53, 208, 127, 0.12);
+  --ordly-warning-tint: rgba(245, 185, 66, 0.12);
+  --ordly-danger-tint: rgba(255, 92, 92, 0.12);
+}
+
+html,
+body,
+#root {
+  height: 100%;
+}
+
+body {
+  background: var(--ordly-background);
+  color: var(--ordly-text);
+  font-family:
+    -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial,
+    sans-serif;
+  -webkit-font-smoothing: antialiased;
+  overflow: hidden;
+  scrollbar-width: thin;
+  scrollbar-color: var(--ordly-border) transparent;
+}
+
+/* Elektron/Chromium: pasek przewijania w kolorach appki zamiast jasnego
+   paska systemowego Windows (domyslny wyglada jak z innej aplikacji). */
+*::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+*::-webkit-scrollbar-track {
+  background: transparent;
+}
+*::-webkit-scrollbar-thumb {
+  background-color: var(--ordly-border);
+  border-radius: 999px;
+  border: 2px solid var(--ordly-background);
+  background-clip: padding-box;
+}
+*::-webkit-scrollbar-thumb:hover {
+  background-color: var(--ordly-text-dim);
+  background-clip: padding-box;
+}
+*::-webkit-scrollbar-corner {
+  background: transparent;
+}
+
+/* Strzalki natywnego <input type="number"> (jasne, systemowe) ukryte -
+   ilosc wpisuje sie recznie, tak jak w reszcie premium UI apki. */
+input[type="number"] {
+  appearance: textfield;
+  -moz-appearance: textfield;
+}
+input[type="number"]::-webkit-outer-spin-button,
+input[type="number"]::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+
+/**
+ * Skala typografii 1:1 z mobile/src/theme/typography.ts. Role jako
+ * klasy narzedziowe, zeby ekrany nie zgadywaly rozmiarow/wag na oko.
+ */
+@layer components {
+  .text-display {
+    font-size: 30px;
+    font-weight: 700;
+    line-height: 36px;
+    font-variant-numeric: tabular-nums;
+  }
+  .text-title1 {
+    font-size: 24px;
+    font-weight: 700;
+    line-height: 30px;
+  }
+  .text-title2 {
+    font-size: 19px;
+    font-weight: 700;
+    line-height: 25px;
+  }
+  .text-headline {
+    font-size: 15.5px;
+    font-weight: 600;
+    line-height: 21px;
+  }
+  .text-body {
+    font-size: 15px;
+    font-weight: 400;
+    line-height: 22px;
+  }
+  .text-callout {
+    font-size: 14px;
+    font-weight: 400;
+    line-height: 20px;
+  }
+  .text-callout-semibold {
+    font-size: 14px;
+    font-weight: 600;
+    line-height: 20px;
+  }
+  .text-footnote {
+    font-size: 12px;
+    font-weight: 400;
+    line-height: 17px;
+  }
+  .text-caption {
+    font-size: 11px;
+    font-weight: 500;
+    line-height: 15px;
+  }
+  .text-mono-role {
+    font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+    font-size: 12px;
+    font-weight: 500;
+    line-height: 17px;
+    font-variant-numeric: tabular-nums;
+  }
+  .text-stat-value {
+    font-size: 18px;
+    font-weight: 700;
+    line-height: 23px;
+    font-variant-numeric: tabular-nums;
+  }
+  .text-button-label {
+    font-size: 15px;
+    font-weight: 600;
+  }
+  .text-badge-label {
+    font-size: 11px;
+    font-weight: 600;
+  }
+
+  .ordly-cta {
+    @apply flex h-[52px] items-center justify-center gap-2 rounded-lg text-on-primary text-button-label;
+    background: linear-gradient(
+      135deg,
+      var(--ordly-primary),
+      var(--ordly-accent)
+    );
+    box-shadow: 0 10px 24px -8px rgba(86, 224, 208, 0.5);
+  }
+  .ordly-cta:disabled {
+    opacity: 0.45;
+    cursor: not-allowed;
+  }
+  .ordly-cta:not(:disabled):active {
+    transform: scale(0.99);
+    opacity: 0.92;
+  }
+
+  .ordly-field-row {
+    @apply flex h-[52px] items-center gap-2 rounded-md border border-border bg-surface px-4;
+  }
+  .ordly-field-row.focused {
+    border-color: var(--ordly-primary);
+    box-shadow: 0 0 0 3px var(--ordly-primary-tint);
+  }
+
+  /* <select> natywny - ukrywa systemowa strzalke (jasna, nie pasuje do
+     ciemnego motywu) i rysuje wlasna, w kolorze textSecondary. */
+  select.ordly-select {
+    appearance: none;
+    -webkit-appearance: none;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24' fill='none' stroke='%239CA3AF' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 0.6rem center;
+    background-size: 15px;
+    padding-right: 2.1rem;
+  }
+}
+
+@keyframes ordly-toast-in {
+  from {
+    opacity: 0;
+    transform: translateY(10px) scale(0.97);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+.animate-toast-in {
+  animation: ordly-toast-in 220ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@keyframes ordly-palette-in {
+  from {
+    opacity: 0;
+    transform: translateY(-6px) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+.animate-palette-in {
+  animation: ordly-palette-in 160ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .animate-floaty,
+  .animate-pulse-dot,
+  .animate-toast-in,
+  .animate-palette-in {
+    animation: none !important;
+  }
+}
+
+@layer utilities {
+  /* Pasek tytulowy okna bez ramki - obszar przeciagania i wyjatki dla przyciskow. */
+  .app-region-drag {
+    -webkit-app-region: drag;
+  }
+  .app-region-no-drag {
+    -webkit-app-region: no-drag;
+  }
+}
