@@ -39,10 +39,12 @@ from app.utils.time import utc_now
 
 _TOKEN_REFRESH_MARGIN = timedelta(minutes=5)
 
-# Zasoby "Post Purchase Issues" (dyskusje + reklamacje, od czerwca 2025
-# zastąpiły dawne /sale/disputes) są w Allegro API oznaczone jako beta -
-# wymagają jawnego Accept, inaczej niż reszta pluginu (public.v1).
-_ISSUES_ACCEPT_HEADER = "application/vnd.allegro.beta.v1+json"
+# Kilka zasobów Allegro API jest oznaczonych jako beta i wymaga jawnego
+# nagłówka Accept, inaczej niż reszta pluginu (public.v1): "Post Purchase
+# Issues" (dyskusje + reklamacje, od czerwca 2025 zastąpiły /sale/disputes)
+# oraz /order/customer-returns (potwierdzone w oficjalnym swagger.yaml -
+# oznaczone tam "[BETA]"), stąd 406 Not Acceptable przy domyślnym public.v1.
+_BETA_ACCEPT_HEADER = "application/vnd.allegro.beta.v1+json"
 
 
 class AllegroPlugin(MarketplacePlugin):
@@ -150,6 +152,7 @@ class AllegroPlugin(MarketplacePlugin):
             "/order/customer-returns",
             access_token,
             params={"limit": "50"},
+            accept=_BETA_ACCEPT_HEADER,
         )
         raw_returns = response.get("customerReturns", [])
         return [map_customer_return_to_domain(raw) for raw in raw_returns]
@@ -203,7 +206,7 @@ class AllegroPlugin(MarketplacePlugin):
             "/sale/issues",
             access_token,
             params={"limit": "50"},
-            accept=_ISSUES_ACCEPT_HEADER,
+            accept=_BETA_ACCEPT_HEADER,
         )
         return [map_issue_to_domain(raw) for raw in response.get("issues", [])]
 
@@ -214,7 +217,7 @@ class AllegroPlugin(MarketplacePlugin):
             f"/sale/issues/{issue_id}/chat",
             access_token,
             params={"limit": "100"},
-            accept=_ISSUES_ACCEPT_HEADER,
+            accept=_BETA_ACCEPT_HEADER,
         )
         return [map_issue_message_to_domain(raw) for raw in response.get("chat", [])]
 
@@ -231,7 +234,7 @@ class AllegroPlugin(MarketplacePlugin):
             f"/sale/issues/{issue_id}/message",
             access_token,
             json_body={"text": text, "type": "REGULAR"},
-            accept=_ISSUES_ACCEPT_HEADER,
+            accept=_BETA_ACCEPT_HEADER,
         )
 
     async def get_products(self) -> list[Product]:
