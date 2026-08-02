@@ -1,0 +1,514 @@
+<title>ORDLY — plan rozbudowy</title>
+<style>
+:root{
+  --bg:#f5faf9;
+  --bg-raised:#ffffff;
+  --ink:#0f211e;
+  --ink-dim:#4b6360;
+  --hair:#d7e6e3;
+  --accent:#1a9c8a;
+  --accent-soft:#e3f5f1;
+  --ok:#1a9c6a;
+  --ok-soft:#e3f5ea;
+  --warn:#b8791a;
+  --warn-soft:#faf1e0;
+  --gap:#b8401a;
+  --gap-soft:#f9e8e0;
+  --font-display:"Iowan Old Style","Palatino Linotype","Book Antiqua",Georgia,serif;
+  --font-body:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+  --font-mono:ui-monospace,"SF Mono",Menlo,Consolas,"Liberation Mono",monospace;
+}
+@media (prefers-color-scheme: dark){
+  :root{
+    --bg:#0d1117;
+    --bg-raised:#141b22;
+    --ink:#e6f0ed;
+    --ink-dim:#8fa8a3;
+    --hair:#243138;
+    --accent:#56e0d0;
+    --accent-soft:#16302c;
+    --ok:#4fd393;
+    --ok-soft:#132a20;
+    --warn:#e0b356;
+    --warn-soft:#2e2513;
+    --gap:#e07856;
+    --gap-soft:#2e1c13;
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#0d1117;--bg-raised:#141b22;--ink:#e6f0ed;--ink-dim:#8fa8a3;--hair:#243138;
+  --accent:#56e0d0;--accent-soft:#16302c;--ok:#4fd393;--ok-soft:#132a20;
+  --warn:#e0b356;--warn-soft:#2e2513;--gap:#e07856;--gap-soft:#2e1c13;
+}
+:root[data-theme="light"]{
+  --bg:#f5faf9;--bg-raised:#ffffff;--ink:#0f211e;--ink-dim:#4b6360;--hair:#d7e6e3;
+  --accent:#1a9c8a;--accent-soft:#e3f5f1;--ok:#1a9c6a;--ok-soft:#e3f5ea;
+  --warn:#b8791a;--warn-soft:#faf1e0;--gap:#b8401a;--gap-soft:#f9e8e0;
+}
+*{box-sizing:border-box;}
+body{
+  background:var(--bg);
+  color:var(--ink);
+  font-family:var(--font-body);
+  line-height:1.55;
+  -webkit-font-smoothing:antialiased;
+}
+.page{
+  max-width:760px;
+  margin:0 auto;
+  padding:4rem 1.5rem 6rem;
+}
+.masthead{
+  display:flex;
+  flex-direction:column;
+  gap:.6rem;
+  padding-bottom:2.2rem;
+  border-bottom:1px solid var(--hair);
+  margin-bottom:2.6rem;
+}
+.eyebrow{
+  font-family:var(--font-mono);
+  font-size:.72rem;
+  letter-spacing:.09em;
+  text-transform:uppercase;
+  color:var(--accent);
+}
+h1{
+  font-family:var(--font-display);
+  font-size:2.15rem;
+  font-weight:600;
+  margin:0;
+  text-wrap:balance;
+  letter-spacing:.005em;
+}
+.dek{
+  color:var(--ink-dim);
+  font-size:1.02rem;
+  max-width:62ch;
+}
+.meta-row{
+  display:flex;
+  gap:1.4rem;
+  flex-wrap:wrap;
+  font-family:var(--font-mono);
+  font-size:.78rem;
+  color:var(--ink-dim);
+  margin-top:.3rem;
+}
+.meta-row b{color:var(--ink);font-weight:600;}
+
+section{margin-bottom:2.8rem;}
+h2{
+  font-family:var(--font-display);
+  font-size:1.3rem;
+  font-weight:600;
+  margin:0 0 .9rem;
+}
+p{margin:.6rem 0;}
+.lede{color:var(--ink-dim);}
+
+/* correction callout */
+.correction{
+  background:var(--gap-soft);
+  border:1px solid color-mix(in srgb, var(--gap) 35%, transparent);
+  border-radius:10px;
+  padding:1.1rem 1.3rem;
+  margin:1.2rem 0;
+}
+.correction .tag{
+  font-family:var(--font-mono);
+  font-size:.7rem;
+  letter-spacing:.08em;
+  text-transform:uppercase;
+  color:var(--gap);
+  font-weight:600;
+}
+.correction p{margin:.4rem 0 0;font-size:.95rem;}
+.correction code{color:var(--ink);}
+
+/* baseline table */
+.baseline{
+  display:grid;
+  grid-template-columns:1fr 1fr;
+  gap:1px;
+  background:var(--hair);
+  border:1px solid var(--hair);
+  border-radius:10px;
+  overflow:auto;
+  font-size:.9rem;
+}
+.baseline .cell{
+  background:var(--bg-raised);
+  padding:.85rem 1rem;
+}
+.baseline .head{
+  font-family:var(--font-mono);
+  font-size:.68rem;
+  letter-spacing:.08em;
+  text-transform:uppercase;
+  color:var(--ink-dim);
+  background:var(--bg);
+}
+.baseline code{font-family:var(--font-mono);font-size:.82em;color:var(--accent);}
+
+/* roadmap phases */
+.phase{
+  border:1px solid var(--hair);
+  border-radius:12px;
+  background:var(--bg-raised);
+  padding:1.4rem 1.5rem 1.5rem;
+  margin-bottom:1.1rem;
+}
+.phase-head{
+  display:flex;
+  align-items:baseline;
+  justify-content:space-between;
+  gap:1rem;
+  flex-wrap:wrap;
+  margin-bottom:.5rem;
+}
+.phase-title{
+  display:flex;
+  align-items:baseline;
+  gap:.6rem;
+}
+.phase-num{
+  font-family:var(--font-mono);
+  color:var(--ink-dim);
+  font-size:.85rem;
+}
+.phase-name{
+  font-family:var(--font-display);
+  font-size:1.12rem;
+  font-weight:600;
+}
+.chip{
+  font-family:var(--font-mono);
+  font-size:.68rem;
+  letter-spacing:.06em;
+  text-transform:uppercase;
+  padding:.22rem .55rem;
+  border-radius:999px;
+  white-space:nowrap;
+  font-weight:600;
+}
+.chip.reuse{background:var(--ok-soft);color:var(--ok);}
+.chip.build{background:var(--gap-soft);color:var(--gap);}
+.chip.decide{background:var(--warn-soft);color:var(--warn);}
+.phase-why{color:var(--ink-dim);font-size:.92rem;margin:.3rem 0 .9rem;}
+.phase-grid{
+  display:grid;
+  grid-template-columns:1fr 1fr;
+  gap:.9rem;
+}
+@media (max-width:600px){.phase-grid{grid-template-columns:1fr;} .baseline{grid-template-columns:1fr;}}
+.col-label{
+  font-family:var(--font-mono);
+  font-size:.66rem;
+  letter-spacing:.08em;
+  text-transform:uppercase;
+  color:var(--ink-dim);
+  margin-bottom:.35rem;
+}
+.col ul{margin:0;padding-left:1.1rem;font-size:.88rem;}
+.col li{margin-bottom:.3rem;}
+.col.reuse .col-label{color:var(--ok);}
+.col.build .col-label{color:var(--gap);}
+.files{
+  font-family:var(--font-mono);
+  font-size:.78rem;
+  color:var(--ink-dim);
+  margin-top:.9rem;
+  padding-top:.7rem;
+  border-top:1px dashed var(--hair);
+}
+
+/* decisions */
+.decision{
+  display:flex;
+  gap:1rem;
+  padding:1rem 0;
+  border-top:1px solid var(--hair);
+}
+.decision:first-of-type{border-top:none;}
+.decision .num{
+  font-family:var(--font-mono);
+  color:var(--accent);
+  font-size:.85rem;
+  padding-top:.15rem;
+}
+.decision .body b{display:block;margin-bottom:.2rem;}
+.decision .body span{color:var(--ink-dim);font-size:.92rem;}
+
+.closing{
+  background:var(--accent-soft);
+  border-radius:12px;
+  padding:1.3rem 1.5rem;
+  font-size:.95rem;
+}
+.closing b{color:var(--accent);}
+
+footer{
+  margin-top:3rem;
+  padding-top:1.2rem;
+  border-top:1px solid var(--hair);
+  font-family:var(--font-mono);
+  font-size:.75rem;
+  color:var(--ink-dim);
+}
+</style>
+
+<div class="page">
+
+  <div class="masthead">
+    <span class="eyebrow">ORDLY · plan rozbudowy · 31 lipca 2026 · v2</span>
+    <h1>Dwie aplikacje, jeden backend: telefon do podglądu, laptop do zarządzania</h1>
+    <p class="dek">Przeczytałem 7 plików z <code style="font-family:var(--font-mono)">files/</code> i zestawiłem je z rzeczywistym stanem repo ORDLY. Po Twojej korekcie: telefon pokazuje magazyn, zamówienia, zwroty, dyskusje i skrzynkę mailową — wyłącznie do podglądu, z pushem. Laptop (nowa aplikacja Electron) dostaje to samo z akcjami, plus hurtownię, OLX i statystyki, których na telefonie świadomie nie ma. Zero kodu napisanego dzisiaj — to materiał do Twojej akceptacji.</p>
+    <div class="meta-row">
+      <span><b>Pliki źródłowe:</b> appplans_00…06.md</span>
+      <span><b>Repo sprawdzone:</b> src/ (backend) + mobile/ (PWA)</span>
+      <span><b>Kod dzisiaj:</b> żaden</span>
+    </div>
+  </div>
+
+  <section>
+    <h2>Najpierw korekta założeń</h2>
+    <p class="lede">Pliki planistyczne opisują architekturę, której w Twoim repo nie ma. Zanim cokolwiek zaplanuję dalej, to trzeba nazwać wprost — inaczej cała kolejność wdrażania z <code style="font-family:var(--font-mono)">appplans_00</code> prowadzi w złą stronę.</p>
+
+    <div class="correction">
+      <span class="tag">Nazewnictwo z planu → rzeczywistość</span>
+      <p><b>Plan zakłada:</b> backend RPi nazwany "Comcio", desktop nazwany "Cewastack".</p>
+      <p><b>W repo jest:</b> jeden backend FastAPI na Raspberry Pi pod nazwą ORDLY (usługa <code>ordly.service</code>) + bot Telegram + aplikacja RN/Expo (PWA). Osobnej appki desktopowej faktycznie nigdy nie było — budujemy ją teraz od zera jako Electron, pod nazwą ORDLY, nie jako drugi produkt z inną marką.</p>
+    </div>
+
+    <div class="correction">
+      <span class="tag">Architektura pluginów jest węższa niż plan zakłada</span>
+      <p>Plan (<code style="font-family:var(--font-mono)">appplans_02/05</code>) zakłada listę <code style="font-family:var(--font-mono)">registered_plugins</code> odpytywaną równolegle (Allegro + OLX naraz). W rzeczywistości <code style="font-family:var(--font-mono)">Container.build_plugin()</code> wybiera <b>jeden</b> aktywny plugin na podstawie <code style="font-family:var(--font-mono)">MARKETPLACE_PROVIDER</code> — Amazon i eBay istnieją tylko jako puste foldery-szkielety, nigdy nie działały równolegle z Allegro.</p>
+      <p>Żeby OLX działał <i>obok</i> Allegro (a nie zamiast), trzeba najpierw rozszerzyć scheduler o wielu jednoczesnych dostawców — to realna, wcześniej niezaplanowana zmiana architektoniczna, nie tylko "dodaj plugin".</p>
+    </div>
+
+    <div class="correction">
+      <span class="tag">Fundament z modułu 02 już częściowo istnieje</span>
+      <p>Sync silnik, Event Bus, scheduler cykliczny i Web Push — to wszystko już działa (<code style="font-family:var(--font-mono)">core/event_bus/</code>, <code style="font-family:var(--font-mono)">scheduler/jobs/sync_orders_job.py</code>, <code style="font-family:var(--font-mono)">infrastructure/webpush/</code>). Zwroty (<code style="font-family:var(--font-mono)">customer_returns</code>) są już synchronizowane i emitują zdarzenie <code style="font-family:var(--font-mono)">OrderReturnCreated</code> — tylko nigdzie w UI nie są jeszcze pokazane. Nie trzeba tego budować od zera, tylko rozszerzyć.</p>
+    </div>
+
+    <div class="correction" style="background:var(--accent-soft);border-color:color-mix(in srgb, var(--accent) 35%, transparent);">
+      <span class="tag" style="color:var(--accent);">Twoja korekta — podział ról między aplikacjami (potwierdzone, v2)</span>
+      <p><b>Telefon (PWA, tak jak dziś):</b> podgląd + powiadomienia push, zero akcji. Konkretnie cztery obszary: <b>Magazyn</b> (stan), <b>Zamówienia</b>, <b>Zwroty i anulowane</b>, <b>Dyskusje</b> i <b>Skrzynka</b> (maile Allegro/OLX) — wszystko tylko do odczytu, z pushem przy nowym zdarzeniu. Kliknięcie w powiadomienie o dyskusji czy mailu otwiera podgląd, nie pole odpowiedzi — z komunikatem „Odpowiedz na laptopie". Poza tym tylko techniczne minimum: logowanie, Face ID, wylogowanie, test powiadomień.</p>
+      <p><b>Laptop (nowa aplikacja Electron):</b> pełna wersja ORDLY do zarządzania — te same cztery obszary co na telefonie, ale z akcjami (odpowiedź na dyskusję, itd.), plus to, czego na telefonie świadomie nie ma: <b>Hurtownia</b> (wysyłka maila) i <b>OLX</b>, oraz przeniesione tam <b>Statystyki</b>.</p>
+      <p><b>Backend pozostaje jeden</b> (RPi, <code style="font-family:var(--font-mono)">ordly.service</code>) — obie aplikacje to tylko klienci tego samego API, zgodnie z zasadą "Pi = jedyne źródło prawdy" z oryginalnego planu. Ten sam endpoint <code style="font-family:var(--font-mono)">GET /returns</code> czy <code style="font-family:var(--font-mono)">GET /disputes</code> karmi obie appki — różnica jest tylko w tym, czy UI pokazuje przycisk akcji.</p>
+    </div>
+  </section>
+
+  <section>
+    <h2>Stan faktyczny — punkt wyjścia</h2>
+    <div class="baseline">
+      <div class="cell head">Warstwa</div>
+      <div class="cell head">Co realnie działa dziś</div>
+      <div class="cell">Backend</div>
+      <div class="cell">FastAPI + aiogram + APScheduler + SQLite/WAL, Clean Architecture (<code>domain / services / infrastructure / repositories</code>), Alembic już skonfigurowany.</div>
+      <div class="cell">Sync</div>
+      <div class="cell"><code>sync_orders_job</code> co <code>SYNC_ORDERS_INTERVAL_SECONDS</code> — zamówienia, anulowania, zwroty. Event Bus emituje <code>OrderCreated/Updated/Cancelled/ReturnCreated</code>.</div>
+      <div class="cell">Powiadomienia</div>
+      <div class="cell">Web Push (VAPID) już wysyła do PWA + bot Telegram do admina. Brak Expo/FCM — i nie jest potrzebny, PWA nie tego wymaga.</div>
+      <div class="cell">Klient (dziś)</div>
+      <div class="cell">Jedna appka RN/Expo (PWA): Home, Orders, OrderDetail, Stock, StockItem, Stats, Settings, Login + Face ID. Po zmianie: Stats wędruje na desktop, reszta zostaje jako czysty podgląd.</div>
+      <div class="cell">Klient (do zbudowania)</div>
+      <div class="cell">Aplikacja Electron na laptopa — nie istnieje jeszcze ani jedna linijka. Nowy szkielet: React + TS + Vite (spójnie z resztą stacku), logowanie przez ten sam <code>POST /api/v1/auth/login</code> co mobile.</div>
+      <div class="cell">Marketplace</div>
+      <div class="cell">Allegro w pełni wdrożony (auth, client, mapper). Amazon/eBay — puste szkielety. OLX — brak w ogóle.</div>
+      <div class="cell">Sekrety</div>
+      <div class="cell">Wszystko w <code>.env</code> na Pi: Allegro, Telegram, VAPID. Brak SMTP, brak IMAP, brak OLX.</div>
+    </div>
+  </section>
+
+  <section>
+    <h2>Kolejność wdrażania</h2>
+    <p class="lede">Osiem etapów. Etap 0 to fundament, bez którego nic dalej nie ma gdzie żyć — dopiero potem dokładam moduły. Telefon dostaje tylko jeden etap na końcu: przycięcie do czystego podglądu.</p>
+
+    <div class="phase">
+      <div class="phase-head">
+        <div class="phase-title"><span class="phase-num">00</span><span class="phase-name">Szkielet aplikacji Electron na laptopa</span></div>
+        <span class="chip build">nowa aplikacja</span>
+      </div>
+      <p class="phase-why">Musi powstać jako pierwsze — wszystkie kolejne etapy to ekrany wewnątrz tej appki. Bez tego nie ma gdzie umieścić zwrotów, dyskusji, hurtowni ani skrzynki.</p>
+      <div class="phase-grid">
+        <div class="col reuse"><div class="col-label">Reużywam</div><ul>
+          <li><code style="font-family:var(--font-mono)">POST /api/v1/auth/login</code>, <code style="font-family:var(--font-mono)">ORDLY_API_TOKEN</code>, adres Tailscale</li>
+        </ul></div>
+        <div class="col build"><div class="col-label">Buduję nowe</div><ul>
+          <li>Electron + React + TS + Vite, okno + nawigacja boczna</li>
+          <li>Ekran logowania (reużywa istniejący endpoint), token w <code style="font-family:var(--font-mono)">electron-store</code> zaszyfrowany</li>
+          <li>Zakładka Magazyn — z edycją: <code style="font-family:var(--font-mono)">POST /stock/{sku}/adjust</code>, linkowanie ofert, nowe produkty (te endpointy już istnieją)</li>
+          <li>Zakładka Zamówienia — podgląd + ręczny <code style="font-family:var(--font-mono)">POST /orders/sync</code> i wyszukiwanie; <b>bez edycji statusu</b> — backend go nie udostępnia, status idzie wyłącznie z Allegro, więc taki przycisk nie powstanie</li>
+        </ul></div>
+      </div>
+      <div class="files">desktop/ (nowy katalog) · desktop/electron/auth.js · desktop/src/App.tsx</div>
+    </div>
+
+    <div class="phase">
+      <div class="phase-head">
+        <div class="phase-title"><span class="phase-num">01</span><span class="phase-name">Zwroty i anulowane</span></div>
+        <span class="chip reuse">głównie reuse backendu</span>
+      </div>
+      <p class="phase-why">Dane już płyną do bazy i emitują zdarzenia (<code style="font-family:var(--font-mono)">customer_returns</code>, <code style="font-family:var(--font-mono)">OrderReturnCreated</code>) — brakuje tylko endpointu i ekranów. Jeden endpoint karmi od razu obie appki: desktop dostaje zakładkę pełną, telefon — podgląd + push.</p>
+      <div class="phase-grid">
+        <div class="col reuse"><div class="col-label">Reużywam</div><ul>
+          <li>Event bus, dane już zsynchronizowane, web push</li>
+        </ul></div>
+        <div class="col build"><div class="col-label">Buduję nowe</div><ul>
+          <li>Endpoint <code style="font-family:var(--font-mono)">GET /api/v1/returns</code> + event push przy nowym zwrocie</li>
+          <li>Zakładka „Zwroty i anulowane" w Electronie (desktop)</li>
+          <li>Ekran „Zwroty" w PWA — lista read-only + push, bez akcji (mobile)</li>
+        </ul></div>
+      </div>
+      <div class="files">api/endpoints/returns.py · desktop/src/features/returns/ · mobile/src/screens/ReturnsScreen.tsx</div>
+    </div>
+
+    <div class="phase">
+      <div class="phase-head">
+        <div class="phase-title"><span class="phase-num">02</span><span class="phase-name">Dyskusje Allegro</span></div>
+        <span class="chip build">nowa funkcja</span>
+      </div>
+      <p class="phase-why">Zero istniejącego wsparcia — model, sync i odpowiadanie powstają od zera. Wymaga weryfikacji aktualnej nazwy scope'u/endpointu w dokumentacji Allegro przed kodowaniem (nazwy bywają zmieniane).</p>
+      <div class="phase-grid">
+        <div class="col reuse"><div class="col-label">Reużywam</div><ul>
+          <li>Wzorzec pluginu Allegro (mapper/client), scheduler, event bus</li>
+        </ul></div>
+        <div class="col build"><div class="col-label">Buduję nowe</div><ul>
+          <li><code style="font-family:var(--font-mono)">DisputeModel</code> + migracja Alembic</li>
+          <li><code style="font-family:var(--font-mono)">POST /disputes/{id}/reply</code> (proxy do Allegro, token zostaje na Pi)</li>
+          <li>Zakładka z wątkiem dyskusji + polem odpowiedzi w Electronie (desktop)</li>
+          <li>Ekran „Dyskusje" w PWA — treść wątku read-only + push, przycisk odpowiedzi zastąpiony komunikatem „Odpowiedz na laptopie" (mobile)</li>
+        </ul></div>
+      </div>
+      <div class="files">infrastructure/plugins/allegro/disputes.py · desktop/src/features/disputes/ · mobile/src/screens/DisputesScreen.tsx</div>
+    </div>
+
+    <div class="phase">
+      <div class="phase-head">
+        <div class="phase-title"><span class="phase-num">03</span><span class="phase-name">Mail do hurtowni</span></div>
+        <span class="chip build">nowa funkcja</span>
+      </div>
+      <p class="phase-why">Niezależny od reszty. Wysyłka SMTP dzieje się w backendzie na Pi (jedyne miejsce z sekretami) — Electron woła endpoint, nie trzyma hasła SMTP lokalnie, zgodnie z zasadą "zero sekretów w kliencie".</p>
+      <div class="phase-grid">
+        <div class="col reuse"><div class="col-label">Reużywam</div><ul>
+          <li>Wzorzec <code style="font-family:var(--font-mono)">.env</code> + serwis w warstwie <code style="font-family:var(--font-mono)">services/</code></li>
+        </ul></div>
+        <div class="col build"><div class="col-label">Buduję nowe</div><ul>
+          <li><code style="font-family:var(--font-mono)">WholesalerModel</code>, <code style="font-family:var(--font-mono)">wholesaler_service.py</code> (SMTP)</li>
+          <li><code style="font-family:var(--font-mono)">SMTP_HOST/PORT/USER/PASS</code> w <code style="font-family:var(--font-mono)">.env</code> na Pi</li>
+          <li>Przycisk „Zamów u hurtowni" w Electronie + modal edycji treści</li>
+        </ul></div>
+      </div>
+      <div class="files">services/wholesaler_service.py · desktop/src/features/wholesalers/</div>
+    </div>
+
+    <div class="phase">
+      <div class="phase-head">
+        <div class="phase-title"><span class="phase-num">04</span><span class="phase-name">Skrzynka — maile Allegro/OLX (Gmail)</span></div>
+        <span class="chip build">nowa funkcja</span>
+      </div>
+      <p class="phase-why">Potwierdzone: Gmail. Wymaga hasła aplikacji (app password) w koncie Google — 2FA musi być włączone. IMAP odpytywany rzadziej niż sync zamówień (co 5 min, nie 60s), żeby Gmail nie throttlował.</p>
+      <div class="phase-grid">
+        <div class="col reuse"><div class="col-label">Reużywam</div><ul>
+          <li>Scheduler (drugi, wolniejszy job), event bus, wzorzec service/model</li>
+        </ul></div>
+        <div class="col build"><div class="col-label">Buduję nowe</div><ul>
+          <li><code style="font-family:var(--font-mono)">mail_watcher.py</code> (IMAP przez <code style="font-family:var(--font-mono)">aioimaplib</code>)</li>
+          <li><code style="font-family:var(--font-mono)">MailMessageModel</code> + endpointy odczytu + push przy nowym mailu</li>
+          <li>Zakładka „Skrzynka" (lista + podgląd, split-view) w Electronie (desktop)</li>
+          <li>Ekran „Skrzynka" w PWA — ta sama lista i podgląd, tylko bez akcji wysyłki (mobile)</li>
+        </ul></div>
+      </div>
+      <div class="files">services/mail_watcher.py · desktop/src/features/mailbox/ · mobile/src/screens/MailboxScreen.tsx</div>
+    </div>
+
+    <div class="phase">
+      <div class="phase-head">
+        <div class="phase-title"><span class="phase-num">05</span><span class="phase-name">OLX — decyzja przed kodem</span></div>
+        <span class="chip decide">wymaga sprawdzenia</span>
+      </div>
+      <p class="phase-why">Zanim napiszę jakikolwiek kod: sprawdzam, czy w tym momencie OLX udostępnia rejestrowalne API partnerskie. Jeśli nie — <b>nie robię scrapingu</b> (łamie regulamin OLX, kruche, ryzyko bana), tylko wariant manualny (import CSV). Dodatkowo: obsługa dwóch rynków naraz wymaga rozszerzenia schedulera o wielu równoległych dostawców (patrz korekta wyżej) — to osobny kawałek pracy, niezależnie od dostępności API OLX.</p>
+      <div class="phase-grid">
+        <div class="col reuse"><div class="col-label">Reużywam</div><ul>
+          <li>Wzorzec folderu pluginu (<code style="font-family:var(--font-mono)">adding_new_marketplace.md</code>) jako szkic, nie 1:1</li>
+        </ul></div>
+        <div class="col build"><div class="col-label">Buduję nowe</div><ul>
+          <li>Scheduler: obsługa wielu aktywnych dostawców jednocześnie</li>
+          <li><code style="font-family:var(--font-mono)">ProductLinkModel</code> — wspólny stan magazynu Allegro↔OLX</li>
+          <li>Zakładka „OLX" w Electronie (lub import CSV, jeśli brak API)</li>
+        </ul></div>
+      </div>
+      <div class="files">infrastructure/plugins/olx/ (do potwierdzenia zakresu)</div>
+    </div>
+
+    <div class="phase">
+      <div class="phase-head">
+        <div class="phase-title"><span class="phase-num">06</span><span class="phase-name">Statystyki — przeniesienie z telefonu na laptop</span></div>
+        <span class="chip build">migracja</span>
+      </div>
+      <p class="phase-why">StatsScreen istnieje dziś w appce mobilnej. Po Twojej korekcie telefon ma pokazywać tylko magazyn i zamówienia — statystyki przenoszą się do Electrona jako pełnoprawna zakładka (z możliwością dalszego rozwoju, np. wykresów, których na telefonie i tak byś nie chciał oglądać).</p>
+      <div class="phase-grid">
+        <div class="col reuse"><div class="col-label">Reużywam</div><ul>
+          <li><code style="font-family:var(--font-mono)">stats_service.py</code>, istniejące endpointy <code style="font-family:var(--font-mono)">/api/v1/stats</code></li>
+        </ul></div>
+        <div class="col build"><div class="col-label">Buduję nowe</div><ul>
+          <li>Zakładka „Statystyki" w Electronie</li>
+        </ul></div>
+      </div>
+      <div class="files">desktop/src/features/stats/</div>
+    </div>
+
+    <div class="phase">
+      <div class="phase-head">
+        <div class="phase-title"><span class="phase-num">07</span><span class="phase-name">Domknięcie appki mobilnej do docelowego zakresu</span></div>
+        <span class="chip reuse">porządki, nie nowa funkcja</span>
+      </div>
+      <p class="phase-why">Ostatni etap, celowo na końcu — dopiero gdy Zwroty/Dyskusje/Skrzynka mają gotowe ekrany read-only z etapów 01/02/04, spinam nawigację telefonu w finalną wersję i usuwam to, czego tam być nie powinno.</p>
+      <div class="phase-grid">
+        <div class="col reuse"><div class="col-label">Zostaje na telefonie</div><ul>
+          <li>Magazyn (Stock/StockItem) — podgląd stanu</li>
+          <li>Zamówienia (Orders/OrderDetail) + push</li>
+          <li>Zwroty i anulowane — podgląd + push</li>
+          <li>Dyskusje — podgląd wątku + push, bez pola odpowiedzi</li>
+          <li>Skrzynka — podgląd maili Allegro/OLX + push, bez wysyłki</li>
+          <li>Ustawienia (logowanie, Face ID, wylogowanie, test powiadomień)</li>
+        </ul></div>
+        <div class="col build"><div class="col-label">Usuwam / nie dodaję na telefonie</div><ul>
+          <li>StatsScreen i wpis w nawigacji (statystyki tylko na desktopie, etap 06)</li>
+          <li>Hurtownia i OLX — świadomie brak na telefonie (akcje wysyłkowe/handlowe zostają na laptopie)</li>
+          <li>Weryfikacja, że żaden ekran mobile nie ma akcji edycyjnej/wysyłkowej</li>
+        </ul></div>
+      </div>
+      <div class="files">mobile/src/screens/StatsScreen.tsx (usunięcie) · mobile/src/navigation/</div>
+    </div>
+  </section>
+
+  <section>
+    <h2>Decyzje, które chcę mieć od Ciebie na piśmie zanim zacznę kodować</h2>
+
+    <div class="decision">
+      <div class="num">1</div>
+      <div class="body"><b>Kolejność startu</b><span>Proponuję etap 00 (szkielet Electron) jako pierwszy — bez niego nie ma gdzie umieścić kolejnych modułów. Potwierdzasz, czy wolisz inaczej?</span></div>
+    </div>
+    <div class="decision">
+      <div class="num">2</div>
+      <div class="body"><b>Zakres etapu 00 przy pierwszym uruchomieniu</b><span>Poza logowaniem, czy chcesz od razu pełne zakładki Magazyn (z edycją stanu) i Zamówienia w desktopie w etapie 00, czy zacząć od samego logowania + pustej nawigacji i dokładać moduły jeden po drugim (01, 02, ...)? Drugie podejście daje szybszy pierwszy, testowalny wynik.</span></div>
+    </div>
+    <div class="decision">
+      <div class="num">3</div>
+      <div class="body"><b>Gmail app password</b><span>Do etapu 04 potrzebne będzie wygenerowane hasło aplikacji w koncie Google (Ustawienia → Bezpieczeństwo → Hasła aplikacji, wymaga 2FA). Dam Ci dokładną instrukcję krok po kroku, kiedy dojdziemy do tego etapu.</span></div>
+    </div>
+    <div class="decision">
+      <div class="num">4</div>
+      <div class="body"><b>OLX — realny zakres</b><span>Zanim zacznę etap 05: czy chcesz żebym już teraz sprawdził dostępność API partnerskiego OLX, czy wolisz to zostawić na sam koniec (po etapach 0-4)?</span></div>
+    </div>
+  </section>
+
+  <div class="closing">
+    <b>Dzisiaj:</b> tylko to — żadna linijka kodu nie została napisana ani zmieniona. Kiedy potwierdzisz kolejność, każdy etap dostanie osobny podgląd HTML do akceptacji <i>przed</i> wdrożeniem, a wdrożenie na Pi/laptopa — rozpisane krok po kroku, osobno „na komputerze" i osobno „na Raspberry Pi".
+  </div>
+
+  <footer>ORDLY · plan sporządzony na podstawie files/appplans_00…06.md + inspekcji src/ i mobile/</footer>
+</div>
