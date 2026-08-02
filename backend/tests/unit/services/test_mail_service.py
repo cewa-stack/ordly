@@ -40,8 +40,14 @@ class TestMailService:
 
     @pytest.mark.asyncio
     async def test_rzuca_mail_not_configured_gdy_brak_konfiguracji(self):
-        """Pusta konfiguracja SMTP powinna dać jasny błąd, nie próbę połączenia."""
-        service = MailService(SmtpSettings(), send_fn=FakeSender())
+        """
+        Pusta konfiguracja SMTP powinna dać jasny błąd, nie próbę połączenia.
+
+        `_env_file=None` izoluje test od lokalnego `.env` dewelopera - bez
+        tego test zależałby od tego, czy akurat w katalogu roboczym leży
+        plik z prawdziwymi danymi SMTP.
+        """
+        service = MailService(SmtpSettings(_env_file=None), send_fn=FakeSender())
 
         with pytest.raises(MailNotConfiguredError):
             await service.send("hurtownia@example.com", "Zamówienie", "Treść")
@@ -72,11 +78,22 @@ class TestMailService:
 
 
 def test_smtp_settings_enabled_wymaga_hosta_uzytkownika_i_hasla():
-    """SmtpSettings.enabled powinno być True tylko przy pełnej konfiguracji."""
-    assert SmtpSettings().enabled is False
-    assert SmtpSettings(SMTP_HOST="smtp.gmail.com", SMTP_USER="a@example.com").enabled is False
+    """
+    SmtpSettings.enabled powinno być True tylko przy pełnej konfiguracji.
+
+    `_env_file=None` wszędzie tutaj izoluje test od lokalnego `.env`
+    dewelopera (patrz komentarz w teście wyżej w tym pliku).
+    """
+    assert SmtpSettings(_env_file=None).enabled is False
     assert (
         SmtpSettings(
+            _env_file=None, SMTP_HOST="smtp.gmail.com", SMTP_USER="a@example.com"
+        ).enabled
+        is False
+    )
+    assert (
+        SmtpSettings(
+            _env_file=None,
             SMTP_HOST="smtp.gmail.com",
             SMTP_USER="a@example.com",
             SMTP_PASS=SecretStr("haslo"),
