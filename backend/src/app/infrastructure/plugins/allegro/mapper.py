@@ -172,9 +172,12 @@ def _author_fallback_login(role: str | None) -> str:
 
     Bez tego wiadomości systemowe pokazywałyby się jako "nieznany",
     co sugeruje błąd - a to normalny stan (Allegro nie ma loginu dla
-    własnych komunikatów w wątku).
+    własnych komunikatów w wątku). `ADMIN` i `SYSTEM` potwierdzone na
+    żywych danych - moderator Allegro rozstrzygający spór i automatyczne
+    powiadomienia ("sprzedający nie odpowiedział w 24h") też nie mają
+    loginu.
     """
-    if role == "ALLEGRO":
+    if role in ("ALLEGRO", "ADMIN", "SYSTEM"):
         return "Allegro"
     if role == "SELLER":
         return "Ty"

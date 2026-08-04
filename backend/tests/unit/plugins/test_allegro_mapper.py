@@ -281,6 +281,24 @@ class TestAllegroMapper:
         assert message.author_login == "Allegro"
         assert message.author_role == "ALLEGRO"
 
+    def test_wiadomosci_admin_i_system_dostaja_nazwe_allegro(self):
+        """
+        Potwierdzone na żywych danych: moderator Allegro rozstrzygający
+        spór (`ADMIN`) i automatyczne powiadomienia typu "sprzedający nie
+        odpowiedział w 24h" (`SYSTEM`) też nie mają loginu.
+        """
+        for role in ("ADMIN", "SYSTEM"):
+            message = map_issue_message_to_domain(
+                {
+                    "id": "M-2",
+                    "text": "Sprzedający nie odpowiedział w ciągu 24 godzin.",
+                    "author": {"login": None, "role": role},
+                    "createdAt": "2025-06-10T12:12:12.019Z",
+                }
+            )
+            assert message.author_login == "Allegro"
+            assert message.author_role == role
+
     def test_wiadomosc_bez_sekcji_autora_dostaje_nazwe_zastepcza(self):
         """Brak całej sekcji `author` też nie może wywalić mapowania."""
         message = map_issue_message_to_domain(
