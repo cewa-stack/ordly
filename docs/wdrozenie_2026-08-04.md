@@ -299,18 +299,41 @@ powershell -Command "Compress-Archive -Path dist\* -DestinationPath $env:USERPRO
 scp $env:USERPROFILE\Desktop\mobile-dist.zip cewastack2@cewastack2:~/
 ```
 
-Na Pi (przez SSH):
+Na Pi (przez SSH) - **najpierw sprawdź, gdzie backend NAPRAWDĘ szuka
+tych plików**. To nie jest `~/ordly/mobile/dist` - katalog źródłowy
+i katalog, z którego backend serwuje, to dwa różne miejsca:
 
 ```bash
-rm -rf ~/ordly/mobile/dist && mkdir -p ~/ordly/mobile/dist && unzip -o ~/mobile-dist.zip -d ~/ordly/mobile/dist && rm ~/mobile-dist.zip && sudo systemctl restart ordly
+grep WEB_APP_DIST_PATH ~/ordly/backend/.env
 ```
 
-Sprawdź, że Pi serwuje NOWĄ paczkę - porównaj hash pliku JS w odpowiedzi
-z hashem w świeżo zbudowanym `dist/index.html`:
+Odpowiedź to coś jak `WEB_APP_DIST_PATH=/home/cewastack2/ordly/webapp_dist`
+(u nas: dokładnie ten katalog). Podmień zawartość TEGO katalogu, nie
+`~/ordly/mobile/dist`:
 
 ```bash
-curl -s https://cewastack2.tail7f5a20.ts.net/ | grep -o 'AppEntry-[a-z0-9]*\.js'
+rm -rf ~/ordly/webapp_dist/* && unzip -o ~/mobile-dist.zip -d ~/ordly/webapp_dist && chmod -R u+rX ~/ordly/webapp_dist && rm ~/mobile-dist.zip && sudo systemctl restart ordly
 ```
+
+> **Dlaczego `chmod -R u+rX`:** `Compress-Archive` w PowerShell czasem
+> pakuje katalogi bez bitu wykonywalności (`x`). Bez niego `unzip`
+> owszem rozpakuje pliki, ale wejście w te katalogi (i ich odczyt przez
+> backend) kończy się cichym `Permission denied` - objaw jest identyczny
+> jak brak aktualizacji, tylko trudniejszy do zdiagnozowania.
+
+Sprawdź LOKALNIE na Pi (z pominięciem Tailscale, żeby wykluczyć cache
+proxy), że hash pliku JS zgadza się ze świeżo zbudowanym `dist/index.html`:
+
+```bash
+curl -s http://localhost:8000/ | grep -o 'AppEntry-[a-z0-9]*\.js'
+```
+
+> **Nauka z pierwszego wdrożenia (4 sierpnia):** wgranie paczki do
+> `~/ordly/mobile/dist` nie zmienia niczego w działającej aplikacji -
+> backend jej stamtąd nie czyta. Usługa może się zrestartować bez
+> błędu, `ls` na dysku pokaże świeże pliki, a przeglądarka i tak dostanie
+> starą wersję, bo patrzy w ogóle w inne miejsce. Zawsze zacznij od
+> `grep WEB_APP_DIST_PATH .env`, nie zgaduj ścieżki.
 
 Na telefonie **zamknij ORDLY całkowicie** (przesuń w górę w przełączniku
 aplikacji) i otwórz ponownie - service worker i statyczny bundle JS mają
