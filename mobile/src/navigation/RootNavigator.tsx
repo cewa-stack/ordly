@@ -18,13 +18,19 @@ import { SettingsScreen } from "@/screens/SettingsScreen";
 import { StockItemScreen } from "@/screens/StockItemScreen";
 import { IssueDetailScreen } from "@/screens/IssueDetailScreen";
 import { MailDetailScreen } from "@/screens/MailDetailScreen";
-import { MainTabs } from "./MainTabs";
+import { MainShell } from "./MainShell";
+import { usePushDeepLinks } from "./usePushDeepLinks";
 import type { RootStackParamList } from "./types";
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
 
 export function RootNavigator() {
   const { hasSession, isLocked, needsBiometricPrompt } = useAuth();
+
+  // Wejście z powiadomienia w konkretny rekord. Podpinane tylko przy
+  // odblokowanej sesji - inaczej push otwierałby ekran szczegółów nad
+  // ekranem logowania.
+  usePushDeepLinks(hasSession && !isLocked && !needsBiometricPrompt);
 
   return (
     <Stack.Navigator
@@ -48,7 +54,7 @@ export function RootNavigator() {
         />
       ) : (
         <>
-          <Stack.Screen name="Main" component={MainTabs} options={{ headerShown: false }} />
+          <Stack.Screen name="Main" component={MainShell} options={{ headerShown: false }} />
           <Stack.Screen
             name="OrderDetail"
             component={OrderDetailScreen}

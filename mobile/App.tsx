@@ -19,6 +19,7 @@ import { navigationTheme } from "@/navigation/theme";
 import { RootNavigator } from "@/navigation/RootNavigator";
 import { Mascot } from "@/components/Mascot";
 import { injectPwaHeadTags, registerServiceWorker } from "@/push/webPush";
+import { SyncProvider } from "@/store/sync";
 
 // Efekt uboczny na `document` - no-op na natywnym iOS/Android (guard w środku).
 injectPwaHeadTags();
@@ -62,8 +63,12 @@ export default function App() {
         <AuthProvider>
           <SplashGate>
             <NavigationContainer theme={navigationTheme}>
-              <StatusBar style="light" />
-              <RootNavigator />
+              {/* Motyw mobilny jest jasny (sekcja 2.2), wiec ikony paska
+                  stanu musza byc ciemne - inaczej znikaja na mincie. */}
+              <StatusBar style="dark" />
+              <SyncProvider>
+                <RootNavigator />
+              </SyncProvider>
             </NavigationContainer>
           </SplashGate>
         </AuthProvider>

@@ -16,6 +16,8 @@ import { MailRow } from "@/components/MailRow";
 import { FilterChip } from "@/components/FilterChip";
 import { EmptyState } from "@/components/EmptyState";
 import { ErrorState } from "@/components/ErrorState";
+import { TabHeading } from "@/components/TabHeading";
+import { ListEndNote } from "@/components/ListEndNote";
 import { Skeleton } from "@/components/Skeleton";
 import type { MailMessage, MailSource } from "@/api/types";
 import type { RootStackParamList } from "@/navigation/types";
@@ -47,9 +49,7 @@ export function MailboxScreen() {
 
   return (
     <View style={styles.screen}>
-      <View style={styles.header}>
-        <Text style={styles.title}>Skrzynka</Text>
-      </View>
+      <TabHeading title="Poczta" />
 
       <View style={styles.filterRow}>
         <FlatList
@@ -88,11 +88,16 @@ export function MailboxScreen() {
               tintColor={colors.primary}
             />
           }
+          ListFooterComponent={
+            (mail.data ?? []).length > 0 ? (
+              <ListEndNote text="To wszystko, co Ordi wyłowił ze skrzynki. Odpisujesz z desktopu albo z Gmaila." />
+            ) : null
+          }
           ListEmptyComponent={
             <EmptyState
               mascotPose="happy"
-              title="Brak maili do pokazania"
-              description="Nowe wiadomości od Allegro i OLX pojawią się tutaj automatycznie."
+              title="Skrzynka jest pusta"
+              description="Ordi pokazuje tu maile od Allegro i OLX. Jeśli spodziewasz się wiadomości, a nic nie przychodzi — sprawdź stan skrzynki w Ustawieniach na desktopie."
             />
           }
         />
@@ -123,6 +128,6 @@ const styles = StyleSheet.create({
   },
   listContent: {
     paddingHorizontal: spacing.xl,
-    paddingBottom: 110,
+    paddingBottom: 96,
   },
 });

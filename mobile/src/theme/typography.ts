@@ -1,8 +1,14 @@
 /**
- * Skala typografii ORDLY Mobile — "ORDLY — Kompletny projekt UX/UI" §15.2.
- * Display/Title w wadze Bold, dane liczbowe zawsze z `tabular-nums`.
- * Siatka: baza 4 pt, rytm 8 pt (§15.3). Promienie: 12 (pola/chipy),
- * 16 (karty), 20 (karty hero), 24 (sheety).
+ * Skala typografii ORDLY Mobile - sekcja 2.5 specyfikacji
+ * (`ORDLY-spec-implementacyjny.md`), część "Skala mobilna".
+ *
+ * Skala jest CIASNIEJSZA niż na desktopie i celowo drobniejsza niż
+ * poprzednia wersja tego pliku: telefon pokazuje listy do przejrzenia
+ * jednym rzutem oka, a nie do czytania.
+ *
+ * Reguła twarda z sekcji 2.5: każda liczba, którą użytkownik może
+ * porównać z inną liczbą, jest tabelaryczna. Stąd `tabularNums` przy
+ * wszystkich rolach niosących dane maszynowe.
  */
 import type { TextStyle } from "react-native";
 
@@ -11,49 +17,53 @@ const tabularNums: Pick<TextStyle, "fontVariant"> = {
 };
 
 export const typography = {
-  /** Kwoty KPI, hero — Display 30/36 Bold. */
-  display: { fontSize: 30, fontWeight: "700", lineHeight: 36, ...tabularNums } satisfies TextStyle,
-  /** Large titles ekranów — Title 1 24/30 Bold. */
-  title1: { fontSize: 24, fontWeight: "700", lineHeight: 30 } satisfies TextStyle,
-  /** Nagłówki sekcji i sheetów — Title 2 19/25 Bold. */
-  title2: { fontSize: 19, fontWeight: "700", lineHeight: 25 } satisfies TextStyle,
-  /** Tytuły kart, top bar — Headline 15.5/21 SemiBold. */
-  headline: { fontSize: 15.5, fontWeight: "600", lineHeight: 21 } satisfies TextStyle,
-  /** Tekst podstawowy — Body 15/22. */
-  body: { fontSize: 15, fontWeight: "400", lineHeight: 22 } satisfies TextStyle,
-  /** Treści kart, nazwiska klientów — Callout 14/20. */
-  callout: { fontSize: 14, fontWeight: "400", lineHeight: 20 } satisfies TextStyle,
-  calloutSemibold: { fontSize: 14, fontWeight: "600", lineHeight: 20 } satisfies TextStyle,
-  /** Metadane, opisy — Footnote 12/17. */
-  footnote: { fontSize: 12, fontWeight: "400", lineHeight: 17 } satisfies TextStyle,
-  /** Timestampy, etykiety — Caption 11/15 Medium. */
-  caption: { fontSize: 11, fontWeight: "500", lineHeight: 15 } satisfies TextStyle,
-  /** Nr zamówień, SKU, tracking — mono/tabular 12/17. */
-  mono: { fontSize: 12, fontWeight: "500", lineHeight: 17, ...tabularNums } satisfies TextStyle,
+  /** Powitanie w nagłówku - 17/600 (sekcja 2.5, skala mobilna). */
+  greeting: { fontSize: 17, fontWeight: "600", lineHeight: 22 } satisfies TextStyle,
+  /** Nagłówek zakładki - 15.5/600. */
+  tabHeading: { fontSize: 15.5, fontWeight: "600", lineHeight: 21 } satisfies TextStyle,
+  /** Tytuł karty - 13/600. */
+  cardTitle: { fontSize: 13, fontWeight: "600", lineHeight: 18 } satisfies TextStyle,
+  /** Treść karty - 12, line-height 1.5. */
+  cardBody: { fontSize: 12, fontWeight: "400", lineHeight: 18 } satisfies TextStyle,
+  /** Czas / SKU - 9.5 mono. */
+  meta: { fontSize: 9.5, fontWeight: "500", lineHeight: 13, ...tabularNums } satisfies TextStyle,
+  /** Etykieta zakładki - 9/500. */
+  tabLabel: { fontSize: 9, fontWeight: "500" } satisfies TextStyle,
 
-  // Role pochodne (używane w wielu miejscach)
-  sectionTitle: { fontSize: 15.5, fontWeight: "600", lineHeight: 21 } satisfies TextStyle,
+  // Role pochodne używane na ekranach szczegółów i formularzach.
+  display: { fontSize: 28, fontWeight: "700", lineHeight: 34, ...tabularNums } satisfies TextStyle,
+  title1: { fontSize: 22, fontWeight: "700", lineHeight: 28 } satisfies TextStyle,
+  title2: { fontSize: 17, fontWeight: "600", lineHeight: 23 } satisfies TextStyle,
+  headline: { fontSize: 15, fontWeight: "600", lineHeight: 20 } satisfies TextStyle,
+  body: { fontSize: 14, fontWeight: "400", lineHeight: 21 } satisfies TextStyle,
+  callout: { fontSize: 13, fontWeight: "400", lineHeight: 19 } satisfies TextStyle,
+  calloutSemibold: { fontSize: 13, fontWeight: "600", lineHeight: 19 } satisfies TextStyle,
+  footnote: { fontSize: 12, fontWeight: "400", lineHeight: 17 } satisfies TextStyle,
+  caption: { fontSize: 11, fontWeight: "500", lineHeight: 15 } satisfies TextStyle,
+  /** Nr zamówień, SKU, kwoty - dane maszynowe. */
+  mono: { fontSize: 11.5, fontWeight: "500", lineHeight: 16, ...tabularNums } satisfies TextStyle,
+
+  sectionTitle: { fontSize: 15, fontWeight: "600", lineHeight: 20 } satisfies TextStyle,
   statValue: { fontSize: 18, fontWeight: "700", lineHeight: 23, ...tabularNums } satisfies TextStyle,
-  rowAmount: { fontSize: 15, fontWeight: "700", lineHeight: 20, ...tabularNums } satisfies TextStyle,
-  tabLabel: { fontSize: 9.5, fontWeight: "600" } satisfies TextStyle,
-  buttonLabel: { fontSize: 15, fontWeight: "600" } satisfies TextStyle,
-  badgeLabel: { fontSize: 11, fontWeight: "600" } satisfies TextStyle,
+  /** Kwota na karcie - 12.5/600 mono (sekcja 6.2). */
+  rowAmount: {
+    fontSize: 12.5,
+    fontWeight: "600",
+    lineHeight: 17,
+    ...tabularNums,
+  } satisfies TextStyle,
+  buttonLabel: { fontSize: 14, fontWeight: "600" } satisfies TextStyle,
+  badgeLabel: { fontSize: 10, fontWeight: "600" } satisfies TextStyle,
 } as const;
 
+/** Promienie z sekcji 2.6 - karta mobilna 17, pasek zakładek 21. */
 export const radii = {
-  /** Miniatury, małe elementy. */
-  xs: 10,
-  /** Pola, chipy prostokątne, wyszukiwarka. */
-  sm: 12,
-  /** Pola formularzy 56 pt. */
-  md: 14,
-  /** Karty. */
-  lg: 16,
-  /** Karty hero. */
-  xl: 20,
-  /** Sheety, dialogi. */
+  xs: 8,
+  sm: 10,
+  md: 12,
+  lg: 17,
+  xl: 21,
   sheet: 24,
-  /** Pastylki, FAB, awatary. */
   full: 999,
 } as const;
 

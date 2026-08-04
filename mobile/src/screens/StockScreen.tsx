@@ -30,6 +30,8 @@ import { FilterChip } from "@/components/FilterChip";
 import { SearchBar } from "@/components/SearchBar";
 import { EmptyState } from "@/components/EmptyState";
 import { ErrorState } from "@/components/ErrorState";
+import { TabHeading } from "@/components/TabHeading";
+import { ListEndNote } from "@/components/ListEndNote";
 import { PrimaryButton } from "@/components/PrimaryButton";
 import { Skeleton } from "@/components/Skeleton";
 import { BoxIcon, PlusIcon } from "@/icons";
@@ -204,6 +206,11 @@ export function StockScreen() {
               tintColor={colors.primary}
             />
           }
+          ListFooterComponent={
+            (stock.data ?? []).length > 0 ? (
+              <ListEndNote text="To cały magazyn. Korektę stanu i progi ustawiasz na desktopie." />
+            ) : null
+          }
           ListEmptyComponent={
             <EmptyState
               icon={<BoxIcon size={24} color={colors.textSecondary} />}
@@ -346,7 +353,7 @@ const styles = StyleSheet.create({
   },
   listContent: {
     paddingHorizontal: spacing.xl,
-    paddingBottom: 110,
+    paddingBottom: 96,
   },
   modalBackdrop: {
     flex: 1,

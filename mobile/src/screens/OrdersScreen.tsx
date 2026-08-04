@@ -1,33 +1,34 @@
 /**
- * Zamówienia — §5 specyfikacji: large title, wyszukiwarka, rząd chipów
- * statusów z licznikami (filtrowanie lokalne), karty zamówień.
- * Przycisk synchronizacji pokazuje wynik ("+N nowych") po zakończeniu.
+ * Zamówienia - zakładka podglądu wg sekcji 6.2 specyfikacji.
+ *
+ * ZMIANA: zniknął lokalny przycisk "Synchronizuj" i komunikat o wyniku.
+ * Synchronizacja mieszka teraz w pigułce we wspólnym nagłówku, bo wg
+ * sekcji 1 i 6.1 to JEDYNE działanie w aplikacji mobilnej - pięć jego
+ * kopii na pięciu ekranach przeczyło tej regule.
+ *
+ * Podczas synchronizacji treść zakładki zastępuje skeleton (sekcja 6.3
+ * pkt 3), a koniec listy mówi wprost, gdzie wykonać akcję (sekcja 7.4).
  */
 import * as React from "react";
-import {
-  ActivityIndicator,
-  FlatList,
-  Pressable,
-  RefreshControl,
-  StyleSheet,
-  Text,
-  View,
-} from "react-native";
+import { FlatList, RefreshControl, StyleSheet, View } from "react-native";
 import { useNavigation } from "@react-navigation/native";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { useQueryClient } from "@tanstack/react-query";
 
 import { colors } from "@/theme/colors";
 import { radii, spacing, typography } from "@/theme/typography";
-import { useOrders, useSearchOrders, useTriggerSync } from "@/api/hooks";
+import { useOrders, useSearchOrders } from "@/api/hooks";
 import { OrderRow } from "@/components/OrderRow";
 import { SearchBar } from "@/components/SearchBar";
 import { FilterChip } from "@/components/FilterChip";
 import { EmptyState } from "@/components/EmptyState";
 import { ErrorState } from "@/components/ErrorState";
 import { Skeleton } from "@/components/Skeleton";
-import { ReceiptIcon, SyncIcon } from "@/icons";
-import { fulfillmentLabel, plural } from "@/utils/format";
+import { ReceiptIcon } from "@/icons";
+import { TabHeading } from "@/components/TabHeading";
+import { ListEndNote } from "@/components/ListEndNote";
+import { useSync } from "@/store/sync";
+import { fulfillmentLabel } from "@/utils/format";
 import type { Order } from "@/api/types";
 import type { RootStackParamList } from "@/navigation/types";
 
@@ -43,7 +44,7 @@ export function OrdersScreen() {
 
   const ordersQuery = useOrders(0);
   const searchQuery = useSearchOrders(query);
-  const sync = useTriggerSync();
+  const { isBusy, sync } = useSync();
 
   const baseData = isSearching ? searchQuery.data : ordersQuery.data;
   const isPending = isSearching ? searchQuery.isPending : ordersQuery.isPending;
@@ -90,38 +91,10 @@ export function OrdersScreen() {
 
   return (
     <View style={styles.screen}>
-      <View style={styles.header}>
-        <Text style={styles.title}>Zamówienia</Text>
-        <Pressable
-          onPress={() => sync.mutate()}
-          disabled={sync.isPending}
-          style={({ pressed }) => [styles.syncButton, pressed && styles.syncButtonPressed]}
-          hitSlop={6}
-        >
-          {sync.isPending ? (
-            <ActivityIndicator size="small" color={colors.primary} />
-          ) : (
-            <>
-              <SyncIcon size={14} color={colors.primary} />
-              <Text style={styles.syncLabel}>Synchronizuj</Text>
-            </>
-          )}
-        </Pressable>
-      </View>
-
-      {sync.isSuccess && sync.data ? (
-        <Text style={styles.syncResult}>
-          Zsynchronizowano · {sync.data.new_orders_count}{" "}
-          {plural(
-            sync.data.new_orders_count,
-            "nowe zamówienie",
-            "nowe zamówienia",
-            "nowych zamówień"
-          )}
-        </Text>
-      ) : sync.isError ? (
-        <Text style={styles.syncError}>Synchronizacja nie powiodła się — spróbuj ponownie.</Text>
-      ) : null}
+      <TabHeading
+        title="Zamówienia"
+        count={data.length > 0 ? `${data.length} na liście` : undefined}
+      />
 
       <View style={styles.searchWrap}>
         <SearchBar value={query} onChangeText={setQuery} placeholder="Numer, kupujący, produkt…" />
@@ -144,7 +117,7 @@ export function OrdersScreen() {
         />
       </View>
 
-      {isPending ? (
+      {isPending || isBusy ? (
         <View style={styles.listPadding}>
           <Skeleton height={88} radius={radii.lg} style={{ marginBottom: spacing.sm }} />
           <Skeleton height={88} radius={radii.lg} style={{ marginBottom: spacing.sm }} />
@@ -164,6 +137,11 @@ export function OrdersScreen() {
               onRefresh={onRefresh}
               tintColor={colors.primary}
             />
+          }
+          ListFooterComponent={
+            data.length > 0 ? (
+              <ListEndNote text="To wszystkie zamówienia pobrane z Pi. Szczegóły i pakowanie znajdziesz na desktopie." />
+            ) : null
           }
           ListEmptyComponent={
             <EmptyState
@@ -190,9 +168,7 @@ export function OrdersScreen() {
               actionLabel={
                 !isSearching && statusFilter === "Wszystkie" ? "Synchronizuj teraz" : undefined
               }
-              onAction={
-                !isSearching && statusFilter === "Wszystkie" ? () => sync.mutate() : undefined
-              }
+              onAction={!isSearching && statusFilter === "Wszystkie" ? sync : undefined}
             />
           }
         />
@@ -206,50 +182,8 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: colors.background,
   },
-  header: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    paddingHorizontal: spacing.xl,
-    paddingTop: spacing.lg,
-  },
-  title: {
-    ...typography.title1,
-    color: colors.text,
-  },
-  syncButton: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 6,
-    height: 36,
-    paddingHorizontal: spacing.md,
-    borderRadius: radii.full,
-    borderWidth: 1,
-    borderColor: colors.primaryBorder,
-  },
-  syncButtonPressed: {
-    backgroundColor: colors.primaryTint,
-  },
-  syncLabel: {
-    ...typography.caption,
-    fontSize: 13,
-    color: colors.primary,
-  },
-  syncResult: {
-    ...typography.caption,
-    color: colors.success,
-    paddingHorizontal: spacing.xl,
-    marginTop: spacing.xs,
-  },
-  syncError: {
-    ...typography.caption,
-    color: colors.danger,
-    paddingHorizontal: spacing.xl,
-    marginTop: spacing.xs,
-  },
   searchWrap: {
     paddingHorizontal: spacing.xl,
-    paddingTop: spacing.md,
   },
   filterRow: {
     paddingHorizontal: spacing.xl,
@@ -260,6 +194,6 @@ const styles = StyleSheet.create({
   },
   listContent: {
     paddingHorizontal: spacing.xl,
-    paddingBottom: 110,
+    paddingBottom: 96,
   },
 });
