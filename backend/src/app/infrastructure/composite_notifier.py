@@ -80,3 +80,9 @@ class CompositeNotifier(Notifier):
     async def send_text(self, text: str) -> None:
         """Rozgłasza dowolny tekst do wszystkich kanałów."""
         await self._run_all([n.send_text(text) for n in self._notifiers])
+
+    async def notify_sync_failed(self, channel: str, retry_in_minutes: int) -> None:
+        """Rozgłasza alert o niedostępnym kanale sprzedaży."""
+        await self._run_all(
+            [n.notify_sync_failed(channel, retry_in_minutes) for n in self._notifiers]
+        )

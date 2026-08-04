@@ -55,3 +55,20 @@ class Notifier(ABC):
     async def send_text(self, text: str) -> None:
         """Wysyła dowolną wiadomość tekstową (np. alert o błędzie)."""
         raise NotImplementedError
+
+    async def notify_sync_failed(self, channel: str, retry_in_minutes: int) -> None:
+        """
+        Alarmuje, że kanał sprzedaży nie odpowiada.
+
+        Ma domyślną implementację opartą o `send_text`, bo nie każdy
+        kanał powiadomień potrzebuje osobnego formatowania - liczy się,
+        żeby informacja w ogóle dotarła. Web Push nadpisuje tę metodę
+        własnym układem z katalogu powiadomień.
+
+        Wywoływane dopiero po DRUGIEJ nieudanej próbie z rzędu
+        (`SyncFailureTracker`), nigdy przy pojedynczym timeoucie.
+        """
+        await self.send_text(
+            f"{channel.capitalize()} nie odpowiedziało. "
+            f"Ordi spróbuje ponownie za {retry_in_minutes} min."
+        )

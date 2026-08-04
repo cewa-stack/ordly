@@ -1,13 +1,17 @@
 /** Parametry nawigacji - jedno źródło prawdy dla typów ekranów. */
 import type { NavigatorScreenParams } from "@react-navigation/native";
 
+/**
+ * Pięć zakładek podglądu (sekcja 6.2). Kolejność odpowiada kolejności
+ * na pasku; ekran "Home" został usunięty - jego rolę przejął wspólny
+ * nagłówek nad zakładkami.
+ */
 export type MainTabParamList = {
-  Home: undefined;
   Orders: undefined;
-  Stock: undefined;
-  Returns: undefined;
   Discussions: undefined;
+  Stock: undefined;
   Mailbox: undefined;
+  Returns: undefined;
 };
 
 export type RootStackParamList = {

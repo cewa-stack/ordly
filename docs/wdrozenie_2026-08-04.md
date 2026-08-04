@@ -267,6 +267,84 @@ kolejne uruchomienia wchodzą od razu do aplikacji.
 
 ---
 
+## CZĘŚĆ C — aplikacja mobilna i powiadomienia
+
+Aplikacja mobilna działa jako PWA (strona dodana do ekranu początkowego),
+więc nie ma tu żadnego instalatora - wystarczy odświeżyć ją na telefonie
+po wgraniu zmian na Pi.
+
+### C1. Sprawdź, czy Web Push jest skonfigurowany na Pi
+
+Powiadomienia wymagają pary kluczy VAPID. Sprawdź, czy backend je ma
+(podmień `TU_TOKEN` na token z kroku A9):
+
+```bash
+curl -s http://localhost:8000/api/v1/push/vapid-public-key -H "Authorization: Bearer TU_TOKEN"
+```
+
+`"enabled":true` oznacza, że wszystko jest gotowe. Przy `"enabled":false`
+trzeba wygenerować klucze i dopisać je do `.env`:
+
+```bash
+cd ~/ordly/backend && uv run python scripts/generate_vapid_keys.py
+```
+
+Wklej wypisane `VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY` i
+`VAPID_CLAIM_EMAIL` do `~/ordly/backend/.env`, a potem:
+
+```bash
+sudo systemctl restart ordly
+```
+
+### C2. Odśwież aplikację na telefonie
+
+Otwórz ORDLY na telefonie i **zamknij ją całkowicie** (przesuń w górę
+w przełączniku aplikacji), a potem otwórz ponownie. Service worker
+podmienia się przy następnym uruchomieniu, nie w trakcie - bez tego
+telefon dalej używa starej wersji obsługi powiadomień.
+
+### C3. Włącz powiadomienia i wyślij test
+
+W aplikacji: **Ustawienia → Powiadomienia push → Włącz**, potem
+**Wyślij testowe powiadomienie**.
+
+Powinno przyjść powiadomienie z dwoma akcjami: **Pokaż** i **Wycisz na
+godzinę**. Dotknięcie „Pokaż" ma otworzyć konkretny rekord, nie samą
+aplikację.
+
+> **iOS wymaga aplikacji z ekranu początkowego.** Powiadomienia push
+> w Safari działają wyłącznie wtedy, gdy ORDLY został dodany przez
+> „Udostępnij → Dodaj do ekranu początkowego" i jest otwierany z ikony.
+> W zwykłej karcie Safari przycisk włączenia powiadomień nie zadziała -
+> to ograniczenie systemu, nie aplikacji.
+
+### Co dostaniesz na telefon
+
+Pełna lista zdarzeń, które ORDLY wolno wysłać - czego tu nie ma, tego
+nie wyśle:
+
+| Zdarzenie | Kiedy przychodzi |
+|---|---|
+| Nowe zamówienie | natychmiast |
+| *n* nowych zamówień (zbiorczo) | gdy wpadną 3 w ciągu 15 minut |
+| Niski stan | natychmiast |
+| Nowy zwrot do decyzji | natychmiast |
+| Kanał nie odpowiedział | dopiero po **drugiej** nieudanej próbie |
+| *n* zamówień do spakowania | raz dziennie |
+
+Zasady, które są wpisane w kod, nie w dobre chęci:
+
+- **Żadna akcja z powiadomienia nie zmienia danych.** Do wyboru są tylko
+  „Pokaż" i „Wycisz na godzinę". Nie ma „Przyjmij zwrot" ani „Oznacz
+  jako spakowane" - to robisz na desktopie.
+- **Każde powiadomienie niesie liczbę** (kwotę, sztuki, ile zostało
+  czasu). Nie ma czegoś takiego jak „masz nowe zdarzenie w systemie".
+- **Cisza nocna 22:00–7:00** - powiadomienia przychodzą, ale bez dźwięku
+  i wibracji.
+- **Plakietka na ikonie** liczy wyłącznie sprawy wymagające decyzji:
+  zamówienia do spakowania, pytania bez odpowiedzi, zwroty. Przeczytane
+  maile się nie liczą.
+
 ## Co nowego w aplikacji
 
 ### Nowe ekrany

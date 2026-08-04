@@ -13,6 +13,8 @@ import { useReturns } from "@/api/hooks";
 import { ReturnRow } from "@/components/ReturnRow";
 import { EmptyState } from "@/components/EmptyState";
 import { ErrorState } from "@/components/ErrorState";
+import { TabHeading } from "@/components/TabHeading";
+import { ListEndNote } from "@/components/ListEndNote";
 import { Skeleton } from "@/components/Skeleton";
 import type { ReturnItem } from "@/api/types";
 
@@ -30,13 +32,7 @@ export function ReturnsScreen() {
 
   return (
     <View style={styles.screen}>
-      <View style={styles.header}>
-        <Text style={styles.title}>Zwroty i anulowane</Text>
-      </View>
-      <Text style={styles.note}>
-        Zwroty synchronizują się razem z zamówieniami — użyj „Synchronizuj" na ekranie Zamówień,
-        żeby sprawdzić nowe.
-      </Text>
+      <TabHeading title="Zwroty" />
 
       {returns.isPending ? (
         <View style={styles.listPadding}>
@@ -57,6 +53,11 @@ export function ReturnsScreen() {
               onRefresh={onRefresh}
               tintColor={colors.primary}
             />
+          }
+          ListFooterComponent={
+            (returns.data ?? []).length > 0 ? (
+              <ListEndNote text="To wszystkie zwroty z ostatnich 30 dni. Ordi da znać, gdy pojawi się nowy." />
+            ) : null
           }
           ListEmptyComponent={
             <EmptyState
@@ -96,6 +97,6 @@ const styles = StyleSheet.create({
   },
   listContent: {
     paddingHorizontal: spacing.xl,
-    paddingBottom: 110,
+    paddingBottom: 96,
   },
 });

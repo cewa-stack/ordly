@@ -73,6 +73,7 @@ from app.scheduler.scheduler_setup import (
     register_sync_orders_job,
     register_telegram_cleanup_job,
 )
+from app.scheduler.sync_failure_tracker import SyncFailureTracker
 
 
 def _register_bot_routers(dispatcher: Dispatcher) -> None:
@@ -163,12 +164,22 @@ async def _run_application() -> None:
 
     scheduler = create_scheduler()
 
+    # Licznik serii awarii synchronizacji. Żyje tak długo jak proces -
+    # dzięki temu powiadomienie "kanał nie odpowiedział" leci dopiero po
+    # DRUGIEJ nieudanej próbie z rzędu (sekcja 04 koncepcji push), a nie
+    # przy każdym pojedynczym timeoucie Allegro.
+    sync_failure_tracker = SyncFailureTracker()
+
     async def scheduled_sync_job() -> None:
         """Wrapper wywoływany cyklicznie przez APScheduler."""
         await run_sync_orders_job(
             session_scope_factory=container.session_scope,
             build_sync_service=container.sync_orders_service,
             sync_status=container.sync_status,
+            failure_tracker=sync_failure_tracker,
+            notifier=container.notifier(),
+            channel=settings.marketplace.marketplace_provider,
+            retry_in_minutes=max(1, settings.scheduler.sync_orders_interval_seconds // 60),
         )
 
     async def scheduled_backup_job() -> None:

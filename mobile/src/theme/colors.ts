@@ -1,63 +1,93 @@
 /**
- * Paleta kolorów ORDLY Mobile — tokeny UI motywu ciemnego wg
- * "ORDLY — Kompletny projekt UX/UI" §15.1. Pochodna kolorów księgi znaku
- * (#3EAAAF / #313E37 / #F0F4EF): primary to rozjaśniony Brand Teal,
- * zoptymalizowany kontrastowo pod tło #0D1117.
- * Nie dodawaj tu kolorów "na oko" — najpierw token w specyfikacji.
+ * Paleta ORDLY Mobile - motyw JASNY, wg sekcji 2.2 specyfikacji
+ * (`ORDLY-spec-implementacyjny.md`).
+ *
+ * Mobile jest jasny CELOWO: używa się go w magazynie i w słońcu, gdzie
+ * ciemny motyw traci czytelność. To nie jest inwersja desktopu - to
+ * osobna, świadoma paleta. Desktop zostaje dark-mode-first i nie ma
+ * wariantu jasnego.
+ *
+ * Nie dodawaj tu kolorów "na oko" - najpierw wartość w specyfikacji,
+ * potem tutaj.
  */
 export const colors = {
-  // Akcenty
-  primary: "#56E0D0",
-  secondary: "#4ABFAF",
-  accent: "#7FF7EA",
+  // Akcenty. `primary` jest CIEMNIEJSZY niż na desktopie (--teal-deep,
+  // nie --teal-bright) - jasny teal na bieli nie przechodzi kontrastu.
+  primary: "#1F7D80",
+  secondary: "#3EAAAF",
+  accent: "#5FD9CC",
 
   // Powierzchnie
-  background: "#0D1117",
-  surface: "#161B22",
-  surfaceRaised: "#1B222B",
-  border: "#2A2F38",
+  background: "#EFF4F1",
+  surface: "#FFFFFF",
+  surfaceRaised: "#E4EDE8",
+  border: "rgba(35,43,39,0.055)",
+  borderStrong: "rgba(35,43,39,0.12)",
 
   // Semantyczne
-  success: "#35D07F",
-  warning: "#F5B942",
-  danger: "#FF5C5C",
+  success: "#166F72",
+  warning: "#9A6F22",
+  danger: "#C4523A",
 
   // Tekst
-  text: "#FFFFFF",
-  textSecondary: "#9CA3AF",
-  textDim: "#6B7280",
+  text: "#232B27",
+  textSecondary: "#68766F",
+  textDim: "#96A49E",
+  textOnIcon: "#9CAAA4",
 
   // Tekst na wypełnieniu primary (CTA)
-  onPrimary: "#0D1117",
+  onPrimary: "#FFFFFF",
 
-  // Tła statusów: kolor przy ~12% krycia + pełny kolor tekstu (§15.10)
-  primaryTint: "rgba(86,224,208,0.12)",
-  primaryBorder: "rgba(86,224,208,0.4)",
-  successTint: "rgba(53,208,127,0.12)",
-  warningTint: "rgba(245,185,66,0.12)",
-  dangerTint: "rgba(255,92,92,0.12)",
+  // Tła statusów w wariancie jasnym (sekcja 2.4)
+  primaryTint: "#D9F0EC",
+  primaryBorder: "rgba(31,125,128,0.3)",
+  successTint: "#D9F0EC",
+  warningTint: "#FBF0D8",
+  dangerTint: "#FFE5D8",
+
+  // Tor paska zapasu (2.2)
+  trackStock: "#E7EDEA",
+
+  // Cień karty (2.6) - w RN rozbity na osobne właściwości.
+  cardShadow: "rgba(35,43,39,0.06)",
 } as const;
 
 export type StockStatus = "ok" | "warning" | "critical";
 
 export const stockStatusColor: Record<StockStatus, string> = {
-  ok: colors.success,
+  ok: colors.primary,
   warning: colors.warning,
   critical: colors.danger,
 };
 
-/** Mapa statusów zamówień (§15.10): Nowe primary · Pakowanie warning ·
- *  Wysłane success · Anulowane danger. Klucze = etykiety z fulfillmentLabel. */
+/**
+ * Kolory kanałów sprzedaży (sekcja 2.3), wariant jasny.
+ *
+ * Każdy kanał ma STAŁY kolor w obu motywach - użytkownik uczy się ich
+ * jako etykiet, więc tych przypisań nigdy się nie zmienia.
+ */
+export const marketplaceColor: Record<string, { background: string; text: string }> = {
+  allegro: { background: "#FFE7DE", text: "#C4523A" },
+  amazon: { background: "#FBF0D8", text: "#9A6F22" },
+  olx: { background: "#E9E7FE", text: "#5A4FD1" },
+  ebay: { background: "#D9F0EC", text: "#166F72" },
+};
+
+/** Mapa statusów zamówień (sekcja 2.4) - klucze = etykiety z fulfillmentLabel. */
 export const orderStatusColor: Record<string, string> = {
-  Nowe: colors.primary,
-  Pakowanie: colors.warning,
-  Wysłane: colors.success,
-  Anulowane: colors.danger,
+  Nowe: "#166F72",
+  "Do spakowania": "#C4523A",
+  Pakowanie: "#C4523A",
+  Wysłane: "#68766F",
+  Odebrane: "#68766F",
+  Anulowane: "#9A6F22",
 };
 
 export const orderStatusTint: Record<string, string> = {
-  Nowe: colors.primaryTint,
-  Pakowanie: colors.warningTint,
-  Wysłane: colors.successTint,
-  Anulowane: colors.dangerTint,
+  Nowe: "#D9F0EC",
+  "Do spakowania": "#FFE5D8",
+  Pakowanie: "#FFE5D8",
+  Wysłane: "#ECEFED",
+  Odebrane: "#ECEFED",
+  Anulowane: "#FBF0D8",
 };

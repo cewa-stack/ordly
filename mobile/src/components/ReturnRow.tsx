@@ -8,6 +8,7 @@ import { StyleSheet, Text, View } from "react-native";
 
 import { colors } from "@/theme/colors";
 import { radii, spacing, typography } from "@/theme/typography";
+import { returnStatusLabel } from "@/utils/format";
 import type { ReturnItem } from "@/api/types";
 
 function shortDate(iso: string): string {
@@ -27,7 +28,7 @@ export function ReturnRow({ item }: ReturnRowProps) {
         </Text>
         <View style={styles.statusPill}>
           <Text style={styles.statusText} numberOfLines={1}>
-            {item.status}
+            {returnStatusLabel(item.status)}
           </Text>
         </View>
       </View>

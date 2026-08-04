@@ -15,6 +15,8 @@ import { useIssues } from "@/api/hooks";
 import { IssueRow } from "@/components/IssueRow";
 import { EmptyState } from "@/components/EmptyState";
 import { ErrorState } from "@/components/ErrorState";
+import { TabHeading } from "@/components/TabHeading";
+import { ListEndNote } from "@/components/ListEndNote";
 import { Skeleton } from "@/components/Skeleton";
 import type { Issue } from "@/api/types";
 import type { RootStackParamList } from "@/navigation/types";
@@ -39,9 +41,7 @@ export function DiscussionsScreen() {
 
   return (
     <View style={styles.screen}>
-      <View style={styles.header}>
-        <Text style={styles.title}>Dyskusje</Text>
-      </View>
+      <TabHeading title="Dyskusje" />
 
       {issues.isPending ? (
         <View style={styles.listPadding}>
@@ -62,6 +62,11 @@ export function DiscussionsScreen() {
               onRefresh={onRefresh}
               tintColor={colors.primary}
             />
+          }
+          ListFooterComponent={
+            (issues.data ?? []).length > 0 ? (
+              <ListEndNote text="Odpowiadać można tylko z desktopu - tutaj widzisz, co czeka." />
+            ) : null
           }
           ListEmptyComponent={
             <EmptyState
@@ -95,6 +100,6 @@ const styles = StyleSheet.create({
   },
   listContent: {
     paddingHorizontal: spacing.xl,
-    paddingBottom: 110,
+    paddingBottom: 96,
   },
 });
