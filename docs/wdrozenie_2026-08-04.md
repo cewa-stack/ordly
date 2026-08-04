@@ -269,9 +269,53 @@ kolejne uruchomienia wchodzą od razu do aplikacji.
 
 ## CZĘŚĆ C — aplikacja mobilna i powiadomienia
 
-Aplikacja mobilna działa jako PWA (strona dodana do ekranu początkowego),
-więc nie ma tu żadnego instalatora - wystarczy odświeżyć ją na telefonie
-po wgraniu zmian na Pi.
+Aplikacja mobilna działa jako PWA (strona dodana do ekranu początkowego).
+**Backend na Pi serwuje ją jako zbudowaną, statyczną paczkę** - to NIE
+jest to samo, co `git pull` w `mobile/`. Kod źródłowy na Pi może się
+zaktualizować, a telefon i tak będzie widział starą wersję, dopóki nie
+zbudujesz i nie wyślesz świeżego `dist/`. Ten krok jest łatwo pominąć -
+zrób go za każdym razem, gdy zmienia się cokolwiek w `mobile/`.
+
+### C0. Zbuduj i wyślij nową wersję aplikacji mobilnej
+
+Na komputerze:
+
+```bash
+cd C:\Users\kukil\Desktop\Projects\toom\mobile
+```
+
+```bash
+npx expo export -p web
+```
+
+Trwa do kilku minut. Efekt trafia do `mobile\dist\`. Spakuj go i wyślij
+na Pi:
+
+```bash
+powershell -Command "Compress-Archive -Path dist\* -DestinationPath $env:USERPROFILE\Desktop\mobile-dist.zip -Force"
+```
+
+```bash
+scp $env:USERPROFILE\Desktop\mobile-dist.zip cewastack2@cewastack2:~/
+```
+
+Na Pi (przez SSH):
+
+```bash
+rm -rf ~/ordly/mobile/dist && mkdir -p ~/ordly/mobile/dist && unzip -o ~/mobile-dist.zip -d ~/ordly/mobile/dist && rm ~/mobile-dist.zip && sudo systemctl restart ordly
+```
+
+Sprawdź, że Pi serwuje NOWĄ paczkę - porównaj hash pliku JS w odpowiedzi
+z hashem w świeżo zbudowanym `dist/index.html`:
+
+```bash
+curl -s https://cewastack2.tail7f5a20.ts.net/ | grep -o 'AppEntry-[a-z0-9]*\.js'
+```
+
+Na telefonie **zamknij ORDLY całkowicie** (przesuń w górę w przełączniku
+aplikacji) i otwórz ponownie - service worker i statyczny bundle JS mają
+własny cache przeglądarki, zwykłe odświeżenie czasem pokazuje starą
+wersję.
 
 ### C1. Sprawdź, czy Web Push jest skonfigurowany na Pi
 
