@@ -155,6 +155,70 @@ export interface MailMessage {
   is_read: boolean;
 }
 
+/**
+ * Stan skrzynki - pozwala odroznic "IMAP wylaczony na Pi" od
+ * "wlaczony, ale nic nie przyszlo". Bez tego pusta lista maili byla
+ * niema i wygladala jak awaria.
+ */
+export interface MailboxStatus {
+  configured: boolean;
+  host: string;
+  user_masked: string;
+  watch_senders: string[];
+  message_count: number;
+  last_received_at: string | null;
+}
+
+export interface MailSyncResult {
+  new_count: number;
+  configured: boolean;
+}
+
+export interface DashboardSummary {
+  orders_today: number;
+  revenue_today: number;
+  orders_to_ship: number;
+  low_stock_count: number;
+  revenue_last_7_days: number[];
+  trend_percent: number;
+  last_sync_human: string;
+  marketplace_connection_ok: boolean;
+}
+
+export interface HealthStatus {
+  uptime: string;
+  last_sync: string;
+  database_ok: boolean;
+  marketplace_connection_ok: boolean;
+}
+
+export interface SystemEvent {
+  event_type: string;
+  level: string;
+  created_at: string;
+}
+
+export interface StockMovement {
+  item_sku: string;
+  item_name: string;
+  change: number;
+  reason: string;
+  created_at: string;
+}
+
+export interface StockCreatePayload {
+  sku: string;
+  name: string;
+  min_stock: number;
+}
+
+export interface Shipment {
+  order_external_id: string;
+  carrier: string | null;
+  tracking_number: string | null;
+  status: string;
+}
+
 export interface WholesalerOrderSendPayload {
   wholesalerId: string;
   wholesalerName: string;

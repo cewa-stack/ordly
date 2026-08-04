@@ -1,20 +1,33 @@
+/**
+ * Dyskusje - uklad "lista + rozmowa" (`1fr 330px`, sekcja 4.3).
+ *
+ * Panel to dymki rozmowy: `them` po lewej (`--panel-2`), `me` po prawej
+ * (`--teal-dim`), plus pole odpowiedzi z szablonami. Szablony realnie
+ * wstawiaja tresc do pola (sekcja 9.1 pkt 10) - wczesniej ikona
+ * szablonu nie robila nic.
+ */
 import * as React from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { RefreshIcon } from "../icons";
-import { EmptyState } from "../components/EmptyState";
+import { SendIcon, TemplateIcon } from "../icons";
+import {
+  Button,
+  EmptyState,
+  ErrorState,
+  IconButton,
+  InitialAvatar,
+  MarketplaceBadge,
+  Pill,
+  SkeletonRows,
+  type PillTone,
+} from "../components/ui";
+import { useToast } from "../lib/toast";
+import { formatAge, formatDateTime } from "../lib/format";
 import type { Issue } from "../types/api";
-
-const dateFormatter = new Intl.DateTimeFormat("pl-PL", {
-  day: "2-digit",
-  month: "2-digit",
-  hour: "2-digit",
-  minute: "2-digit",
-});
 
 /**
  * Etykiety statusow 1:1 ze schematu PostPurchaseIssueStatus w oficjalnym
  * swagger.yaml Allegro (zweryfikowane, nie zgadywane) - to jedyne 6
- * mozliwych wartosci, wiec bezpiecznie tlumaczymy i kolorujemy.
+ * mozliwych wartosci.
  */
 const STATUS_LABEL: Record<string, string> = {
   DISPUTE_ONGOING: "W toku",
@@ -25,22 +38,36 @@ const STATUS_LABEL: Record<string, string> = {
   CLAIM_REJECTED: "Odrzucona",
 };
 
-const STATUS_TONE: Record<string, "ok" | "warn" | "crit"> = {
-  DISPUTE_ONGOING: "warn",
-  DISPUTE_CLOSED: "ok",
-  DISPUTE_UNRESOLVED: "crit",
-  CLAIM_SUBMITTED: "warn",
-  CLAIM_ACCEPTED: "ok",
-  CLAIM_REJECTED: "crit",
+const STATUS_TONE: Record<string, PillTone> = {
+  DISPUTE_ONGOING: "pack",
+  DISPUTE_CLOSED: "done",
+  DISPUTE_UNRESOLVED: "warn",
+  CLAIM_SUBMITTED: "pack",
+  CLAIM_ACCEPTED: "new",
+  CLAIM_REJECTED: "warn",
 };
 
-const TONE_CLASS: Record<"ok" | "warn" | "crit", string> = {
-  ok: "bg-success-tint text-success",
-  warn: "bg-warning-tint text-warning",
-  crit: "bg-danger-tint text-danger",
-};
+/** Szablony odpowiedzi - tresc wg regul tonu z sekcji 7.1: konkret, bez sprytu. */
+const TEMPLATES: { name: string; text: string }[] = [
+  {
+    name: "Potwierdzenie zgłoszenia",
+    text: "Dzień dobry,\n\ndziękuję za zgłoszenie. Sprawdzam sprawę i wracam z odpowiedzią najpóźniej jutro do południa.\n\nPozdrawiam",
+  },
+  {
+    name: "Wysyłka w toku",
+    text: "Dzień dobry,\n\npaczka jest już spakowana i trafi do kuriera dzisiaj. Numer przesyłki wyślę, gdy tylko go otrzymam.\n\nPozdrawiam",
+  },
+  {
+    name: "Prośba o zdjęcia",
+    text: "Dzień dobry,\n\nżeby szybciej rozwiązać sprawę, proszę o 2-3 zdjęcia produktu i opakowania. Na tej podstawie od razu zaproponuję rozwiązanie.\n\nPozdrawiam",
+  },
+  {
+    name: "Zwrot przyjęty",
+    text: "Dzień dobry,\n\nzwrot przyjęty. Zwrot środków uruchamiam po odbiorze przesyłki - księgowanie zajmuje zwykle 2-3 dni robocze.\n\nPozdrawiam",
+  },
+];
 
-function useIssuesList() {
+function useIssues() {
   return useQuery({
     queryKey: ["issues"],
     queryFn: async () => {
@@ -48,30 +75,30 @@ function useIssuesList() {
       if (!result.ok) throw new Error(result.message);
       return result.data;
     },
+    retry: false,
   });
 }
 
-function useIssueThread(issueId: string | null) {
-  return useQuery({
-    queryKey: ["issue-thread", issueId],
-    enabled: issueId !== null,
+function Conversation({ issue }: { issue: Issue }) {
+  const queryClient = useQueryClient();
+  const toast = useToast();
+  const [text, setText] = React.useState("");
+  const [templatesOpen, setTemplatesOpen] = React.useState(false);
+  const scrollRef = React.useRef<HTMLDivElement>(null);
+
+  const threadQuery = useQuery({
+    queryKey: ["issue-thread", issue.external_id],
     queryFn: async () => {
-      const result = await window.ordly.issues.messages(issueId as string);
+      const result = await window.ordly.issues.messages(issue.external_id);
       if (!result.ok) throw new Error(result.message);
       return result.data;
     },
+    retry: false,
   });
-}
-
-function IssueThreadModal({ issue, onClose }: { issue: Issue; onClose: () => void }) {
-  const queryClient = useQueryClient();
-  const { data: messages, isLoading, isError, error } = useIssueThread(issue.external_id);
-  const [text, setText] = React.useState("");
-  const scrollRef = React.useRef<HTMLDivElement>(null);
 
   React.useEffect(() => {
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight });
-  }, [messages]);
+  }, [threadQuery.data]);
 
   const replyMutation = useMutation({
     mutationFn: async () => {
@@ -82,89 +109,116 @@ function IssueThreadModal({ issue, onClose }: { issue: Issue; onClose: () => voi
       setText("");
       void queryClient.invalidateQueries({ queryKey: ["issue-thread", issue.external_id] });
       void queryClient.invalidateQueries({ queryKey: ["issues"] });
+      toast.success("Odpowiedź wysłana", `Do ${issue.buyer_login}`);
+    },
+    onError: (error) => {
+      toast.error(
+        "Allegro nie przyjęło odpowiedzi",
+        error instanceof Error ? error.message : "Spróbuj ponownie za chwilę."
+      );
     },
   });
 
-  const statusTone = STATUS_TONE[issue.status] ?? "warn";
-
   return (
-    <div className="fixed inset-0 z-10 flex items-center justify-center bg-black/60 p-4" onClick={onClose}>
-      <div
-        className="flex max-h-[80vh] w-full max-w-lg flex-col rounded-2xl border border-border bg-surface"
-        onClick={(e) => e.stopPropagation()}
-      >
-        <div className="border-b border-border p-5">
-          <div className="flex items-center gap-2">
-            <span className="rounded-full bg-primary-tint px-2.5 py-1 text-badge-label text-primary">
-              {issue.type === "CLAIM" ? "Reklamacja" : "Dyskusja"}
-            </span>
-            <span className={`rounded-full px-2.5 py-1 text-badge-label ${TONE_CLASS[statusTone]}`}>
-              {STATUS_LABEL[issue.status] ?? issue.status}
-            </span>
+    <div className="flex min-h-0 flex-col gap-3.5 overflow-hidden border-l border-line p-5">
+      <div className="flex shrink-0 flex-col gap-1">
+        <div className="flex items-center gap-2">
+          <MarketplaceBadge marketplace={issue.marketplace} />
+          <Pill tone={STATUS_TONE[issue.status] ?? "warn"}>
+            {STATUS_LABEL[issue.status] ?? issue.status}
+          </Pill>
+        </div>
+        <h3 className="o-section-title mt-1">{issue.subject ?? "Bez tematu"}</h3>
+        <p className="o-mono text-[11px] text-slate-dim">
+          {issue.buyer_login} · {issue.messages_count} wiadomości
+        </p>
+      </div>
+
+      <div ref={scrollRef} className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto">
+        {threadQuery.isLoading && (
+          <div className="flex flex-col gap-2">
+            {Array.from({ length: 3 }).map((_, index) => (
+              <span key={index} className="o-skeleton-bar h-12 w-[80%]" />
+            ))}
           </div>
-          <h2 className="mt-2 text-headline">{issue.subject ?? "Bez tematu"}</h2>
-          <p className="mt-1 text-footnote text-text-secondary">
-            Zamówienie {issue.order_external_id} · {issue.buyer_login}
+        )}
+        {threadQuery.isError && (
+          <p className="text-[12px] leading-relaxed text-coral">
+            Allegro nie zwróciło treści tego wątku.{" "}
+            {threadQuery.error instanceof Error ? threadQuery.error.message : ""}
           </p>
-        </div>
-
-        <div ref={scrollRef} className="flex-1 overflow-y-auto p-5">
-          {isLoading && <p className="text-footnote text-text-secondary">Wczytywanie wątku…</p>}
-          {isError && (
-            <p className="text-footnote text-danger">
-              Nie udało się pobrać wątku: {error instanceof Error ? error.message : "nieznany błąd"}
-            </p>
-          )}
-          <div className="flex flex-col gap-3">
-            {messages?.map((message) => {
-              const isSeller = message.author_role === "SELLER";
-              return (
-                <div key={message.id} className={`flex ${isSeller ? "justify-end" : "justify-start"}`}>
-                  <div
-                    className={`max-w-[80%] rounded-xl px-3.5 py-2.5 text-callout ${
-                      isSeller ? "bg-primary-tint text-text" : "bg-surface-raised text-text"
-                    }`}
-                  >
-                    <p>{message.text}</p>
-                    <p className="mt-1 text-[10.5px] text-text-dim">
-                      {isSeller ? "Ty" : message.author_login} ·{" "}
-                      {dateFormatter.format(new Date(message.created_at))}
-                    </p>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        </div>
-
-        <div className="border-t border-border p-4">
-          {!issue.chat_active && (
-            <p className="mb-2 text-caption text-text-dim">
-              Ta dyskusja jest zamknięta - odpowiedź może się nie udać.
-            </p>
-          )}
-          {replyMutation.isError && (
-            <p className="mb-2 text-caption text-danger">
-              {replyMutation.error instanceof Error
-                ? replyMutation.error.message
-                : "Nie udało się wysłać odpowiedzi."}
-            </p>
-          )}
-          <div className="flex items-end gap-2">
-            <textarea
-              value={text}
-              onChange={(e) => setText(e.target.value)}
-              placeholder="Napisz odpowiedź…"
-              rows={2}
-              className="flex-1 resize-none rounded-md border border-border bg-background px-3 py-2 text-body text-text focus:border-primary focus:outline-none"
-            />
-            <button
-              onClick={() => replyMutation.mutate()}
-              disabled={text.trim().length === 0 || replyMutation.isPending}
-              className="h-10 shrink-0 rounded-lg bg-gradient-to-br from-primary to-accent px-4 text-callout-semibold text-on-primary shadow-[0_8px_18px_-8px_rgba(86,224,208,0.5)] disabled:opacity-45"
+        )}
+        {threadQuery.data?.map((message) => {
+          const isSeller = message.author_role === "SELLER";
+          return (
+            <div
+              key={`${message.id}-${message.created_at}`}
+              className={`max-w-[85%] rounded-md px-3.5 py-3 text-[12.5px] leading-[1.55] ${
+                isSeller
+                  ? "self-end rounded-tr-[4px] bg-teal-dim text-white"
+                  : "rounded-tl-[4px] bg-panel-2 text-white"
+              }`}
             >
-              {replyMutation.isPending ? "Wysyłanie…" : "Wyślij"}
-            </button>
+              <p className="whitespace-pre-wrap">{message.text || "(wiadomość bez treści)"}</p>
+              <span className="o-mono mt-1.5 block text-[9.5px] text-slate-dim">
+                {isSeller ? "Ty" : message.author_login} ·{" "}
+                {formatDateTime(message.created_at)}
+              </span>
+            </div>
+          );
+        })}
+      </div>
+
+      <div className="relative shrink-0">
+        {templatesOpen && (
+          <div className="absolute bottom-full left-0 right-0 z-10 mb-2 overflow-hidden rounded-md border border-line-strong bg-panel shadow-palette">
+            {TEMPLATES.map((template) => (
+              <button
+                key={template.name}
+                onClick={() => {
+                  setText(template.text);
+                  setTemplatesOpen(false);
+                }}
+                className="block w-full border-b border-line px-3.5 py-2.5 text-left text-[12px] text-slate last:border-b-0 hover:bg-panel-2 hover:text-white"
+              >
+                {template.name}
+              </button>
+            ))}
+          </div>
+        )}
+
+        <div className="flex flex-col gap-2.5 rounded-md border border-line-strong bg-panel-2 px-3 py-3">
+          <textarea
+            value={text}
+            onChange={(event) => setText(event.target.value)}
+            placeholder="Napisz odpowiedź…"
+            rows={3}
+            disabled={!issue.chat_active}
+            className="resize-none bg-transparent text-[12.5px] leading-[1.55] text-white outline-none placeholder:text-slate-dim disabled:opacity-50"
+          />
+          <div className="flex items-center gap-2">
+            <IconButton
+              onClick={() => setTemplatesOpen((prev) => !prev)}
+              aria-label="Wstaw szablon odpowiedzi"
+              title="Szablony odpowiedzi"
+            >
+              <TemplateIcon size={14} />
+            </IconButton>
+            {!issue.chat_active && (
+              <span className="text-[10.5px] text-slate-dim">
+                Wątek zamknięty przez Allegro
+              </span>
+            )}
+            <Button
+              className="ml-auto !px-3.5 !py-[7px] !text-[12px]"
+              onClick={() => replyMutation.mutate()}
+              disabled={
+                !issue.chat_active || text.trim().length === 0 || replyMutation.isPending
+              }
+              icon={<SendIcon size={13} />}
+            >
+              {replyMutation.isPending ? "Wysyłam…" : "Wyślij"}
+            </Button>
           </div>
         </div>
       </div>
@@ -173,72 +227,76 @@ function IssueThreadModal({ issue, onClose }: { issue: Issue; onClose: () => voi
 }
 
 export function DiscussionsScreen() {
-  const { data, isLoading, isError, error, isFetching } = useIssuesList();
-  const queryClient = useQueryClient();
-  const [openIssue, setOpenIssue] = React.useState<Issue | null>(null);
+  const { data, isLoading, isError, error, refetch } = useIssues();
+  const [selectedId, setSelectedId] = React.useState<string | null>(null);
+
+  const selected =
+    (data ?? []).find((issue) => issue.external_id === selectedId) ?? (data ?? [])[0];
+
+  if (isError) {
+    return (
+      <ErrorState
+        title="Nie udało się pobrać dyskusji"
+        detail={`${
+          error instanceof Error ? error.message : "Nieznany błąd."
+        } Jeśli w treści jest 403 AccessDenied, brakuje uprawnienia "Dyskusje i reklamacje pozakupowe" w rejestracji aplikacji na apps.developer.allegro.pl.`}
+        onRetry={() => void refetch()}
+      />
+    );
+  }
 
   return (
-    <div>
-      <div className="mb-5 flex items-center justify-between gap-4">
-        <h1 className="text-title1">Dyskusje</h1>
-        <button
-          onClick={() => void queryClient.invalidateQueries({ queryKey: ["issues"] })}
-          disabled={isFetching}
-          className="flex h-9 items-center gap-2 rounded-[10px] border border-border bg-surface px-3.5 text-[12.5px] font-semibold text-text-secondary hover:bg-surface-raised disabled:opacity-50"
-        >
-          <RefreshIcon size={14} className={isFetching ? "animate-spin" : ""} />
-          Odśwież
-        </button>
+    <div className="grid min-h-0 flex-1 grid-cols-[minmax(0,1fr)_330px] max-[1100px]:grid-cols-1">
+      <div className="min-h-0 min-w-0 overflow-y-auto">
+        {isLoading && <SkeletonRows rows={5} />}
+        {!isLoading && (data ?? []).length === 0 && (
+          <EmptyState
+            pose="happy"
+            title="Brak otwartych spraw"
+            description="Zero dyskusji i reklamacji do obsłużenia - spokojnie."
+          />
+        )}
+        {(data ?? []).map((issue) => {
+          const isSelected = selected?.external_id === issue.external_id;
+          return (
+            <button
+              key={issue.external_id}
+              onClick={() => setSelectedId(issue.external_id)}
+              className={`relative flex w-full items-start gap-3 border-b border-line px-[22px] py-[15px] text-left transition-colors duration-150 ease-ordly ${
+                isSelected ? "bg-teal-dim" : "hover:bg-panel-2"
+              }`}
+            >
+              {isSelected && (
+                <span className="absolute bottom-0 left-0 top-0 w-[3px] bg-teal-bright" />
+              )}
+              <InitialAvatar name={issue.buyer_login} />
+              <span className="min-w-0 flex-1">
+                <span className="mb-1 flex items-center gap-2.5">
+                  <span className="text-[13px] font-semibold">{issue.buyer_login}</span>
+                  <MarketplaceBadge marketplace={issue.marketplace} />
+                  <span className="o-mono ml-auto text-[10px] text-slate-dim">
+                    {issue.last_message_at ? formatAge(issue.last_message_at) : "—"}
+                  </span>
+                </span>
+                <span className="line-clamp-2 block text-[12.5px] leading-[1.5] text-slate">
+                  {issue.description ?? issue.subject ?? "Bez treści"}
+                </span>
+              </span>
+              {issue.chat_active && (
+                <span className="mt-1.5 h-[7px] w-[7px] shrink-0 rounded-full bg-coral" />
+              )}
+            </button>
+          );
+        })}
       </div>
 
-      {isLoading && <p className="text-footnote text-text-secondary">Wczytywanie dyskusji…</p>}
-      {isError && (
-        <p className="text-footnote text-danger">
-          Nie udało się pobrać dyskusji: {error instanceof Error ? error.message : "nieznany błąd"}
-        </p>
-      )}
-      {!isLoading && !isError && data && data.length === 0 && (
-        <EmptyState
-          pose="happy"
-          title="Brak otwartych spraw"
-          description="Zero dyskusji i reklamacji do obsłużenia - spokojnie."
-        />
-      )}
-
-      {data && data.length > 0 && (
-        <div className="flex flex-col gap-2">
-          {data.map((issue) => {
-            const statusTone = STATUS_TONE[issue.status] ?? "warn";
-            return (
-              <button
-                key={issue.external_id}
-                onClick={() => setOpenIssue(issue)}
-                className="flex items-center gap-3 rounded-xl border border-border bg-surface px-4 py-3 text-left hover:bg-surface-raised"
-              >
-                <span className="rounded-full bg-primary-tint px-2.5 py-1 text-badge-label text-primary">
-                  {issue.type === "CLAIM" ? "Reklamacja" : "Dyskusja"}
-                </span>
-                <div className="min-w-0 flex-1">
-                  <p className="truncate text-callout-semibold">{issue.subject ?? "Bez tematu"}</p>
-                  <p className="truncate text-[12px] text-text-secondary">
-                    {issue.buyer_login} · zamówienie {issue.order_external_id}
-                  </p>
-                </div>
-                <span className={`shrink-0 rounded-full px-2.5 py-1 text-badge-label ${TONE_CLASS[statusTone]}`}>
-                  {STATUS_LABEL[issue.status] ?? issue.status}
-                </span>
-                {issue.last_message_at && (
-                  <span className="shrink-0 text-[11px] tabular-nums text-text-dim">
-                    {dateFormatter.format(new Date(issue.last_message_at))}
-                  </span>
-                )}
-              </button>
-            );
-          })}
+      {selected ? (
+        <Conversation key={selected.external_id} issue={selected} />
+      ) : (
+        <div className="flex items-center justify-center border-l border-line p-5 text-center text-[12.5px] text-slate-dim">
+          Wybierz wątek z listy, żeby zobaczyć rozmowę.
         </div>
       )}
-
-      {openIssue && <IssueThreadModal issue={openIssue} onClose={() => setOpenIssue(null)} />}
     </div>
   );
 }

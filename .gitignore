@@ -49,6 +49,15 @@ out/
 .expo/
 web-build/
 
+# ...ale `desktop/build/` to NIE jest katalog wynikowy, tylko zasoby
+# potrzebne do zbudowania instalatora (ikona aplikacji). Bez tego
+# `npm run dist` po swiezym sklonowaniu repo wywala sie na braku ikony.
+!desktop/build/
+!desktop/build/**
+
+# Gotowe instalatory .exe - powstaja lokalnie, nie trafiaja do repo
+desktop/release/
+
 # Docker (lokalne override'y, jeśli powstaną)
 docker-compose.override.yml
 

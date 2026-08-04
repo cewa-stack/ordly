@@ -24,6 +24,8 @@ class FakeMarketplacePlugin(MarketplacePlugin):
         self.issues_to_return: list[Issue] = []
         self.issue_messages_to_return: list[IssueMessage] = []
         self.reply_calls: list[tuple[str, str]] = []
+        self.fulfillment_calls: list[tuple[str, str]] = []
+        self.should_raise_fulfillment_api_error: bool = False
         self.should_raise_api_error: bool = False
         self.should_raise_returns_api_error: bool = False
         self.should_raise_issues_api_error: bool = False
@@ -64,6 +66,11 @@ class FakeMarketplacePlugin(MarketplacePlugin):
         if self.should_raise_issues_api_error:
             raise AllegroApiError(503, "Serwis testowy: symulowana niedostępność dyskusji")
         self.reply_calls.append((issue_id, text))
+
+    async def set_fulfillment_status(self, external_id: str, status: str) -> None:
+        if self.should_raise_fulfillment_api_error:
+            raise AllegroApiError(403, "Serwis testowy: brak uprawnienia do zapisu")
+        self.fulfillment_calls.append((external_id, status))
 
     async def get_order(self, external_id: str) -> Order:
         order = next((o for o in self.orders_to_return if o.external_id == external_id), None)

@@ -44,7 +44,10 @@ function createWindow(): void {
     minHeight: 600,
     show: false,
     frame: false,
-    backgroundColor: "#0d1117",
+    // Kolor tla okna PRZED pierwszym malowaniem renderera - musi byc
+    // rowny `--panel` z systemu wizualnego, inaczej przy starcie mignie
+    // jasna albo nie ta ciemna plansza.
+    backgroundColor: "#141B19",
     webPreferences: {
       preload: join(__dirname, "../preload/index.js"),
       sandbox: true,
@@ -54,6 +57,19 @@ function createWindow(): void {
   });
 
   win.on("ready-to-show", () => win.show());
+
+  // Diagnostyka wersji spakowanej: `ORDLY_DEVTOOLS=1` otwiera narzedzia
+  // deweloperskie i przepisuje konsole renderera do stdout. Bez tego
+  // jedyny sposob na zobaczenie bledu w .exe to zgadywanie.
+  if (process.env["ORDLY_DEVTOOLS"] === "1") {
+    win.webContents.openDevTools({ mode: "detach" });
+    win.webContents.on("console-message", (_event, level, message, line, sourceId) => {
+      // `process.stdout.write`, nie `console.log` - kryterium odbioru 10.3
+      // zabrania `console.log` w kodzie, a to i tak jest strumien
+      // diagnostyczny, nie logowanie aplikacyjne.
+      process.stdout.write(`[renderer:${level}] ${message} (${sourceId}:${line})\n`);
+    });
+  }
 
   win.webContents.setWindowOpenHandler(({ url }) => {
     void shell.openExternal(url);

@@ -4,12 +4,20 @@ from __future__ import annotations
 
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.dependencies import get_container, get_session
-from app.api.schemas import MailMessageOut, WholesalerMailIn, mail_message_out
+from app.api.schemas import (
+    MailboxStatusOut,
+    MailMessageOut,
+    MailSyncResultOut,
+    WholesalerMailIn,
+    mail_message_out,
+    mailbox_status_out,
+)
 from app.container import Container
+from app.infrastructure.mail.imap_watcher import ImapConnectionError
 
 router = APIRouter()
 
@@ -45,6 +53,49 @@ async def list_mail_messages(
         source=source, unread_only=unread_only, limit=limit, offset=offset
     )
     return [mail_message_out(m) for m in messages]
+
+
+@router.get("/mail/status", response_model=MailboxStatusOut)
+async def get_mailbox_status(
+    container: Annotated[Container, Depends(get_container)],
+    session: Annotated[AsyncSession, Depends(get_session)],
+) -> MailboxStatusOut:
+    """
+    Zwraca stan skrzynki: czy IMAP jest skonfigurowany, kogo obserwuje
+    i ile maili leży w bazie.
+
+    Bez tego pusta lista maili była nierozróżnialna od niedziałającej
+    konfiguracji - aplikacja pokazywała "brak wiadomości" niezależnie
+    od tego, czy IMAP w ogóle był włączony.
+    """
+    mailbox_service = container.mailbox_service(session)
+    return mailbox_status_out(await mailbox_service.get_status())
+
+
+@router.post("/mail/sync", response_model=MailSyncResultOut)
+async def sync_mailbox(
+    container: Annotated[Container, Depends(get_container)],
+) -> MailSyncResultOut:
+    """
+    Wymusza natychmiastowe sprawdzenie skrzynki IMAP.
+
+    Otwiera własny zakres sesji (tak jak `POST /orders/sync`), żeby
+    zapis nowych maili był zatwierdzony przed odpowiedzią. Błąd
+    połączenia/logowania IMAP wraca jako 502 z treścią do pokazania
+    użytkownikowi - w cyklicznym jobie taki błąd jest tylko logowany,
+    ale przy ręcznym kliknięciu użytkownik musi znać powód.
+    """
+    async with container.session_scope() as session:
+        mailbox_service = container.mailbox_service(session)
+        status = await mailbox_service.get_status()
+        if not status.configured:
+            return MailSyncResultOut(new_count=0, configured=False)
+        try:
+            new_count = await mailbox_service.sync_now()
+        except ImapConnectionError as exc:
+            raise HTTPException(status_code=502, detail=str(exc)) from exc
+
+    return MailSyncResultOut(new_count=new_count, configured=True)
 
 
 @router.post("/mail/messages/{message_id}/mark-read", status_code=204, response_model=None)

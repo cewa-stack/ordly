@@ -14,6 +14,9 @@ const ordly = {
   },
   stock: {
     list: () => ipcRenderer.invoke("ordly:stock:list"),
+    create: (payload: { sku: string; name: string; min_stock: number }) =>
+      ipcRenderer.invoke("ordly:stock:create", payload),
+    history: (sku: string) => ipcRenderer.invoke("ordly:stock:history", sku),
     adjust: (
       sku: string,
       payload: { op: "set" | "add" | "remove" | "min"; quantity: number; reason?: string }
@@ -21,6 +24,10 @@ const ordly = {
   },
   orders: {
     list: () => ipcRenderer.invoke("ordly:orders:list"),
+    search: (query: string) => ipcRenderer.invoke("ordly:orders:search", query),
+    tracking: (externalId: string) => ipcRenderer.invoke("ordly:orders:tracking", externalId),
+    setFulfillment: (externalId: string, status: string) =>
+      ipcRenderer.invoke("ordly:orders:setFulfillment", externalId, status),
     sync: () => ipcRenderer.invoke("ordly:orders:sync"),
   },
   returns: {
@@ -36,6 +43,10 @@ const ordly = {
     get: () => ipcRenderer.invoke("ordly:stats:get"),
     stockReport: () => ipcRenderer.invoke("ordly:stats:stockReport"),
     shoppingList: () => ipcRenderer.invoke("ordly:stats:shoppingList"),
+    dashboard: () => ipcRenderer.invoke("ordly:stats:dashboard"),
+    health: () => ipcRenderer.invoke("ordly:stats:health"),
+    events: () => ipcRenderer.invoke("ordly:stats:events"),
+    backup: () => ipcRenderer.invoke("ordly:stats:backup"),
   },
   olx: {
     list: () => ipcRenderer.invoke("ordly:olx:list"),
@@ -53,6 +64,8 @@ const ordly = {
   mailbox: {
     list: (filters: { source?: "allegro" | "olx" | "other"; unreadOnly?: boolean } = {}) =>
       ipcRenderer.invoke("ordly:mailbox:list", filters),
+    status: () => ipcRenderer.invoke("ordly:mailbox:status"),
+    sync: () => ipcRenderer.invoke("ordly:mailbox:sync"),
     markRead: (messageId: string) => ipcRenderer.invoke("ordly:mailbox:markRead", messageId),
   },
   wholesalers: {

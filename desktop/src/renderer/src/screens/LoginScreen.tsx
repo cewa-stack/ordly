@@ -1,10 +1,55 @@
+/**
+ * Logowanie - polaczenie z wlasnym Raspberry Pi przez Tailscale.
+ *
+ * Ekran uzywa tego samego systemu wizualnego co reszta aplikacji, ale
+ * bez paska bocznego i topbara - do czasu polaczenia nie ma czego
+ * pokazywac w nawigacji.
+ */
 import * as React from "react";
 import { useAuth } from "../lib/auth";
 import { Mascot } from "../components/Mascot";
-import { GlowBackdrop } from "../components/GlowBackdrop";
-import { FormField } from "../components/FormField";
 import { Titlebar } from "../components/Titlebar";
+import { Button } from "../components/ui";
 import { EyeIcon, EyeOffIcon, LockIcon, ServerIcon, UserIcon } from "../icons";
+
+const FIELD_CLASS =
+  "flex items-center gap-2.5 rounded-md border border-line bg-panel-2 px-3.5 py-2.5 transition-colors focus-within:border-teal-bright";
+
+function Field({
+  label,
+  icon,
+  trailing,
+  onTrailingClick,
+  ...inputProps
+}: {
+  label: string;
+  icon: React.ReactNode;
+  trailing?: React.ReactNode;
+  onTrailingClick?: () => void;
+} & React.InputHTMLAttributes<HTMLInputElement>) {
+  return (
+    <label className="flex flex-col gap-1.5">
+      <span className="o-eyebrow">{label}</span>
+      <span className={FIELD_CLASS}>
+        {icon}
+        <input
+          {...inputProps}
+          className="min-w-0 flex-1 bg-transparent text-[13px] text-white outline-none placeholder:text-slate-dim"
+        />
+        {trailing && (
+          <button
+            type="button"
+            onClick={onTrailingClick}
+            aria-label="Pokaż lub ukryj hasło"
+            className="shrink-0 text-slate-dim hover:text-white"
+          >
+            {trailing}
+          </button>
+        )}
+      </span>
+    </label>
+  );
+}
 
 export function LoginScreen() {
   const { login } = useAuth();
@@ -16,7 +61,10 @@ export function LoginScreen() {
   const [error, setError] = React.useState<string | null>(null);
 
   const canSubmit =
-    serverUrl.trim().length > 4 && username.trim().length > 0 && password.length > 0 && !isSubmitting;
+    serverUrl.trim().length > 4 &&
+    username.trim().length > 0 &&
+    password.length > 0 &&
+    !isSubmitting;
 
   async function handleSubmit(event: React.FormEvent) {
     event.preventDefault();
@@ -34,81 +82,76 @@ export function LoginScreen() {
   }
 
   return (
-    <div className="flex h-screen flex-col bg-background">
-      <Titlebar />
+    <div className="flex h-screen flex-col bg-panel text-white">
+      <Titlebar online={false} hostname="" />
       <div className="relative flex flex-1 items-center justify-center overflow-hidden">
+        <div
+          aria-hidden="true"
+          className="pointer-events-none absolute -left-40 -top-40 h-[520px] w-[520px] rounded-full opacity-50 blur-[110px]"
+          style={{ background: "rgba(62,170,175,.16)" }}
+        />
         <form
           onSubmit={handleSubmit}
-          className="relative flex w-full max-w-[340px] flex-col items-center px-8 text-center"
+          className="relative flex w-full max-w-[360px] flex-col px-8"
         >
-          <div className="relative mb-3 flex items-center justify-center">
-            <GlowBackdrop />
-            <Mascot size={92} />
+          <div className="mb-5 flex flex-col items-center text-center">
+            <Mascot pose="orders" size={92} />
+            <div className="o-display mt-3 text-[15.5px] font-semibold tracking-[-.015em]">
+              ORDLY
+            </div>
+            <h1 className="o-hero-title mt-3">Witaj z powrotem</h1>
+            <p className="mt-1.5 max-w-[280px] text-[12.5px] leading-[1.55] text-slate">
+              Połącz się ze swoim ORDLY na Raspberry Pi.
+            </p>
           </div>
-          <div className="mb-4 text-[12px] font-extrabold tracking-[0.3em] text-text">ORDLY</div>
-          <h1 className="text-title1 !text-[22px] !leading-[28px]">Witaj z powrotem</h1>
-          <p className="mb-6 mt-1 max-w-[260px] text-footnote text-text-secondary">
-            Twój sklep czekał. Połącz się ze swoim ORDLY na Raspberry Pi.
-          </p>
 
-          <div className="flex w-full flex-col gap-2 text-left">
-            <FormField
+          <div className="flex flex-col gap-3">
+            <Field
               label="Adres serwera"
-              icon={<ServerIcon className="shrink-0 text-primary" />}
+              icon={<ServerIcon size={15} className="shrink-0 text-teal-bright" />}
               value={serverUrl}
-              onChange={(e) => setServerUrl(e.target.value)}
+              onChange={(event) => setServerUrl(event.target.value)}
               placeholder="https://cewastack2.tail7f5a20.ts.net"
               autoCapitalize="none"
               autoCorrect="off"
               spellCheck={false}
-              error={Boolean(error)}
             />
-            <FormField
+            <Field
               label="Login"
-              icon={<UserIcon className="shrink-0 text-text-secondary" />}
+              icon={<UserIcon size={15} className="shrink-0 text-slate-dim" />}
               value={username}
-              onChange={(e) => setUsername(e.target.value)}
+              onChange={(event) => setUsername(event.target.value)}
               placeholder="admin"
               autoCapitalize="none"
               autoCorrect="off"
               spellCheck={false}
-              error={Boolean(error)}
             />
-            <FormField
+            <Field
               label="Hasło"
-              icon={<LockIcon className="shrink-0 text-text-secondary" />}
+              icon={<LockIcon size={15} className="shrink-0 text-slate-dim" />}
               value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              placeholder="domyślnie: admin"
+              onChange={(event) => setPassword(event.target.value)}
               type={showPassword ? "text" : "password"}
               autoCapitalize="none"
               autoCorrect="off"
               spellCheck={false}
-              error={Boolean(error)}
-              trailing={
-                showPassword ? (
-                  <EyeOffIcon className="text-text-secondary" />
-                ) : (
-                  <EyeIcon className="text-text-secondary" />
-                )
-              }
-              onTrailingClick={() => setShowPassword((v) => !v)}
+              trailing={showPassword ? <EyeOffIcon size={15} /> : <EyeIcon size={15} />}
+              onTrailingClick={() => setShowPassword((prev) => !prev)}
             />
           </div>
 
-          {error ? <p className="mt-3 self-stretch text-caption leading-[17px] text-danger">{error}</p> : null}
-
-          <button type="submit" disabled={!canSubmit} className="ordly-cta mt-4 w-full">
-            {isSubmitting ? "Łączenie…" : "Połącz z ORDLY"}
-          </button>
-
-          {!isSubmitting && (
-            <p className="mt-3 max-w-[280px] text-[11.5px] leading-4 text-text-dim">
-              Domyślne dane logowania to <span className="font-bold text-text-secondary">admin</span> /{" "}
-              <span className="font-bold text-text-secondary">admin</span> — zmień je w pliku .env po
-              pierwszym uruchomieniu.
-            </p>
+          {error && (
+            <p className="mt-3 text-[11.5px] leading-[1.5] text-coral">{error}</p>
           )}
+
+          <Button type="submit" disabled={!canSubmit} className="mt-4 !py-3">
+            {isSubmitting ? "Łączę…" : "Połącz z ORDLY"}
+          </Button>
+
+          <p className="mt-3.5 text-center text-[11px] leading-[1.55] text-slate-dim">
+            Adres musi zaczynać się od <b className="text-slate">https://</b> - Tailscale
+            serwuje ORDLY po HTTPS na porcie 443.
+          </p>
         </form>
       </div>
     </div>

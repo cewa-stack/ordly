@@ -258,3 +258,34 @@ class TestAllegroMapper:
         assert message.text == "Proszę o wyjaśnienie problemu."
         assert message.author_login == "example-user"
         assert message.author_role == "BUYER"
+
+    def test_wiadomosc_z_pustym_loginem_autora_nie_wywraca_watku(self):
+        """
+        Regresja: Allegro zwraca w wątkach `"login": null` (wiadomość
+        systemowa albo zanonimizowany kupujący). Wartość domyślna
+        `.get(klucz, domyslna)` NIE łapie takiego przypadku - klucz
+        istnieje - więc None przelatywał do encji i cały endpoint
+        `/api/v1/issues/{id}/messages` zwracał 422.
+        """
+        message = map_issue_message_to_domain(
+            {
+                "id": None,
+                "text": None,
+                "author": {"login": None, "role": "ALLEGRO"},
+                "createdAt": "2025-06-10T12:12:12.019Z",
+            }
+        )
+
+        assert message.id == ""
+        assert message.text == ""
+        assert message.author_login == "Allegro"
+        assert message.author_role == "ALLEGRO"
+
+    def test_wiadomosc_bez_sekcji_autora_dostaje_nazwe_zastepcza(self):
+        """Brak całej sekcji `author` też nie może wywalić mapowania."""
+        message = map_issue_message_to_domain(
+            {"id": "M-1", "text": "cokolwiek", "createdAt": "2025-06-10T12:12:12.019Z"}
+        )
+
+        assert message.author_login == "nieznany"
+        assert message.author_role == "UNKNOWN"

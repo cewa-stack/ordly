@@ -280,3 +280,32 @@ class SyncOrdersService:
         if order is None:
             raise OrderNotFoundError(external_id)
         return order
+
+    async def set_fulfillment_status(self, external_id: str, status: str) -> Order:
+        """
+        Ustawia status realizacji na marketplace, a potem u siebie.
+
+        Kolejnosc jest istotna: najpierw zapis na marketplace, dopiero
+        potem lokalnie. Odwrotnie aplikacja pokazywalaby "wysłane" przy
+        zamowieniu, ktorego kupujacy nadal widzi jako nieobsluzone.
+
+        Raises:
+            OrderNotFoundError: Gdy zamówienia nie ma w bazie.
+            MarketplaceUnavailableError: Gdy marketplace odrzuci zapis.
+        """
+        order = await self.get_order_by_external_id(external_id)
+        try:
+            await self._plugin.set_fulfillment_status(external_id, status)
+        except AllegroApiError as exc:
+            logger.warning(
+                "Marketplace odrzucił zmianę statusu realizacji {} na {}: {}",
+                external_id,
+                status,
+                exc,
+            )
+            raise MarketplaceUnavailableError(str(exc)) from exc
+
+        await self._order_repository.update_fulfillment_status(
+            order.marketplace, external_id, status
+        )
+        return await self.get_order_by_external_id(external_id)

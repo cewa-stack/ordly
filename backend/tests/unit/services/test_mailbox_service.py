@@ -118,6 +118,52 @@ class TestMailboxServiceSync:
 
         assert count == 0
 
+    @pytest.mark.asyncio
+    async def test_reczna_synchronizacja_przepuszcza_blad_imap_dalej(
+        self, fake_mail_repository
+    ):
+        """
+        Odwrotnie niż job cykliczny: przy kliknięciu w aplikacji użytkownik
+        musi zobaczyć powód, a nie ciche "0 nowych wiadomości".
+        """
+        watcher = FakeWatcher(should_raise=ImapConnectionError("logowanie odrzucone"))
+        service = MailboxService(
+            fake_mail_repository, _configured_settings(), watcher_factory=lambda: watcher
+        )
+
+        with pytest.raises(ImapConnectionError):
+            await service.sync_now()
+
+
+class TestMailboxServiceStatus:
+    """Testy diagnostyki skrzynki (`GET /api/v1/mail/status`)."""
+
+    @pytest.mark.asyncio
+    async def test_nieskonfigurowany_imap_widac_w_statusie(self, fake_mail_repository):
+        service = MailboxService(fake_mail_repository, MailWatchSettings(_env_file=None))
+
+        status = await service.get_status()
+
+        assert status.configured is False
+        assert status.message_count == 0
+        assert status.last_received_at is None
+
+    @pytest.mark.asyncio
+    async def test_status_maskuje_adres_i_liczy_maile(
+        self, fake_mail_repository, sample_mail_message
+    ):
+        await fake_mail_repository.save(sample_mail_message)
+        service = MailboxService(fake_mail_repository, _configured_settings())
+
+        status = await service.get_status()
+
+        assert status.configured is True
+        assert status.user_masked == "sk***@gmail.com"
+        assert "sklep@gmail.com" not in status.user_masked
+        assert status.watch_senders == ["allegro.pl", "olx.pl"]
+        assert status.message_count == 1
+        assert status.last_received_at == sample_mail_message.received_at
+
 
 class TestMailboxServiceRead:
     """Testy odczytu i oznaczania jako przeczytane."""

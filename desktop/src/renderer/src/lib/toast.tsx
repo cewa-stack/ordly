@@ -1,62 +1,56 @@
 /**
- * System toastów - zastępuje rozrzucone, niespójne komunikaty inline
- * ("Zsynchronizowano...", błędy mutacji) jednym, spójnym, "premium"
- * wzorcem: karta w rogu ekranu, ikona statusu w kółku, auto-znikanie.
- * Wywoływane przez `useToast()` z dowolnego ekranu (musi być pod
- * `ToastProvider`, zamontowanym raz w App.tsx).
+ * Toasty wg sekcji 5 i 7.3 specyfikacji: prawy dolny rog, Ordi 30 px,
+ * tytul + podtytul, 2600 ms zycia, 320 ms wyjscia w prawo.
+ *
+ * Reguly tresci (7.1): podtytul mowi, CO dokladnie sie wydarzylo, a nie
+ * ze "operacja sie powiodla". Toast bledu ma Ordiego w pozie `think`
+ * i akcent koralowy.
  */
 import * as React from "react";
+import { Mascot } from "../components/Mascot";
 
-type ToastType = "success" | "error";
+type ToastTone = "success" | "error";
 
 interface ToastItem {
   id: number;
-  type: ToastType;
-  message: string;
+  tone: ToastTone;
+  title: string;
+  subtitle?: string;
+  leaving: boolean;
 }
 
 interface ToastContextValue {
-  success: (message: string) => void;
-  error: (message: string) => void;
+  success: (title: string, subtitle?: string) => void;
+  error: (title: string, subtitle?: string) => void;
 }
 
 const ToastContext = React.createContext<ToastContextValue | null>(null);
 
-const AUTO_DISMISS_MS = 4500;
-
-function CheckCircleGlyph() {
-  return (
-    <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
-      <path d="M4 12.5l5 5L20 6.5" stroke="currentColor" strokeWidth={3} strokeLinecap="round" strokeLinejoin="round" />
-    </svg>
-  );
-}
-
-function AlertGlyph() {
-  return (
-    <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
-      <path d="M12 8v5" stroke="currentColor" strokeWidth={3} strokeLinecap="round" />
-      <circle cx="12" cy="16.3" r="1" fill="currentColor" />
-    </svg>
-  );
-}
+/** Czasy 1:1 z tabela w sekcji 2.6. */
+const TOAST_LIFETIME_MS = 2600;
+const TOAST_EXIT_MS = 320;
 
 function ToastCard({ toast, onDismiss }: { toast: ToastItem; onDismiss: () => void }) {
-  const isSuccess = toast.type === "success";
+  const isError = toast.tone === "error";
   return (
     <div
       onClick={onDismiss}
-      className="animate-toast-in flex w-[340px] cursor-pointer items-center gap-3 rounded-2xl border border-border bg-surface px-4 py-3.5 shadow-[0_16px_40px_-12px_rgba(0,0,0,0.6)]"
       role="status"
+      className={`flex max-w-[330px] cursor-pointer items-center gap-[11px] rounded-md border bg-panel-2 py-[11px] pl-[11px] pr-[15px] shadow-toast ${
+        toast.leaving ? "animate-toast-out" : "animate-toast-in"
+      } ${isError ? "border-coral/50" : "border-line-strong"}`}
     >
-      <span
-        className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full ${
-          isSuccess ? "bg-success text-on-primary" : "bg-danger text-on-primary"
-        }`}
-      >
-        {isSuccess ? <CheckCircleGlyph /> : <AlertGlyph />}
-      </span>
-      <p className="text-callout leading-snug text-text">{toast.message}</p>
+      <Mascot pose={isError ? "think" : "happy"} size={30} floaty={false} />
+      <div className="flex min-w-0 flex-col gap-0.5">
+        <span
+          className={`text-[12.5px] font-semibold ${isError ? "text-coral" : "text-white"}`}
+        >
+          {toast.title}
+        </span>
+        {toast.subtitle && (
+          <span className="text-[11px] leading-snug text-slate-dim">{toast.subtitle}</span>
+        )}
+      </div>
     </div>
   );
 }
@@ -66,22 +60,27 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
   const nextId = React.useRef(0);
 
   const dismiss = React.useCallback((id: number) => {
-    setToasts((prev) => prev.filter((t) => t.id !== id));
+    // Najpierw klasa wyjscia, dopiero po jej zakonczeniu usuniecie z listy -
+    // inaczej karta znikalaby skokowo, bez animacji w prawo.
+    setToasts((prev) => prev.map((t) => (t.id === id ? { ...t, leaving: true } : t)));
+    window.setTimeout(() => {
+      setToasts((prev) => prev.filter((t) => t.id !== id));
+    }, TOAST_EXIT_MS);
   }, []);
 
   const push = React.useCallback(
-    (type: ToastType, message: string) => {
+    (tone: ToastTone, title: string, subtitle?: string) => {
       const id = nextId.current++;
-      setToasts((prev) => [...prev, { id, type, message }]);
-      window.setTimeout(() => dismiss(id), AUTO_DISMISS_MS);
+      setToasts((prev) => [...prev, { id, tone, title, subtitle, leaving: false }]);
+      window.setTimeout(() => dismiss(id), TOAST_LIFETIME_MS);
     },
     [dismiss]
   );
 
   const value = React.useMemo<ToastContextValue>(
     () => ({
-      success: (message: string) => push("success", message),
-      error: (message: string) => push("error", message),
+      success: (title, subtitle) => push("success", title, subtitle),
+      error: (title, subtitle) => push("error", title, subtitle),
     }),
     [push]
   );
@@ -89,7 +88,7 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
   return (
     <ToastContext.Provider value={value}>
       {children}
-      <div className="pointer-events-none fixed bottom-6 right-6 z-50 flex flex-col-reverse gap-2.5">
+      <div className="pointer-events-none fixed bottom-[26px] right-[26px] z-[120] flex flex-col items-end gap-2.5">
         {toasts.map((toast) => (
           <div key={toast.id} className="pointer-events-auto">
             <ToastCard toast={toast} onDismiss={() => dismiss(toast.id)} />

@@ -1,27 +1,37 @@
+/**
+ * Pasek boczny 224 px (sekcja 4.2). Kolejnosc od gory: marka -> grupa
+ * glowna -> grupa "Zaplecze" -> Ustawienia i wskaznik Ordiego przyklejone
+ * do dolu.
+ *
+ * Kazda pozycja MUSI prowadzic do dzialajacego ekranu - slepe zaulki sa
+ * bledem krytycznym (sekcja 4.4).
+ */
 import type { ReactNode } from "react";
-import mascotSrc from "../assets/mascot.png";
 import {
-  BarsIcon,
   BoxIcon,
+  ChartIcon,
   ChatIcon,
-  LogoutIcon,
+  GearIcon,
+  GridIcon,
+  HomeIcon,
   MailIcon,
-  ReceiptIcon,
+  ReturnIcon,
   TagIcon,
-  UndoIcon,
-  WarehouseIcon,
+  TruckIcon,
 } from "../icons";
-import { useAuth } from "../lib/auth";
+import { OrdiIndicator } from "./OrdiIndicator";
 
 export type ViewId =
-  | "magazyn"
+  | "start"
   | "zamowienia"
-  | "zwroty"
   | "dyskusje"
-  | "hurtownia"
-  | "skrzynka"
+  | "magazyn"
+  | "poczta"
+  | "zwroty"
+  | "hurtownie"
   | "olx"
-  | "statystyki";
+  | "statystyki"
+  | "ustawienia";
 
 interface NavItemDef {
   id: ViewId;
@@ -29,96 +39,151 @@ interface NavItemDef {
   icon: ReactNode;
 }
 
-interface SoonItemDef {
-  label: string;
-  icon: ReactNode;
-  stage: string;
-}
-
-const liveItems: NavItemDef[] = [
-  { id: "magazyn", label: "Magazyn", icon: <BoxIcon /> },
-  { id: "zamowienia", label: "Zamówienia", icon: <ReceiptIcon /> },
-  { id: "zwroty", label: "Zwroty i anulowane", icon: <UndoIcon /> },
+export const MAIN_NAV: NavItemDef[] = [
+  { id: "start", label: "Start", icon: <HomeIcon /> },
+  { id: "zamowienia", label: "Zamówienia", icon: <BoxIcon /> },
   { id: "dyskusje", label: "Dyskusje", icon: <ChatIcon /> },
-  { id: "hurtownia", label: "Hurtownia", icon: <WarehouseIcon /> },
-  { id: "skrzynka", label: "Skrzynka", icon: <MailIcon /> },
-  { id: "olx", label: "OLX", icon: <TagIcon /> },
-  { id: "statystyki", label: "Statystyki", icon: <BarsIcon /> },
+  { id: "magazyn", label: "Magazyn", icon: <GridIcon /> },
+  { id: "poczta", label: "Poczta", icon: <MailIcon /> },
+  { id: "zwroty", label: "Zwroty", icon: <ReturnIcon /> },
 ];
 
-// Wszystkie etapy z files/ordly_roadmap_2026-07-31.html sa juz zbudowane.
-const soonItems: SoonItemDef[] = [];
+export const BACKSTAGE_NAV: NavItemDef[] = [
+  { id: "hurtownie", label: "Hurtownie", icon: <TruckIcon /> },
+  { id: "olx", label: "OLX", icon: <TagIcon /> },
+  { id: "statystyki", label: "Statystyki", icon: <ChartIcon /> },
+];
+
+/** Liczniki po prawej stronie pozycji - `alert` gdy wymagaja uwagi. */
+export interface NavCounts {
+  zamowienia?: number;
+  dyskusje?: { value: number; alert: boolean };
+  magazyn?: { value: number; alert: boolean };
+  poczta?: number;
+  zwroty?: number;
+}
 
 interface SidebarProps {
   active: ViewId;
   onSelect: (view: ViewId) => void;
+  counts: NavCounts;
 }
 
-export function Sidebar({ active, onSelect }: SidebarProps) {
-  const { session, logout } = useAuth();
-
+function NavItem({
+  item,
+  active,
+  onSelect,
+  count,
+  alert = false,
+}: {
+  item: NavItemDef;
+  active: boolean;
+  onSelect: (view: ViewId) => void;
+  count?: number;
+  alert?: boolean;
+}) {
   return (
-    <aside className="flex w-[236px] shrink-0 flex-col border-r border-border bg-surface p-3">
-      <div className="flex items-center gap-2 px-2 pb-4 pt-1">
-        <img src={mascotSrc} alt="" width={24} height={24} className="shrink-0 rounded-[7px]" />
-        <div className="text-[13px] font-extrabold tracking-[0.22em]">ORDLY</div>
+    <button
+      onClick={() => onSelect(item.id)}
+      aria-current={active ? "page" : undefined}
+      className={`relative flex w-full items-center gap-[11px] rounded-[9px] px-2.5 py-[9px] text-left text-[13.5px] transition-[background,color] duration-150 ease-ordly ${
+        active
+          ? "bg-teal-dim text-teal-bright"
+          : "text-slate hover:bg-panel-2 hover:text-white"
+      }`}
+    >
+      {active && (
+        <span className="absolute -left-3 top-1/2 h-[17px] w-[3px] -translate-y-1/2 rounded-r-[3px] bg-teal-bright" />
+      )}
+      <span className={active ? "opacity-100" : "opacity-80"}>{item.icon}</span>
+      {item.label}
+      {count !== undefined && count > 0 && (
+        <span
+          className={`o-mono ml-auto text-[10.5px] ${
+            alert ? "text-coral" : active ? "text-teal-bright" : "text-slate-dim"
+          }`}
+        >
+          {count}
+        </span>
+      )}
+    </button>
+  );
+}
+
+export function Sidebar({ active, onSelect, counts }: SidebarProps) {
+  function countFor(id: ViewId): { value?: number; alert: boolean } {
+    switch (id) {
+      case "zamowienia":
+        return { value: counts.zamowienia, alert: false };
+      case "dyskusje":
+        return { value: counts.dyskusje?.value, alert: counts.dyskusje?.alert ?? false };
+      case "magazyn":
+        return { value: counts.magazyn?.value, alert: counts.magazyn?.alert ?? false };
+      case "poczta":
+        return { value: counts.poczta, alert: false };
+      case "zwroty":
+        return { value: counts.zwroty, alert: false };
+      default:
+        return { alert: false };
+    }
+  }
+
+  // Ponizej 940 px pasek boczny znika (tak jak w koncepcji) - nawigacja
+  // zostaje przez Ctrl+K i skroty `G` + litera.
+  return (
+    <aside className="flex w-[224px] shrink-0 flex-col border-r border-line bg-ink-raised px-3 py-[18px] max-[940px]:hidden">
+      <div className="flex items-center gap-[11px] px-2 pb-5 pt-1.5">
+        <div
+          className="o-display flex h-7 w-7 items-center justify-center rounded-[9px] text-[14px] font-bold text-[#04211F] shadow-brand"
+          style={{
+            background: "linear-gradient(150deg, var(--teal-bright), var(--teal-deep))",
+          }}
+        >
+          O
+        </div>
+        <div className="o-display text-[15.5px] font-semibold tracking-[-.015em]">ORDLY</div>
+        <span className="o-mono ml-auto rounded-[5px] border border-line px-[5px] py-0.5 text-[9px] text-slate-dim">
+          v2
+        </span>
       </div>
 
       <nav className="flex flex-col gap-0.5">
-        {liveItems.map((item) => (
-          <button
+        {MAIN_NAV.map((item) => {
+          const { value, alert } = countFor(item.id);
+          return (
+            <NavItem
+              key={item.id}
+              item={item}
+              active={active === item.id}
+              onSelect={onSelect}
+              count={value}
+              alert={alert}
+            />
+          );
+        })}
+      </nav>
+
+      <div className="flex flex-col gap-0.5">
+        <div className="o-mono px-2.5 pb-[7px] pt-4 text-[9.5px] uppercase tracking-[.13em] text-slate-dim">
+          Zaplecze
+        </div>
+        {BACKSTAGE_NAV.map((item) => (
+          <NavItem
             key={item.id}
-            onClick={() => onSelect(item.id)}
-            className={`relative flex items-center gap-2.5 rounded-[10px] px-2.5 py-2 text-left text-[13.5px] font-semibold transition-colors ${
-              active === item.id
-                ? "bg-primary-tint text-primary"
-                : "text-text-secondary hover:bg-surface-raised"
-            }`}
-          >
-            {active === item.id && (
-              <span className="absolute -left-3 top-2 bottom-2 w-[3px] rounded-r-[3px] bg-primary" />
-            )}
-            <span className="shrink-0">{item.icon}</span>
-            {item.label}
-          </button>
+            item={item}
+            active={active === item.id}
+            onSelect={onSelect}
+          />
         ))}
-      </nav>
+      </div>
 
-      {soonItems.length > 0 && <div className="my-2.5 h-px bg-border" />}
-
-      <nav className="flex flex-col gap-0.5">
-        {soonItems.map((item) => (
-          <div
-            key={item.label}
-            title={`Zaplanowane — etap ${item.stage}`}
-            className="flex cursor-not-allowed items-center gap-2.5 rounded-[10px] px-2.5 py-2 text-[13.5px] font-semibold text-text-secondary opacity-40"
-          >
-            <span className="shrink-0">{item.icon}</span>
-            {item.label}
-            <span className="ml-auto rounded-[6px] bg-surface-raised px-1.5 py-0.5 font-mono text-[9.5px] text-text-dim">
-              {item.stage}
-            </span>
-          </div>
-        ))}
-      </nav>
-
-      <div className="mt-auto flex items-center gap-2.5 border-t border-border pt-3">
-        <div className="flex h-[30px] w-[30px] shrink-0 items-center justify-center rounded-full border border-border bg-surface-raised text-[12px] font-bold text-text-secondary">
-          {session?.username.slice(0, 1).toUpperCase()}
-        </div>
-        <div className="min-w-0 flex-1">
-          <div className="truncate text-[12.5px] font-semibold text-text">{session?.username}</div>
-          <div className="text-[10.5px] text-text-dim">Połączono</div>
-        </div>
-        <button
-          type="button"
-          title="Wyloguj"
-          aria-label="Wyloguj"
-          onClick={() => void logout()}
-          className="shrink-0 text-text-dim hover:text-danger"
-        >
-          <LogoutIcon size={16} />
-        </button>
+      <div className="mt-auto flex flex-col gap-2.5 border-t border-line pt-4">
+        <NavItem
+          item={{ id: "ustawienia", label: "Ustawienia", icon: <GearIcon /> }}
+          active={active === "ustawienia"}
+          onSelect={onSelect}
+        />
+        <OrdiIndicator />
       </div>
     </aside>
   );

@@ -24,6 +24,22 @@ export function registerMailboxIpc(): void {
     })
   );
 
+  ipcMain.handle("ordly:mailbox:status", async () =>
+    toResult(async () => {
+      const session = requireSession();
+      return apiRequest(session.baseUrl, session.token, "/api/v1/mail/status");
+    })
+  );
+
+  ipcMain.handle("ordly:mailbox:sync", async () =>
+    toResult(async () => {
+      const session = requireSession();
+      return apiRequest(session.baseUrl, session.token, "/api/v1/mail/sync", {
+        method: "POST",
+      });
+    })
+  );
+
   ipcMain.handle("ordly:mailbox:markRead", async (_event, messageId: string) =>
     toResult(async () => {
       const session = requireSession();

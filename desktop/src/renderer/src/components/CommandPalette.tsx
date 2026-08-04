@@ -1,235 +1,286 @@
 /**
- * Paleta poleceń (Ctrl/Cmd+K) - szybka nawigacja + realne szybkie akcje.
- * Celowo NIE ma akcji bez pokrycia w backendzie (żadnego "utwórz
- * zamówienie" - ORDLY nigdy nie tworzy zamówień ręcznie, tylko z
- * synchronizacji Allegro) - patrz [[feedback-no-phantom-features]].
- * Obie szybkie akcje (synchronizacja, import CSV) są bezkontekstowe,
- * więc mają sens z dowolnego ekranu.
+ * Paleta polecen (Ctrl+K) wg sekcji 4.5 i 9.1 pkt 4.
+ *
+ * Paleta nie tylko nawiguje - realnie SZUKA: po numerze zamowienia,
+ * nazwie kupujacego, SKU i nazwie produktu, i otwiera konkretny rekord.
+ * Zamowienia leca do `/api/v1/orders/search` na Pi, produkty sa
+ * filtrowane po stronie aplikacji z juz pobranej listy magazynu.
+ *
+ * Zadnej akcji bez pokrycia w backendzie - patrz
+ * [[feedback-no-phantom-features]].
  */
 import * as React from "react";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
-import type { ViewId } from "./Sidebar";
-import { useToast } from "../lib/toast";
-import {
-  BarsIcon,
-  BoxIcon,
-  ChatIcon,
-  MailIcon,
-  ReceiptIcon,
-  RefreshIcon,
-  SearchIcon,
-  TagIcon,
-  UndoIcon,
-  WarehouseIcon,
-} from "../icons";
+import { useQuery } from "@tanstack/react-query";
+import { BoxIcon, GearIcon, GridIcon, RefreshIcon, SearchIcon } from "../icons";
+import { BACKSTAGE_NAV, MAIN_NAV, type ViewId } from "./Sidebar";
+import { useSync } from "../lib/sync";
+import { formatCurrency } from "../lib/format";
+
+export type PaletteTarget =
+  | { kind: "view"; view: ViewId }
+  | { kind: "order"; externalId: string }
+  | { kind: "product"; sku: string };
+
+interface PaletteEntry {
+  id: string;
+  group: string;
+  label: string;
+  hint?: string;
+  icon: React.ReactNode;
+  target: PaletteTarget | "sync";
+}
 
 interface CommandPaletteProps {
   open: boolean;
   onClose: () => void;
-  onNavigate: (view: ViewId) => void;
+  onSelect: (target: PaletteTarget) => void;
 }
 
-interface PaletteItem {
-  id: string;
-  section: "Szybkie akcje" | "Nawigacja";
-  label: string;
-  icon: React.ReactNode;
-  keywords?: string;
-  run: () => void;
-}
+const SEARCH_DEBOUNCE_MS = 220;
 
-const NAV_ITEMS: { id: ViewId; label: string; icon: React.ReactNode }[] = [
-  { id: "magazyn", label: "Magazyn", icon: <BoxIcon size={15} /> },
-  { id: "zamowienia", label: "Zamówienia", icon: <ReceiptIcon size={15} /> },
-  { id: "zwroty", label: "Zwroty i anulowane", icon: <UndoIcon size={15} /> },
-  { id: "dyskusje", label: "Dyskusje", icon: <ChatIcon size={15} /> },
-  { id: "hurtownia", label: "Hurtownia", icon: <WarehouseIcon size={15} /> },
-  { id: "skrzynka", label: "Skrzynka", icon: <MailIcon size={15} /> },
-  { id: "olx", label: "OLX", icon: <TagIcon size={15} /> },
-  { id: "statystyki", label: "Statystyki", icon: <BarsIcon size={15} /> },
-];
-
-export function CommandPalette({ open, onClose, onNavigate }: CommandPaletteProps) {
+export function CommandPalette({ open, onClose, onSelect }: CommandPaletteProps) {
   const [query, setQuery] = React.useState("");
-  const [activeIndex, setActiveIndex] = React.useState(0);
+  const [cursor, setCursor] = React.useState(0);
+  const [debounced, setDebounced] = React.useState("");
+  const listRef = React.useRef<HTMLDivElement>(null);
   const inputRef = React.useRef<HTMLInputElement>(null);
-  const toast = useToast();
-  const queryClient = useQueryClient();
-
-  const syncMutation = useMutation({
-    mutationFn: async () => {
-      const result = await window.ordly.orders.sync();
-      if (!result.ok) throw new Error(result.message);
-      return result.data;
-    },
-    onSuccess: (result) => {
-      void queryClient.invalidateQueries({ queryKey: ["orders"] });
-      toast.success(
-        result.new_orders_count > 0
-          ? `${result.new_orders_count} nowych zamówień zsynchronizowanych`
-          : "Zsynchronizowano — brak nowości"
-      );
-    },
-    onError: (err) => {
-      toast.error(err instanceof Error ? err.message : "Synchronizacja nie powiodła się");
-    },
-  });
-
-  const importMutation = useMutation({
-    mutationFn: () => window.ordly.olx.importCsv(),
-    onSuccess: (result) => {
-      if (!result.cancelled) {
-        void queryClient.invalidateQueries({ queryKey: ["olx-offers"] });
-        toast.success(`Zaimportowano ${result.imported} ofert OLX`);
-      }
-    },
-    onError: () => toast.error("Import CSV nie powiódł się"),
-  });
-
-  const items = React.useMemo<PaletteItem[]>(() => {
-    const actions: PaletteItem[] = [
-      {
-        id: "action-sync",
-        section: "Szybkie akcje",
-        label: "Synchronizuj zamówienia teraz",
-        icon: <RefreshIcon size={15} />,
-        run: () => syncMutation.mutate(),
-      },
-      {
-        id: "action-import-olx",
-        section: "Szybkie akcje",
-        label: "Importuj CSV z OLX",
-        icon: <TagIcon size={15} />,
-        run: () => importMutation.mutate(),
-      },
-    ];
-    const nav: PaletteItem[] = NAV_ITEMS.map((n) => ({
-      id: `nav-${n.id}`,
-      section: "Nawigacja",
-      label: n.label,
-      icon: n.icon,
-      keywords: `przejdź idź ${n.label}`,
-      run: () => onNavigate(n.id),
-    }));
-    return [...actions, ...nav];
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [onNavigate]);
-
-  const filtered = React.useMemo(() => {
-    const q = query.trim().toLowerCase();
-    if (!q) return items;
-    return items.filter(
-      (item) =>
-        item.label.toLowerCase().includes(q) || item.keywords?.toLowerCase().includes(q)
-    );
-  }, [items, query]);
+  const { sync } = useSync();
 
   React.useEffect(() => {
-    setActiveIndex(0);
-  }, [query]);
-
-  React.useEffect(() => {
-    if (open) {
+    if (!open) {
       setQuery("");
-      setActiveIndex(0);
-      // Modal renderuje sie po klatce - focus w mikrotasku, zeby input juz istnial w DOM.
-      requestAnimationFrame(() => inputRef.current?.focus());
+      setCursor(0);
+      return;
     }
+    inputRef.current?.focus();
   }, [open]);
 
   React.useEffect(() => {
+    const timer = window.setTimeout(() => setDebounced(query.trim()), SEARCH_DEBOUNCE_MS);
+    return () => window.clearTimeout(timer);
+  }, [query]);
+
+  const ordersQuery = useQuery({
+    queryKey: ["palette-orders", debounced],
+    enabled: open && debounced.length >= 2,
+    queryFn: async () => {
+      const result = await window.ordly.orders.search(debounced);
+      if (!result.ok) throw new Error(result.message);
+      return result.data;
+    },
+  });
+
+  const stockQuery = useQuery({
+    queryKey: ["stock"],
+    enabled: open,
+    queryFn: async () => {
+      const result = await window.ordly.stock.list();
+      if (!result.ok) throw new Error(result.message);
+      return result.data;
+    },
+  });
+
+  const entries = React.useMemo<PaletteEntry[]>(() => {
+    const needle = debounced.toLowerCase();
+
+    const screens: PaletteEntry[] = [
+      ...MAIN_NAV,
+      ...BACKSTAGE_NAV,
+      { id: "ustawienia" as ViewId, label: "Ustawienia", icon: <GearIcon /> },
+    ]
+      .map((item) => ({
+        id: `view:${item.id}`,
+        group: "Ekrany",
+        label: item.label,
+        icon: item.icon,
+        target: { kind: "view" as const, view: item.id as ViewId },
+      }))
+      .filter((entry) => needle === "" || entry.label.toLowerCase().includes(needle));
+
+    const orders: PaletteEntry[] = (ordersQuery.data ?? []).slice(0, 6).map((order) => ({
+      id: `order:${order.external_id}`,
+      group: "Zamówienia",
+      label: order.buyer_login,
+      hint: formatCurrency(order.total_amount),
+      icon: <BoxIcon />,
+      target: { kind: "order", externalId: order.external_id },
+    }));
+
+    const products: PaletteEntry[] =
+      needle.length >= 2
+        ? (stockQuery.data ?? [])
+            .filter(
+              (item) =>
+                item.sku.toLowerCase().includes(needle) ||
+                item.name.toLowerCase().includes(needle)
+            )
+            .slice(0, 6)
+            .map((item) => ({
+              id: `product:${item.sku}`,
+              group: "Produkty",
+              label: item.name,
+              hint: item.sku,
+              icon: <GridIcon />,
+              target: { kind: "product" as const, sku: item.sku },
+            }))
+        : [];
+
+    const actions: PaletteEntry[] = (
+      [
+        {
+          id: "action:sync",
+          group: "Działania",
+          label: "Synchronizuj z marketplace",
+          hint: "Ctrl R",
+          icon: <RefreshIcon />,
+          target: "sync" as const,
+        },
+      ] satisfies PaletteEntry[]
+    ).filter((entry) => needle === "" || entry.label.toLowerCase().includes(needle));
+
+    return [...screens, ...orders, ...products, ...actions];
+  }, [debounced, ordersQuery.data, stockQuery.data]);
+
+  React.useEffect(() => {
+    setCursor(0);
+  }, [entries.length]);
+
+  const commit = React.useCallback(
+    (entry: PaletteEntry | undefined) => {
+      if (!entry) return;
+      onClose();
+      if (entry.target === "sync") {
+        sync();
+        return;
+      }
+      onSelect(entry.target);
+    },
+    [onClose, onSelect, sync]
+  );
+
+  React.useEffect(() => {
     if (!open) return;
-    function handleGlobalKey(e: KeyboardEvent) {
-      if (e.key === "Escape") {
-        e.preventDefault();
+    function handleKey(event: KeyboardEvent) {
+      if (event.key === "Escape") {
+        event.preventDefault();
         onClose();
+        return;
+      }
+      if (event.key === "ArrowDown") {
+        event.preventDefault();
+        setCursor((prev) => (entries.length === 0 ? 0 : (prev + 1) % entries.length));
+        return;
+      }
+      if (event.key === "ArrowUp") {
+        event.preventDefault();
+        setCursor((prev) =>
+          entries.length === 0 ? 0 : (prev - 1 + entries.length) % entries.length
+        );
+        return;
+      }
+      if (event.key === "Enter") {
+        event.preventDefault();
+        commit(entries[cursor]);
       }
     }
-    window.addEventListener("keydown", handleGlobalKey);
-    return () => window.removeEventListener("keydown", handleGlobalKey);
-  }, [open, onClose]);
+    window.addEventListener("keydown", handleKey);
+    return () => window.removeEventListener("keydown", handleKey);
+  }, [open, entries, cursor, commit, onClose]);
+
+  React.useEffect(() => {
+    listRef.current
+      ?.querySelector('[data-cursor="true"]')
+      ?.scrollIntoView({ block: "nearest" });
+  }, [cursor]);
 
   if (!open) return null;
 
-  function activate(item: PaletteItem) {
-    item.run();
-    onClose();
-  }
-
-  function handleInputKeyDown(e: React.KeyboardEvent<HTMLInputElement>) {
-    if (e.key === "ArrowDown") {
-      e.preventDefault();
-      setActiveIndex((i) => Math.min(i + 1, filtered.length - 1));
-    } else if (e.key === "ArrowUp") {
-      e.preventDefault();
-      setActiveIndex((i) => Math.max(i - 1, 0));
-    } else if (e.key === "Enter") {
-      e.preventDefault();
-      const item = filtered[activeIndex];
-      if (item) activate(item);
-    }
-  }
-
-  let renderedIndex = -1;
+  let lastGroup = "";
 
   return (
     <div
-      className="fixed inset-0 z-40 flex items-start justify-center bg-black/60 pt-[14vh]"
+      className="fixed inset-0 z-[100] flex items-start justify-center pt-[14vh]"
+      style={{ background: "rgba(4,7,6,.72)", backdropFilter: "blur(7px)" }}
       onClick={onClose}
+      role="dialog"
+      aria-modal="true"
+      aria-label="Paleta poleceń"
     >
       <div
-        className="animate-palette-in flex max-h-[65vh] w-full max-w-lg flex-col overflow-hidden rounded-2xl border border-border bg-surface shadow-[0_24px_60px_-15px_rgba(0,0,0,0.7)]"
-        onClick={(e) => e.stopPropagation()}
+        className="animate-cmd-in w-[min(540px,92vw)] overflow-hidden rounded-lg border border-line-strong bg-panel shadow-palette"
+        onClick={(event) => event.stopPropagation()}
       >
-        <div className="flex items-center gap-3 border-b border-border px-4 py-3.5">
-          <SearchIcon size={16} className="shrink-0 text-text-dim" />
+        <div className="flex items-center gap-[11px] border-b border-line px-[17px] py-[15px]">
+          <SearchIcon size={16} className="text-slate-dim" />
           <input
             ref={inputRef}
             value={query}
-            onChange={(e) => setQuery(e.target.value)}
-            onKeyDown={handleInputKeyDown}
-            placeholder="Szukaj sekcji, uruchom akcję…"
-            className="w-full border-0 bg-transparent text-body text-text placeholder:text-text-dim focus:outline-none"
+            onChange={(event) => setQuery(event.target.value)}
+            placeholder="Szukaj zamówienia, produktu lub ekranu…"
+            className="flex-1 bg-transparent text-[14.5px] text-white outline-none placeholder:text-slate-dim"
           />
-          <kbd className="shrink-0 rounded-md border border-border bg-surface-raised px-1.5 py-0.5 font-mono text-[10px] text-text-dim">
-            esc
-          </kbd>
         </div>
 
-        <div className="min-h-0 flex-1 overflow-y-auto p-2">
-          {filtered.length === 0 && (
-            <p className="px-3 py-6 text-center text-footnote text-text-dim">Brak wyników.</p>
+        <div ref={listRef} className="max-h-[320px] overflow-y-auto p-[7px]">
+          {entries.length === 0 ? (
+            <p className="px-4 py-7 text-center text-[12.5px] text-slate-dim">
+              Nic nie pasuje do «{query}»
+            </p>
+          ) : (
+            entries.map((entry, index) => {
+              const showGroup = entry.group !== lastGroup;
+              lastGroup = entry.group;
+              return (
+                <React.Fragment key={entry.id}>
+                  {showGroup && (
+                    <div className="o-mono px-2.5 pb-[5px] pt-2.5 text-[9.5px] uppercase tracking-[.12em] text-slate-dim">
+                      {entry.group}
+                    </div>
+                  )}
+                  <button
+                    data-cursor={index === cursor}
+                    onMouseEnter={() => setCursor(index)}
+                    onClick={() => commit(entry)}
+                    className={`flex w-full items-center gap-[11px] rounded-[9px] px-2.5 py-[9.5px] text-left text-[13.5px] transition-colors duration-100 ${
+                      index === cursor ? "bg-teal-dim text-teal-bright" : "text-slate"
+                    }`}
+                  >
+                    <span className="opacity-80">{entry.icon}</span>
+                    <span className="min-w-0 flex-1 truncate">{entry.label}</span>
+                    {entry.hint && (
+                      <span className="o-mono shrink-0 text-[9.5px] text-slate-dim">
+                        {entry.hint}
+                      </span>
+                    )}
+                  </button>
+                </React.Fragment>
+              );
+            })
           )}
-          {(["Szybkie akcje", "Nawigacja"] as const).map((section) => {
-            const sectionItems = filtered.filter((i) => i.section === section);
-            if (sectionItems.length === 0) return null;
-            return (
-              <div key={section} className="mb-1.5 last:mb-0">
-                <p className="px-3 pb-1 pt-2 font-mono text-[10px] uppercase tracking-wide text-text-dim">
-                  {section}
-                </p>
-                {sectionItems.map((item) => {
-                  renderedIndex += 1;
-                  const isActive = renderedIndex === activeIndex;
-                  return (
-                    <button
-                      key={item.id}
-                      onMouseEnter={() => setActiveIndex(renderedIndex)}
-                      onClick={() => activate(item)}
-                      className={`flex w-full items-center gap-2.5 rounded-lg px-3 py-2.5 text-left text-[13.5px] font-medium transition-colors ${
-                        isActive ? "bg-primary-tint text-primary" : "text-text hover:bg-surface-raised"
-                      }`}
-                    >
-                      <span className="shrink-0">{item.icon}</span>
-                      {item.label}
-                    </button>
-                  );
-                })}
-              </div>
-            );
-          })}
+        </div>
+
+        <div className="flex items-center gap-3.5 border-t border-line px-4 py-2.5 text-[10.5px] text-slate-dim">
+          <span className="flex items-center gap-1.5">
+            <Kbd>↑</Kbd>
+            <Kbd>↓</Kbd> nawigacja
+          </span>
+          <span className="flex items-center gap-1.5">
+            <Kbd>↵</Kbd> otwórz
+          </span>
+          <span className="flex items-center gap-1.5">
+            <Kbd>Esc</Kbd> zamknij
+          </span>
+          <span className="ml-auto">Ordi indeksuje przy każdej synchronizacji</span>
         </div>
       </div>
     </div>
+  );
+}
+
+function Kbd({ children }: { children: React.ReactNode }) {
+  return (
+    <span className="o-mono rounded-[5px] border border-line-strong bg-ink-raised px-1.5 py-0.5 text-[10px] text-slate-dim">
+      {children}
+    </span>
   );
 }
