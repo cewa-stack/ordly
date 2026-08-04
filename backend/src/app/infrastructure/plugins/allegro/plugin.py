@@ -237,6 +237,25 @@ class AllegroPlugin(MarketplacePlugin):
             accept=_BETA_ACCEPT_HEADER,
         )
 
+    async def set_fulfillment_status(self, external_id: str, status: str) -> None:
+        """
+        Ustawia status realizacji zamówienia (`PUT .../fulfillment`).
+
+        Allegro przyjmuje tu m.in. `NEW`, `PROCESSING`, `READY_FOR_SHIPMENT`,
+        `SENT`, `PICKED_UP`. Endpoint odpowiada 204 bez ciała.
+
+        Wymaga uprawnienia `allegro:api:orders:write` na poziomie
+        REJESTRACJI aplikacji w apps.developer.allegro.pl - bez niego
+        Allegro zwraca 403 AccessDenied i sam ponowny login nic nie da
+        (ta sama pułapka co przy dyskusjach).
+        """
+        access_token = await self._get_valid_access_token()
+        await self._api_client.put(
+            f"/order/checkout-forms/{external_id}/fulfillment",
+            access_token,
+            json_body={"status": status},
+        )
+
     async def get_products(self) -> list[Product]:
         """Pobiera listę ofert (produktów) sprzedawcy."""
         access_token = await self._get_valid_access_token()

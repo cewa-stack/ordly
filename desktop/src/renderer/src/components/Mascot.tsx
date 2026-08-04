@@ -1,52 +1,53 @@
 /**
- * Maskotka ORDLY - uzywana WYLACZNIE w: logowanie, puste stany, sukces,
- * blad. Nigdy w sidebarze/dashboardzie/ustawieniach jako powtarzalny
- * element chrome (ta sama zasada co mobile/src/components/Mascot.tsx).
+ * Ordi - maskotka ORDLY, uzywana jako WSKAZNIK STANU SYSTEMU, nie ozdoba.
  *
- * Kazda poza niesie inne znaczenie, zeby te same puste stany nie byly
- * wizualnie monotonne w calej appce:
- * - "default" (clipboard) - logowanie, ogolny stan "do zrobienia".
- * - "orders"  - pusta lista zamowien (czeka na pierwsze/kolejne).
- * - "happy"   - pusty stan, ktory jest DOBRA wiadomoscia (zero zwrotow,
- *               zero otwartych dyskusji).
- * - "thinking"- szukanie/filtrowanie nic nie znalazlo.
- * - "stats"   - brak danych do statystyk/prognozy.
+ * Cztery pozy, kazda o innym znaczeniu (sekcja 3.1 specyfikacji):
+ * - "idle"   - spoczynek, stan domyslny wskaznika
+ * - "think"  - praca / uwaga (synchronizacja, niski stan magazynowy)
+ * - "happy"  - sukces (zakonczona akcja, pusta lista, ktora jest dobra
+ *              wiadomoscia)
+ * - "orders" - kontekst zamowien (hero ekranu Start)
  *
- * Wszystkie pliki maja teraz prawdziwa przezroczystosc (usunieto tlo) -
- * renderowane bezposrednio, bez dodatkowej "plytki" w tle.
+ * Zasada jednego Ordiego: na jednym widoku w jednym momencie Ordi
+ * wystepuje RAZ w roli wskaznika. Male ikony 22 px przy pozycjach
+ * niskiego stanu sa wyjatkiem - to etykiety, nie wskazniki.
  */
-import mascotDefault from "../assets/mascot.png";
+import mascotIdle from "../assets/mascot_stats.png";
 import mascotHappy from "../assets/mascot_happy.png";
 import mascotOrders from "../assets/mascot_orders.png";
-import mascotStats from "../assets/mascot_stats.png";
-import mascotThinking from "../assets/mascot_thinking.png";
+import mascotThink from "../assets/mascot_thinking.png";
 
-export type MascotPose = "default" | "happy" | "orders" | "thinking" | "stats";
+export type OrdiPose = "idle" | "think" | "happy" | "orders";
 
-const POSE_SRC: Record<MascotPose, string> = {
-  default: mascotDefault,
+const POSE_SRC: Record<OrdiPose, string> = {
+  idle: mascotIdle,
+  think: mascotThink,
   happy: mascotHappy,
   orders: mascotOrders,
-  thinking: mascotThinking,
-  stats: mascotStats,
 };
 
 interface MascotProps {
-  pose?: MascotPose;
+  pose?: OrdiPose;
   size?: number;
+  /** Unoszenie w spoczynku (3.4 s w petli). Wylaczone w fazie pracy. */
   floaty?: boolean;
   className?: string;
 }
 
-export function Mascot({ pose = "default", size = 96, floaty = true, className = "" }: MascotProps) {
+export function Mascot({
+  pose = "idle",
+  size = 88,
+  floaty = true,
+  className = "",
+}: MascotProps) {
   return (
     <img
       src={POSE_SRC[pose]}
-      alt="Maskotka ORDLY"
+      alt="Ordi"
       width={size}
       height={size}
-      className={`${floaty ? "animate-floaty" : ""} ${className}`}
-      style={{ objectFit: "contain" }}
+      className={`${floaty ? "animate-bob-slow" : ""} ${className}`}
+      style={{ objectFit: "contain", width: size, height: size }}
     />
   );
 }

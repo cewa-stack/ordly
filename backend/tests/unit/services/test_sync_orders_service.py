@@ -306,3 +306,45 @@ class TestSyncCustomerReturns:
 
         assert result.new_orders_count == 1
         assert result.new_returns == ()
+
+
+class TestSetFulfillmentStatus:
+    """Testy zmiany statusu realizacji ("Oznacz jako spakowane" w aplikacji)."""
+
+    @pytest.mark.asyncio
+    async def test_zapisuje_status_najpierw_na_marketplace_potem_lokalnie(
+        self, fake_marketplace_plugin, fake_order_repository, sample_order
+    ):
+        await fake_order_repository.save(sample_order)
+        service = SyncOrdersService(
+            fake_marketplace_plugin, fake_order_repository, EventBus()
+        )
+
+        updated = await service.set_fulfillment_status(sample_order.external_id, "SENT")
+
+        assert fake_marketplace_plugin.fulfillment_calls == [
+            (sample_order.external_id, "SENT")
+        ]
+        assert updated.fulfillment_status == "SENT"
+
+    @pytest.mark.asyncio
+    async def test_odmowa_marketplace_nie_zmienia_stanu_lokalnego(
+        self, fake_marketplace_plugin, fake_order_repository, sample_order
+    ):
+        """
+        Gdy Allegro odrzuci zapis (np. 403 z braku uprawnienia
+        `allegro:api:orders:write`), aplikacja NIE MOZE pokazac
+        "wysłane" - kupujacy nadal widzi zamowienie jako nieobsluzone.
+        """
+        await fake_order_repository.save(sample_order)
+        fake_marketplace_plugin.should_raise_fulfillment_api_error = True
+        service = SyncOrdersService(
+            fake_marketplace_plugin, fake_order_repository, EventBus()
+        )
+
+        with pytest.raises(MarketplaceUnavailableError):
+            await service.set_fulfillment_status(sample_order.external_id, "SENT")
+
+        stored = await fake_order_repository.get_by_external_id(sample_order.external_id)
+        assert stored is not None
+        assert stored.fulfillment_status == sample_order.fulfillment_status

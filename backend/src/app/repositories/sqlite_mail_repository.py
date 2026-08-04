@@ -76,6 +76,11 @@ class SqliteMailRepository(MailRepository):
         result = await self._session.execute(stmt)
         return result.scalar_one_or_none()
 
+    async def count(self) -> int:
+        stmt = select(func.count()).select_from(MailMessageModel)
+        result = await self._session.execute(stmt)
+        return int(result.scalar_one() or 0)
+
     @staticmethod
     def _to_domain(model: MailMessageModel) -> MailMessage:
         return MailMessage(

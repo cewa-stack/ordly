@@ -23,6 +23,7 @@ from app.domain.entities.order_return import ReturnRecord
 from app.domain.entities.shipment import Shipment
 from app.repositories.sqlite_event_repository import EventRecord
 from app.services.dashboard_service import DashboardSummary
+from app.services.mailbox_service import MailboxStatus
 from app.shared.dto.inventory_dto import InventoryReport, ItemForecast
 from app.shared.dto.stats_dto import HealthStatus, StatsSummary, SyncResult
 
@@ -123,6 +124,18 @@ def shipment_out(shipment: Shipment) -> ShipmentOut:
         status=shipment.status,
         updated_at=shipment.updated_at,
     )
+
+
+class FulfillmentStatusIn(BaseModel):
+    """
+    Ciało żądania `POST /api/v1/orders/{id}/fulfillment`.
+
+    Dozwolone wartości to dokładnie te, które przyjmuje Allegro -
+    `Literal` zamiast `str` sprawia, że literówka wraca jako 422
+    z listą poprawnych opcji, a nie jako 502 z marketplace.
+    """
+
+    status: Literal["NEW", "PROCESSING", "READY_FOR_SHIPMENT", "SENT", "PICKED_UP"]
 
 
 class SyncResultOut(BaseModel):
@@ -291,6 +304,36 @@ def mail_message_out(message: MailMessage) -> MailMessageOut:
         body_preview=message.body_preview,
         is_read=message.is_read,
     )
+
+
+class MailboxStatusOut(BaseModel):
+    """Stan skrzynki zwracany przez `GET /api/v1/mail/status`."""
+
+    configured: bool
+    host: str
+    user_masked: str
+    watch_senders: list[str]
+    message_count: int
+    last_received_at: datetime | None
+
+
+def mailbox_status_out(status: MailboxStatus) -> MailboxStatusOut:
+    """Mapuje stan skrzynki z serwisu na schemat odpowiedzi API."""
+    return MailboxStatusOut(
+        configured=status.configured,
+        host=status.host,
+        user_masked=status.user_masked,
+        watch_senders=status.watch_senders,
+        message_count=status.message_count,
+        last_received_at=status.last_received_at,
+    )
+
+
+class MailSyncResultOut(BaseModel):
+    """Wynik ręcznej synchronizacji skrzynki (`POST /api/v1/mail/sync`)."""
+
+    new_count: int
+    configured: bool
 
 
 # --------------------------------------------------------------------------

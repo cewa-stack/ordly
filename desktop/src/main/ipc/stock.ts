@@ -9,11 +9,38 @@ export interface StockAdjustPayload {
   reason?: string;
 }
 
+export interface StockCreatePayload {
+  sku: string;
+  name: string;
+  min_stock: number;
+}
+
 export function registerStockIpc(): void {
   ipcMain.handle("ordly:stock:list", async () =>
     toResult(async () => {
       const session = requireSession();
       return apiRequest(session.baseUrl, session.token, "/api/v1/stock");
+    })
+  );
+
+  ipcMain.handle("ordly:stock:create", async (_event, payload: StockCreatePayload) =>
+    toResult(async () => {
+      const session = requireSession();
+      return apiRequest(session.baseUrl, session.token, "/api/v1/stock", {
+        method: "POST",
+        body: payload,
+      });
+    })
+  );
+
+  ipcMain.handle("ordly:stock:history", async (_event, sku: string) =>
+    toResult(async () => {
+      const session = requireSession();
+      return apiRequest(
+        session.baseUrl,
+        session.token,
+        `/api/v1/stock/${encodeURIComponent(sku)}/history?limit=20`
+      );
     })
   );
 

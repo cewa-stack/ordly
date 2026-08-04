@@ -1,17 +1,25 @@
 import type {
   BridgeResult,
+  DashboardSummary,
+  HealthStatus,
   Issue,
   IssueMessage,
+  MailboxStatus,
   MailMessage,
+  MailSyncResult,
   OlxOffer,
   Order,
   ReturnItem,
   Session,
+  Shipment,
   StatsSummary,
   StockAdjustPayload,
+  StockCreatePayload,
   StockItem,
+  StockMovement,
   StockReport,
   SyncResult,
+  SystemEvent,
   Wholesaler,
   WholesalerOrderRecord,
   WholesalerOrderSendPayload,
@@ -29,10 +37,18 @@ export interface OrdlyBridge {
   };
   stock: {
     list: () => Promise<BridgeResult<StockItem[]>>;
+    create: (payload: StockCreatePayload) => Promise<BridgeResult<StockItem>>;
+    history: (sku: string) => Promise<BridgeResult<StockMovement[]>>;
     adjust: (sku: string, payload: StockAdjustPayload) => Promise<BridgeResult<StockItem>>;
   };
   orders: {
     list: () => Promise<BridgeResult<Order[]>>;
+    search: (query: string) => Promise<BridgeResult<Order[]>>;
+    tracking: (externalId: string) => Promise<BridgeResult<Shipment>>;
+    setFulfillment: (
+      externalId: string,
+      status: "NEW" | "PROCESSING" | "READY_FOR_SHIPMENT" | "SENT" | "PICKED_UP"
+    ) => Promise<BridgeResult<Order>>;
     sync: () => Promise<BridgeResult<SyncResult>>;
   };
   returns: {
@@ -47,6 +63,10 @@ export interface OrdlyBridge {
     get: () => Promise<BridgeResult<StatsSummary>>;
     stockReport: () => Promise<BridgeResult<StockReport>>;
     shoppingList: () => Promise<BridgeResult<StockItem[]>>;
+    dashboard: () => Promise<BridgeResult<DashboardSummary>>;
+    health: () => Promise<BridgeResult<HealthStatus>>;
+    events: () => Promise<BridgeResult<SystemEvent[]>>;
+    backup: () => Promise<BridgeResult<{ status: string; backup_path: string }>>;
   };
   olx: {
     list: () => Promise<OlxOffer[]>;
@@ -59,6 +79,8 @@ export interface OrdlyBridge {
       source?: "allegro" | "olx" | "other";
       unreadOnly?: boolean;
     }) => Promise<BridgeResult<MailMessage[]>>;
+    status: () => Promise<BridgeResult<MailboxStatus>>;
+    sync: () => Promise<BridgeResult<MailSyncResult>>;
     markRead: (messageId: string) => Promise<BridgeResult<null>>;
   };
   wholesalers: {

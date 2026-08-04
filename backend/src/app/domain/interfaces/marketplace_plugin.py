@@ -87,6 +87,19 @@ class MarketplacePlugin(ABC):
             f"{self.marketplace_code} nie obsługuje odpowiedzi na dyskusje/reklamacje"
         )
 
+    async def set_fulfillment_status(self, external_id: str, status: str) -> None:
+        """
+        Ustawia status realizacji zamówienia po stronie marketplace.
+
+        Jak `reply_to_issue`: brak wsparcia rzuca NotImplementedError,
+        nie "udaje sukcesu". Cicha zgoda na zapis, ktory nigdzie nie
+        dotarl, jest gorsza niz jawny blad - sprzedawca myslalby, ze
+        kupujacy widzi juz "wysłane".
+        """
+        raise NotImplementedError(
+            f"{self.marketplace_code} nie obsługuje zmiany statusu realizacji"
+        )
+
     @abstractmethod
     async def get_order(self, external_id: str) -> Order:
         """Pobiera szczegóły pojedynczego zamówienia po jego identyfikatorze."""

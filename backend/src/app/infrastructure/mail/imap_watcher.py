@@ -44,13 +44,22 @@ class ImapWatcher:
         Jedno zapytanie SEARCH per nadawca - IMAP SEARCH nie wspiera
         czytelnie OR na wszystkich serwerach, więc bezpieczniej iterować.
         """
-        client = aioimaplib.IMAP4_SSL(host=self._host, port=self._port)
-        await client.wait_hello_from_server()
+        try:
+            client = aioimaplib.IMAP4_SSL(host=self._host, port=self._port)
+            await client.wait_hello_from_server()
+        except (OSError, TimeoutError, aioimaplib.Abort) as exc:
+            # Nieosiągalny host/port albo zerwane TLS - bez tego opakowania
+            # surowy OSError leciał do FastAPI jako 500 "Internal Server
+            # Error" i użytkownik nie wiedział, że chodzi o pocztę.
+            raise ImapConnectionError(
+                f"Brak połączenia z serwerem IMAP {self._host}:{self._port} ({exc})"
+            ) from exc
 
         login_response = await client.login(self._user, self._password)
         if login_response.result != "OK":
             raise ImapConnectionError(
-                "Logowanie IMAP nie powiodło się - sprawdź IMAP_USER/IMAP_PASS"
+                "Logowanie IMAP odrzucone - sprawdź IMAP_USER i IMAP_PASS w .env na Pi. "
+                "Gmail i iCloud wymagają hasła aplikacji, nie zwykłego hasła konta."
             )
 
         select_response = await client.select("INBOX")

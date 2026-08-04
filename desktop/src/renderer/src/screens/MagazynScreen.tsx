@@ -1,16 +1,213 @@
+/**
+ * Magazyn - tabela Produkt · SKU · Zapas · Korekta · Status (sekcja 4.4).
+ *
+ * Wiersze ponizej progu maja wsuniety pasek `--coral` na lewej krawedzi
+ * i ikone Ordiego 22 px w pozie `think` przy nazwie. To jedyny wyjatek
+ * od "reguly jednego Ordiego" - tutaj Ordi jest ETYKIETA, nie
+ * wskaznikiem stanu (sekcja 3.3).
+ *
+ * Nowosc wobec poprzedniej wersji: formularz produktu (sekcja 9.1 pkt 6)
+ * i historia ruchow magazynowych - wczesniej byl tylko stepper korekty.
+ */
 import * as React from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { SearchIcon } from "../icons";
-import { EmptyState } from "../components/EmptyState";
-import { StockStatusPill } from "../components/StockStatusPill";
-import { WholesalerOrderModal } from "../components/WholesalerOrderModal";
+import { ClockIcon, PlusIcon } from "../icons";
+import {
+  Button,
+  Chip,
+  EmptyState,
+  ErrorState,
+  MiniButton,
+  Pill,
+  SkeletonRows,
+  StockBar,
+  Stepper,
+} from "../components/ui";
+import { Modal } from "../components/Modal";
+import { Mascot } from "../components/Mascot";
 import { useToast } from "../lib/toast";
-import type { StockAdjustPayload, StockItem } from "../types/api";
+import { formatDateTime, formatStock } from "../lib/format";
+import type { StockItem } from "../types/api";
 
-const currency = new Intl.NumberFormat("pl-PL", { style: "currency", currency: "PLN" });
+type StockFilter = "all" | "low" | "zero";
 
-function useStockList() {
-  return useQuery({
+const STOCK_FILTER_LABEL: Record<StockFilter, string> = {
+  all: "Wszystkie",
+  low: "Poniżej progu",
+  zero: "Zerowy stan",
+};
+
+interface MagazynScreenProps {
+  focusSku: string | null;
+  onFocusHandled: () => void;
+}
+
+function statusPill(item: StockItem) {
+  if (item.status === "critical") return <Pill tone="pack">Brak</Pill>;
+  if (item.status === "warning") return <Pill tone="warn">Niski stan</Pill>;
+  return <Pill tone="done">W normie</Pill>;
+}
+
+function Field({
+  label,
+  hint,
+  children,
+}: {
+  label: string;
+  hint: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <label className="flex flex-col gap-1.5">
+      <span className="o-eyebrow">{label}</span>
+      {children}
+      <span className="text-[11px] text-slate-dim">{hint}</span>
+    </label>
+  );
+}
+
+function NewProductModal({ open, onClose }: { open: boolean; onClose: () => void }) {
+  const queryClient = useQueryClient();
+  const toast = useToast();
+  const [sku, setSku] = React.useState("");
+  const [name, setName] = React.useState("");
+  const [minStock, setMinStock] = React.useState("0");
+
+  const mutation = useMutation({
+    mutationFn: async () => {
+      const result = await window.ordly.stock.create({
+        sku: sku.trim(),
+        name: name.trim(),
+        min_stock: Number(minStock) || 0,
+      });
+      if (!result.ok) throw new Error(result.message);
+      return result.data;
+    },
+    onSuccess: (item) => {
+      void queryClient.invalidateQueries({ queryKey: ["stock"] });
+      void queryClient.invalidateQueries({ queryKey: ["dashboard"] });
+      toast.success("Dodano produkt", `${item.sku} · stan początkowy 0`);
+      setSku("");
+      setName("");
+      setMinStock("0");
+      onClose();
+    },
+    onError: (error) => {
+      toast.error(
+        "Nie udało się dodać produktu",
+        error instanceof Error ? error.message : "Sprawdź, czy SKU nie jest już zajęte."
+      );
+    },
+  });
+
+  const canSubmit = sku.trim().length > 0 && name.trim().length > 0;
+
+  return (
+    <Modal
+      open={open}
+      onClose={onClose}
+      title="Nowy produkt"
+      subtitle="Stan początkowy 0 - uzupełnisz go korektą"
+      width={460}
+      footer={
+        <>
+          <Button variant="ghost" onClick={onClose} disabled={mutation.isPending}>
+            Anuluj
+          </Button>
+          <Button onClick={() => mutation.mutate()} disabled={!canSubmit || mutation.isPending}>
+            {mutation.isPending ? "Dodaję…" : "Dodaj produkt"}
+          </Button>
+        </>
+      }
+    >
+      <div className="flex flex-col gap-3.5">
+        <Field label="SKU" hint="Unikalny identyfikator, np. PET30">
+          <input
+            value={sku}
+            onChange={(event) => setSku(event.target.value.toUpperCase())}
+            className="o-mono w-full rounded-sm border border-line bg-ink-raised px-3 py-2.5 text-[12.5px] text-white outline-none focus:border-teal-bright"
+          />
+        </Field>
+        <Field label="Nazwa" hint="Tak, jak nazywasz produkt na co dzień">
+          <input
+            value={name}
+            onChange={(event) => setName(event.target.value)}
+            className="w-full rounded-sm border border-line bg-ink-raised px-3 py-2.5 text-[12.5px] text-white outline-none focus:border-teal-bright"
+          />
+        </Field>
+        <Field label="Próg niskiego stanu" hint="Poniżej tej liczby Ordi zacznie ostrzegać">
+          <input
+            type="number"
+            min={0}
+            value={minStock}
+            onChange={(event) => setMinStock(event.target.value)}
+            className="o-mono w-full rounded-sm border border-line bg-ink-raised px-3 py-2.5 text-[12.5px] text-white outline-none focus:border-teal-bright"
+          />
+        </Field>
+      </div>
+    </Modal>
+  );
+}
+
+function HistoryModal({ sku, onClose }: { sku: string | null; onClose: () => void }) {
+  const historyQuery = useQuery({
+    queryKey: ["stock-history", sku],
+    enabled: sku !== null,
+    queryFn: async () => {
+      const result = await window.ordly.stock.history(sku as string);
+      if (!result.ok) throw new Error(result.message);
+      return result.data;
+    },
+  });
+
+  return (
+    <Modal
+      open={sku !== null}
+      onClose={onClose}
+      title="Historia zmian"
+      subtitle={sku ?? ""}
+      width={520}
+    >
+      {historyQuery.isLoading && <span className="o-skeleton-bar h-24 w-full" />}
+      {historyQuery.data?.length === 0 && (
+        <p className="text-[12.5px] text-slate-dim">
+          Brak zapisanych ruchów dla tego produktu.
+        </p>
+      )}
+      <div className="flex flex-col">
+        {(historyQuery.data ?? []).map((movement, index) => (
+          <div
+            key={`${movement.created_at}-${index}`}
+            className="flex items-center gap-3 border-b border-line py-2.5 text-[12.5px] last:border-b-0"
+          >
+            <span className="o-mono w-[100px] shrink-0 text-[10.5px] text-slate-dim">
+              {formatDateTime(movement.created_at)}
+            </span>
+            <span
+              className={`o-mono w-12 shrink-0 text-right ${
+                movement.change < 0 ? "text-coral" : "text-teal-bright"
+              }`}
+            >
+              {movement.change > 0 ? `+${movement.change}` : movement.change}
+            </span>
+            <span className="min-w-0 flex-1 truncate text-slate">{movement.reason}</span>
+          </div>
+        ))}
+      </div>
+    </Modal>
+  );
+}
+
+export function MagazynScreen({ focusSku, onFocusHandled }: MagazynScreenProps) {
+  const queryClient = useQueryClient();
+  const toast = useToast();
+  const [filter, setFilter] = React.useState<StockFilter>("all");
+  const [newOpen, setNewOpen] = React.useState(false);
+  const [historySku, setHistorySku] = React.useState<string | null>(null);
+  const [highlightSku, setHighlightSku] = React.useState<string | null>(null);
+  const rowRefs = React.useRef<Record<string, HTMLTableRowElement | null>>({});
+
+  const { data, isLoading, isError, error, refetch } = useQuery({
     queryKey: ["stock"],
     queryFn: async () => {
       const result = await window.ordly.stock.list();
@@ -18,228 +215,170 @@ function useStockList() {
       return result.data;
     },
   });
-}
 
-const inputClass =
-  "h-10 rounded-md border border-border bg-background px-3 text-body text-text focus:border-primary focus:outline-none";
-
-interface AdjustStockModalProps {
-  item: StockItem;
-  onClose: () => void;
-}
-
-function AdjustStockModal({ item, onClose }: AdjustStockModalProps) {
-  const queryClient = useQueryClient();
-  const toast = useToast();
-  const [op, setOp] = React.useState<StockAdjustPayload["op"]>("add");
-  const [quantity, setQuantity] = React.useState(1);
-  const [reason, setReason] = React.useState("");
-
-  const mutation = useMutation({
-    mutationFn: async () => {
-      const result = await window.ordly.stock.adjust(item.sku, {
-        op,
-        quantity,
-        reason: reason.trim() || undefined,
+  const adjustMutation = useMutation({
+    mutationFn: async ({ sku, delta }: { sku: string; delta: number }) => {
+      const result = await window.ordly.stock.adjust(sku, {
+        op: delta > 0 ? "add" : "remove",
+        quantity: Math.abs(delta),
+        reason: "Korekta z aplikacji desktopowej",
       });
       if (!result.ok) throw new Error(result.message);
       return result.data;
     },
-    onSuccess: (result) => {
+    onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ["stock"] });
-      toast.success(`${item.name}: nowy stan ${result.stock} szt.`);
-      onClose();
+      void queryClient.invalidateQueries({ queryKey: ["dashboard"] });
+    },
+    onError: (error) => {
+      toast.error(
+        "Korekta nie przeszła",
+        error instanceof Error ? error.message : "Odśwież listę i spróbuj ponownie."
+      );
     },
   });
 
-  return (
-    <div
-      className="fixed inset-0 z-10 flex items-center justify-center bg-black/60 p-4"
-      onClick={onClose}
-    >
-      <div
-        className="w-full max-w-sm rounded-2xl border border-border bg-surface p-5"
-        onClick={(e) => e.stopPropagation()}
-      >
-        <h2 className="text-headline">Koryguj stan — {item.name}</h2>
-        <p className="mt-1 text-footnote text-text-secondary">Obecny stan: {item.stock} szt.</p>
+  // Wejscie z palety polecen - przewin do produktu i podswietl go.
+  React.useEffect(() => {
+    if (!focusSku) return;
+    setFilter("all");
+    setHighlightSku(focusSku);
+    onFocusHandled();
+    const scrollTimer = window.setTimeout(() => {
+      rowRefs.current[focusSku]?.scrollIntoView({ block: "center" });
+    }, 60);
+    const clearTimer = window.setTimeout(() => setHighlightSku(null), 2400);
+    return () => {
+      window.clearTimeout(scrollTimer);
+      window.clearTimeout(clearTimer);
+    };
+  }, [focusSku, onFocusHandled]);
 
-        <div className="mt-4 flex flex-col gap-3">
-          <label className="flex flex-col gap-1.5">
-            <span className="text-caption text-text-secondary">Operacja</span>
-            <select
-              value={op}
-              onChange={(e) => setOp(e.target.value as StockAdjustPayload["op"])}
-              className={`${inputClass} ordly-select`}
-            >
-              <option value="add">Dodaj do stanu</option>
-              <option value="remove">Odejmij ze stanu</option>
-              <option value="set">Ustaw dokładny stan</option>
-              <option value="min">Ustaw próg minimalny</option>
-            </select>
-          </label>
-          <label className="flex flex-col gap-1.5">
-            <span className="text-caption text-text-secondary">Ilość</span>
-            <input
-              type="number"
-              min={0}
-              value={quantity}
-              onChange={(e) => setQuantity(Math.max(0, Number(e.target.value)))}
-              className={inputClass}
-            />
-          </label>
-          <label className="flex flex-col gap-1.5">
-            <span className="text-caption text-text-secondary">Powód (opcjonalnie)</span>
-            <input
-              value={reason}
-              onChange={(e) => setReason(e.target.value)}
-              placeholder="np. inwentaryzacja, zwrot dostawcy"
-              className={inputClass}
-            />
-          </label>
-        </div>
+  const visible = (data ?? []).filter((item) => {
+    if (filter === "low") return item.is_low_stock;
+    if (filter === "zero") return item.stock === 0;
+    return true;
+  });
 
-        {mutation.isError && (
-          <p className="mt-3 text-caption text-danger">
-            {mutation.error instanceof Error ? mutation.error.message : "Nie udało się zapisać zmiany."}
-          </p>
-        )}
-
-        <div className="mt-5 flex justify-end gap-2">
-          <button
-            onClick={onClose}
-            className="rounded-lg px-4 py-2 text-callout-semibold text-text-secondary hover:bg-surface-raised"
-          >
-            Anuluj
-          </button>
-          <button
-            onClick={() => mutation.mutate()}
-            disabled={mutation.isPending}
-            className="rounded-lg bg-gradient-to-br from-primary to-accent px-4 py-2 text-callout-semibold text-on-primary shadow-[0_8px_18px_-8px_rgba(86,224,208,0.5)] disabled:opacity-45"
-          >
-            {mutation.isPending ? "Zapisywanie…" : "Zapisz"}
-          </button>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-const columns = ["SKU", "Nazwa", "Stan", "Min.", "Wartość", "Status", ""];
-
-export function MagazynScreen() {
-  const { data, isLoading, isError, error } = useStockList();
-  const [search, setSearch] = React.useState("");
-  const [adjustingItem, setAdjustingItem] = React.useState<StockItem | null>(null);
-  const [orderingItem, setOrderingItem] = React.useState<StockItem | null>(null);
-
-  const filtered = React.useMemo(() => {
-    if (!data) return [];
-    const q = search.trim().toLowerCase();
-    if (!q) return data;
-    return data.filter(
-      (item) => item.sku.toLowerCase().includes(q) || item.name.toLowerCase().includes(q)
+  if (isError) {
+    return (
+      <ErrorState
+        title="Nie udało się pobrać magazynu"
+        detail={`Pi nie odpowiedziało na zapytanie o stan magazynowy. ${
+          error instanceof Error ? error.message : ""
+        }`}
+        onRetry={() => void refetch()}
+      />
     );
-  }, [data, search]);
+  }
 
   return (
-    <div>
-      <div className="mb-5 flex items-center justify-between gap-4">
-        <h1 className="text-title1">Magazyn</h1>
-        <div className="flex h-9 w-[200px] items-center gap-2 rounded-[10px] border border-border bg-surface px-3 text-footnote text-text-dim">
-          <SearchIcon size={14} />
-          <input
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            placeholder="Szukaj SKU, nazwy…"
-            className="w-full border-0 bg-transparent p-0 text-footnote text-text placeholder:text-text-dim focus:outline-none"
-          />
+    <div className="flex min-h-0 flex-1 flex-col">
+      <div className="flex flex-wrap items-center gap-2 border-b border-line px-[22px] py-[11px]">
+        {(["all", "low", "zero"] as const).map((option) => (
+          <Chip key={option} active={filter === option} onClick={() => setFilter(option)}>
+            {STOCK_FILTER_LABEL[option]}
+          </Chip>
+        ))}
+        <div className="ml-auto">
+          <MiniButton icon={<PlusIcon size={13} />} onClick={() => setNewOpen(true)}>
+            Nowy produkt
+          </MiniButton>
         </div>
       </div>
 
-      {isLoading && <p className="text-footnote text-text-secondary">Wczytywanie magazynu…</p>}
-      {isError && (
-        <p className="text-footnote text-danger">
-          Nie udało się pobrać magazynu: {error instanceof Error ? error.message : "nieznany błąd"}
-        </p>
-      )}
-      {!isLoading && !isError && filtered.length === 0 && (
-        <EmptyState
-          pose="thinking"
-          title="Nic nie znaleziono"
-          description="Żaden produkt nie pasuje do wyszukiwania - spróbuj innej frazy."
-        />
-      )}
-
-      {filtered.length > 0 && (
-        <div className="overflow-x-auto rounded-xl border border-border bg-surface">
+      <div className="min-h-0 flex-1 overflow-y-auto">
+        {isLoading && <SkeletonRows rows={6} />}
+        {!isLoading && visible.length === 0 && (
+          <EmptyState
+            pose={filter === "all" ? "idle" : "happy"}
+            title={filter === "all" ? "Magazyn jest pusty" : "Nic w tym filtrze"}
+            description={
+              filter === "all"
+                ? "Dodaj pierwszy produkt, żeby Ordi mógł pilnować jego stanu."
+                : "Żaden produkt nie spełnia tego warunku - to dobra wiadomość."
+            }
+          />
+        )}
+        {!isLoading && visible.length > 0 && (
           <table className="w-full border-collapse">
             <thead>
               <tr>
-                {columns.map((h, i) => (
-                  <th
-                    key={h || `col-${i}`}
-                    className={`border-b border-border px-4 py-2.5 text-left font-mono text-[10.5px] uppercase tracking-wide text-text-dim ${
-                      i === 2 || i === 3 || i === 4 ? "text-right" : ""
-                    }`}
-                  >
-                    {h}
-                  </th>
-                ))}
+                {["Produkt", "SKU", "Zapas", "Korekta", "Status", "Historia"].map(
+                  (header, index, all) => (
+                    <th
+                      key={header}
+                      className={`o-mono sticky top-0 z-[2] border-b border-line bg-panel py-[11px] text-left text-[9.5px] uppercase tracking-[.11em] text-slate-dim ${
+                        index === 0 || index === all.length - 1 ? "px-[22px]" : "px-3"
+                      }`}
+                    >
+                      {header}
+                    </th>
+                  )
+                )}
               </tr>
             </thead>
             <tbody>
-              {filtered.map((item, rowIndex) => {
-                const isLastRow = rowIndex === filtered.length - 1;
-                const cellBorder = isLastRow ? "" : "border-b border-border";
+              {visible.map((item) => {
+                const max = item.max_stock ?? Math.max(item.min_stock * 2, item.stock, 1);
                 return (
-                  <tr key={item.sku} className="hover:bg-surface-raised">
-                    <td className={`px-4 py-3 font-mono text-[12px] text-text-secondary ${cellBorder}`}>
+                  <tr
+                    key={item.sku}
+                    ref={(element) => {
+                      rowRefs.current[item.sku] = element;
+                    }}
+                    className={`transition-colors duration-150 ease-ordly hover:bg-panel-2 ${
+                      highlightSku === item.sku ? "bg-teal-dim" : ""
+                    }`}
+                  >
+                    <td
+                      className={`border-b border-line px-[22px] py-3 text-[13px] text-white ${
+                        item.is_low_stock ? "shadow-[inset_3px_0_0_var(--coral)]" : ""
+                      }`}
+                    >
+                      <span className="flex items-center gap-2.5">
+                        {item.is_low_stock && <Mascot pose="think" size={22} floaty={false} />}
+                        {item.name}
+                      </span>
+                    </td>
+                    <td className="o-mono border-b border-line px-3 py-3 text-[12px] text-slate">
                       {item.sku}
                     </td>
-                    <td className={`px-4 py-3 text-[13px] ${cellBorder}`}>{item.name}</td>
-                    <td className={`px-4 py-3 text-right text-[13px] font-semibold tabular-nums ${cellBorder}`}>
-                      {item.stock}
+                    <td className="border-b border-line px-3 py-3">
+                      <span className="flex items-center gap-2.5">
+                        <StockBar value={item.stock} max={max} low={item.is_low_stock} />
+                        <span className="o-mono text-[12px] text-slate">
+                          {formatStock(item.stock, max)}
+                        </span>
+                      </span>
                     </td>
-                    <td className={`px-4 py-3 text-right text-[13px] tabular-nums text-text-secondary ${cellBorder}`}>
-                      {item.min_stock}
+                    <td className="border-b border-line px-3 py-3">
+                      <Stepper
+                        value={item.stock}
+                        disabled={adjustMutation.isPending}
+                        onDecrease={() => adjustMutation.mutate({ sku: item.sku, delta: -1 })}
+                        onIncrease={() => adjustMutation.mutate({ sku: item.sku, delta: 1 })}
+                      />
                     </td>
-                    <td className={`px-4 py-3 text-right text-[13px] tabular-nums text-text-secondary ${cellBorder}`}>
-                      {currency.format(item.stock_value)}
-                    </td>
-                    <td className={`px-4 py-3 ${cellBorder}`}>
-                      <StockStatusPill status={item.status} />
-                    </td>
-                    <td className={`px-4 py-3 text-right ${cellBorder}`}>
-                      <div className="inline-flex items-center gap-1">
-                        <button
-                          onClick={() => setOrderingItem(item)}
-                          className="rounded-lg px-2.5 py-1 text-[11.5px] font-semibold text-text-secondary hover:bg-surface-raised"
-                        >
-                          Zamów
-                        </button>
-                        <button
-                          onClick={() => setAdjustingItem(item)}
-                          className="rounded-lg px-2.5 py-1 text-[11.5px] font-semibold text-primary hover:bg-primary-tint"
-                        >
-                          Koryguj
-                        </button>
-                      </div>
+                    <td className="border-b border-line px-3 py-3">{statusPill(item)}</td>
+                    <td className="border-b border-line px-[22px] py-3 text-right">
+                      <MiniButton
+                        icon={<ClockIcon size={13} />}
+                        onClick={() => setHistorySku(item.sku)}
+                      >
+                        Historia
+                      </MiniButton>
                     </td>
                   </tr>
                 );
               })}
             </tbody>
           </table>
-        </div>
-      )}
+        )}
+      </div>
 
-      {adjustingItem && (
-        <AdjustStockModal item={adjustingItem} onClose={() => setAdjustingItem(null)} />
-      )}
-      {orderingItem && (
-        <WholesalerOrderModal item={orderingItem} onClose={() => setOrderingItem(null)} />
-      )}
+      <NewProductModal open={newOpen} onClose={() => setNewOpen(false)} />
+      <HistoryModal sku={historySku} onClose={() => setHistorySku(null)} />
     </div>
   );
 }

@@ -47,3 +47,6 @@ class FakeMailRepository(MailRepository):
         if not self._messages:
             return None
         return max(m.received_at for m in self._messages.values())
+
+    async def count(self) -> int:
+        return len(self._messages)

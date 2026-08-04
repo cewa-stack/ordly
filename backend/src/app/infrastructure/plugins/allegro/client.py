@@ -46,6 +46,18 @@ class AllegroApiClient:
             "POST", path, access_token, json_body=json_body, accept=accept
         )
 
+    async def put(
+        self,
+        path: str,
+        access_token: str,
+        json_body: dict[str, Any] | None = None,
+        accept: str | None = None,
+    ) -> dict[str, Any]:
+        """Wykonuje żądanie PUT do Allegro API i zwraca sparsowany JSON."""
+        return await self._request(
+            "PUT", path, access_token, json_body=json_body, accept=accept
+        )
+
     async def _request(
         self,
         method: str,
@@ -98,5 +110,10 @@ class AllegroApiClient:
                 response.text,
             )
             raise AllegroApiError(response.status_code, response.text)
+
+        # Czesc zapisow (np. PUT .../fulfillment) odpowiada 204 bez ciala -
+        # `response.json()` rzucilby wtedy JSONDecodeError na pustym stringu.
+        if response.status_code == 204 or not response.content:
+            return {}
 
         return response.json()

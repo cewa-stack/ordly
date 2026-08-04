@@ -1,108 +1,111 @@
-import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { RefreshIcon } from "../icons";
-import { EmptyState } from "../components/EmptyState";
+/**
+ * Zwroty - karty poziome (sekcja 4.4): odznaka kanalu, numer i produkt,
+ * powod i wiek zgloszenia, akcje po prawej.
+ *
+ * SWIADOMA ROZNICA WOBEC KONCEPCJI: koncepcja pokazuje przyciski
+ * "Odrzuć / Przyjmij zwrot". ORDLY ich nie rysuje, bo przyjecie zwrotu
+ * na Allegro oznacza zwrot pieniedzy - operacje finansowa, ktorej to
+ * narzedzie swiadomie nie wykonuje. Zamiast martwego przycisku jest
+ * dzialajace przejscie do panelu Allegro, gdzie decyzje podejmuje
+ * czlowiek. Patrz [[feedback-no-phantom-features]].
+ */
+import { useQuery } from "@tanstack/react-query";
+import { ExternalIcon } from "../icons";
+import {
+  EmptyState,
+  ErrorState,
+  MarketplaceBadge,
+  MiniButton,
+  Pill,
+  SkeletonRows,
+  type PillTone,
+} from "../components/ui";
+import { formatAge, formatDateTime } from "../lib/format";
 
-const dateFormatter = new Intl.DateTimeFormat("pl-PL", {
-  day: "2-digit",
-  month: "2-digit",
-  year: "numeric",
-  hour: "2-digit",
-  minute: "2-digit",
-});
+/** Statusy zwrotow Allegro - tlumaczone, nie surowe. */
+const STATUS_LABEL: Record<string, string> = {
+  CREATED: "Zgłoszony",
+  COMMISSION_REFUND_CLAIMED: "Prowizja do zwrotu",
+  COMMISSION_REFUNDED: "Prowizja zwrócona",
+  CANCELLED: "Anulowany",
+  REJECTED: "Odrzucony",
+};
 
-function useReturnsList() {
-  return useQuery({
+const STATUS_TONE: Record<string, PillTone> = {
+  CREATED: "pack",
+  COMMISSION_REFUND_CLAIMED: "warn",
+  COMMISSION_REFUNDED: "done",
+  CANCELLED: "done",
+  REJECTED: "done",
+};
+
+const ALLEGRO_RETURNS_URL = "https://allegro.pl/moje-allegro/sprzedaz/zwroty";
+
+export function ReturnsScreen() {
+  const { data, isLoading, isError, error, refetch } = useQuery({
     queryKey: ["returns"],
     queryFn: async () => {
       const result = await window.ordly.returns.list();
       if (!result.ok) throw new Error(result.message);
       return result.data;
     },
+    retry: false,
   });
-}
 
-export function ReturnsScreen() {
-  const { data, isLoading, isError, error, isFetching } = useReturnsList();
-  const queryClient = useQueryClient();
+  if (isError) {
+    return (
+      <ErrorState
+        title="Nie udało się pobrać zwrotów"
+        detail={`Pi nie odpowiedziało na zapytanie o zwroty klientów. ${
+          error instanceof Error ? error.message : ""
+        }`}
+        onRetry={() => void refetch()}
+      />
+    );
+  }
 
   return (
-    <div>
-      <div className="mb-5 flex items-center justify-between gap-4">
-        <h1 className="text-title1">Zwroty i anulowane</h1>
-        <button
-          onClick={() => void queryClient.invalidateQueries({ queryKey: ["returns"] })}
-          disabled={isFetching}
-          className="flex h-9 items-center gap-2 rounded-[10px] border border-border bg-surface px-3.5 text-[12.5px] font-semibold text-text-secondary hover:bg-surface-raised disabled:opacity-50"
-        >
-          <RefreshIcon size={14} className={isFetching ? "animate-spin" : ""} />
-          Odśwież
-        </button>
-      </div>
+    <div className="flex min-h-0 flex-1 flex-col gap-3.5 overflow-y-auto p-[22px]">
+      {isLoading && <SkeletonRows rows={4} />}
 
-      <p className="mb-4 text-footnote text-text-secondary">
-        Zwroty synchronizują się razem z zamówieniami — użyj „Synchronizuj teraz" na
-        ekranie Zamówień, żeby sprawdzić nowe.
-      </p>
-
-      {isLoading && <p className="text-footnote text-text-secondary">Wczytywanie zwrotów…</p>}
-      {isError && (
-        <p className="text-footnote text-danger">
-          Nie udało się pobrać zwrotów: {error instanceof Error ? error.message : "nieznany błąd"}
-        </p>
-      )}
-      {!isLoading && !isError && data && data.length === 0 && (
+      {!isLoading && (data ?? []).length === 0 && (
         <EmptyState
           pose="happy"
-          title="Zero zwrotów i anulowań"
-          description="Wszystkie zamówienia idą gładko - nic tu dziś nie ma."
+          title="Zero zwrotów"
+          description="Wszystkie zamówienia idą gładko. Ordi da znać, gdy pojawi się nowy zwrot."
         />
       )}
 
-      {data && data.length > 0 && (
-        <div className="overflow-x-auto rounded-xl border border-border bg-surface">
-          <table className="w-full border-collapse">
-            <thead>
-              <tr>
-                {["Nr zwrotu", "Zamówienie", "Klient", "Produkty", "Data", "Status"].map((h) => (
-                  <th
-                    key={h}
-                    className="border-b border-border px-4 py-2.5 text-left font-mono text-[10.5px] uppercase tracking-wide text-text-dim"
-                  >
-                    {h}
-                  </th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {data.map((item, rowIndex) => {
-                const isLastRow = rowIndex === data.length - 1;
-                const cellBorder = isLastRow ? "" : "border-b border-border";
-                return (
-                  <tr key={item.external_id} className="hover:bg-surface-raised">
-                    <td className={`px-4 py-3 font-mono text-[12px] text-text-secondary ${cellBorder}`}>
-                      {item.external_id}
-                    </td>
-                    <td className={`px-4 py-3 font-mono text-[12px] text-text-secondary ${cellBorder}`}>
-                      {item.order_external_id}
-                    </td>
-                    <td className={`px-4 py-3 text-[13px] ${cellBorder}`}>{item.buyer_login}</td>
-                    <td className={`px-4 py-3 text-[12.5px] text-text-secondary ${cellBorder}`}>
-                      {item.products_summary}
-                    </td>
-                    <td className={`px-4 py-3 text-[12px] tabular-nums text-text-secondary ${cellBorder}`}>
-                      {dateFormatter.format(new Date(item.return_date))}
-                    </td>
-                    <td className={`px-4 py-3 ${cellBorder}`}>
-                      <span className="rounded-full bg-surface-raised px-2.5 py-1 font-mono text-[10.5px] text-text-secondary">
-                        {item.status}
-                      </span>
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
+      {(data ?? []).map((item) => (
+        <div
+          key={item.external_id}
+          className="flex items-center gap-4 rounded-md border border-line bg-panel-2 px-[17px] py-[15px]"
+        >
+          <MarketplaceBadge marketplace={item.marketplace} />
+          <div className="min-w-0 flex-1">
+            <h4 className="o-card-title mb-1 truncate">{item.products_summary}</h4>
+            <p className="o-mono truncate text-[12px] text-slate-dim">
+              {item.buyer_login} · zgłoszony {formatAge(item.return_date)} ·{" "}
+              {formatDateTime(item.return_date)}
+            </p>
+          </div>
+          <Pill tone={STATUS_TONE[item.status] ?? "warn"}>
+            {STATUS_LABEL[item.status] ?? item.status}
+          </Pill>
+          <MiniButton
+            icon={<ExternalIcon size={13} />}
+            onClick={() => window.open(ALLEGRO_RETURNS_URL, "_blank", "noopener,noreferrer")}
+          >
+            Obsłuż na Allegro
+          </MiniButton>
         </div>
+      ))}
+
+      {(data ?? []).length > 0 && (
+        <p className="pb-2 pt-1 text-[11.5px] leading-[1.6] text-slate-dim">
+          Decyzję o przyjęciu zwrotu i zwrocie pieniędzy podejmujesz w panelu Allegro - ORDLY
+          pokazuje stan i pilnuje, żeby żaden zwrot Ci nie umknął.
+        </p>
       )}
     </div>
   );

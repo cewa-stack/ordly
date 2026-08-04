@@ -46,3 +46,8 @@ class MailRepository(ABC):
     async def get_latest_received_at(self) -> datetime | None:
         """Zwraca datę najnowszego zapisanego maila - punkt startowy kolejnej synchronizacji."""
         raise NotImplementedError
+
+    @abstractmethod
+    async def count(self) -> int:
+        """Zwraca liczbę wszystkich zapisanych maili (diagnostyka skrzynki)."""
+        raise NotImplementedError

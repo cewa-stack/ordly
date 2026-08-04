@@ -122,14 +122,14 @@ def map_issue_to_domain(raw: dict[str, Any]) -> Issue:
     return Issue(
         external_id=raw["id"],
         marketplace="allegro",
-        type=raw.get("type", "DISPUTE"),
-        status=current_state.get("status", "UNKNOWN"),
-        order_external_id=raw.get("checkoutForm", {}).get("id", ""),
-        buyer_login=raw.get("buyer", {}).get("login", "nieznany"),
+        type=raw.get("type") or "DISPUTE",
+        status=current_state.get("status") or "UNKNOWN",
+        order_external_id=(raw.get("checkoutForm") or {}).get("id") or "",
+        buyer_login=(raw.get("buyer") or {}).get("login") or "nieznany",
         subject=raw.get("subject"),
         description=raw.get("description"),
         opened_at=_parse_datetime(raw.get("openedDate")),
-        messages_count=int(chat.get("messagesCount", 0)),
+        messages_count=int(chat.get("messagesCount") or 0),
         chat_active=bool(current_state.get("chatActive", False)),
         last_message_at=(
             _parse_datetime(last_message_created_at) if last_message_created_at else None
@@ -141,6 +141,15 @@ def map_issue_message_to_domain(raw: dict[str, Any]) -> IssueMessage:
     """
     Mapuje pojedynczą wiadomość z GET /sale/issues/{id}/chat na IssueMessage.
 
+    Wszystkie pola tekstowe są ściągane przez `or`, nie przez wartość
+    domyślną `.get(klucz, domyslna)` - Allegro zwraca w wątkach klucze
+    obecne, ale ustawione na `null` (np. `author.login` przy wiadomości
+    systemowej albo po anonimizacji kupującego). Wartość domyślna
+    `.get()` działa tylko przy BRAKU klucza, więc `null` przelatywał do
+    encji i cały wątek wywracał się na walidacji `IssueMessageOut`
+    błędem 422 - dla użytkownika wyglądało to jak "dyskusje się nie
+    ładują po kliknięciu".
+
     Args:
         raw: Surowy słownik JSON reprezentujący jedną wiadomość w wątku.
 
@@ -149,12 +158,29 @@ def map_issue_message_to_domain(raw: dict[str, Any]) -> IssueMessage:
     """
     author = raw.get("author") or {}
     return IssueMessage(
-        id=raw.get("id", ""),
-        text=raw.get("text", ""),
-        author_login=author.get("login", "nieznany"),
-        author_role=author.get("role", "UNKNOWN"),
+        id=raw.get("id") or "",
+        text=raw.get("text") or "",
+        author_login=author.get("login") or _author_fallback_login(author.get("role")),
+        author_role=author.get("role") or "UNKNOWN",
         created_at=_parse_datetime(raw.get("createdAt")),
     )
+
+
+def _author_fallback_login(role: str | None) -> str:
+    """
+    Nazwa zastępcza autora wiadomości, gdy Allegro nie podaje loginu.
+
+    Bez tego wiadomości systemowe pokazywałyby się jako "nieznany",
+    co sugeruje błąd - a to normalny stan (Allegro nie ma loginu dla
+    własnych komunikatów w wątku).
+    """
+    if role == "ALLEGRO":
+        return "Allegro"
+    if role == "SELLER":
+        return "Ty"
+    if role == "BUYER":
+        return "Kupujący"
+    return "nieznany"
 
 
 def map_shipment_to_domain(order_external_id: str, raw: dict[str, Any]) -> Shipment:

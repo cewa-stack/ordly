@@ -17,6 +17,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.dependencies import get_container, get_session
 from app.api.schemas import (
+    FulfillmentStatusIn,
     OrderOut,
     ShipmentOut,
     SyncResultOut,
@@ -91,6 +92,26 @@ async def get_order(
     """Zwraca szczegóły jednego zamówienia po numerze zewnętrznym."""
     orders_service = container.orders_service(session)
     order = await orders_service.get_order_by_external_id(external_id)
+    return order_out(order)
+
+
+@router.post("/orders/{external_id}/fulfillment", response_model=OrderOut)
+async def set_order_fulfillment(
+    container: Annotated[Container, Depends(get_container)],
+    external_id: str,
+    payload: FulfillmentStatusIn,
+) -> OrderOut:
+    """
+    Ustawia status realizacji zamówienia na marketplace i w bazie.
+
+    Otwiera własny zakres sesji (jak `/orders/sync`), żeby zapis lokalny
+    był zatwierdzony przed odpowiedzią - inaczej aplikacja odświeżyłaby
+    listę szybciej, niż transakcja zdążyłaby się zamknąć, i pokazała
+    stary status.
+    """
+    async with container.session_scope() as session:
+        orders_service = container.orders_service(session)
+        order = await orders_service.set_fulfillment_status(external_id, payload.status)
     return order_out(order)
 
 
