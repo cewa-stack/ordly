@@ -146,18 +146,18 @@ class SqliteOrderRepository(OrderRepository):
 
     async def get_new_status(self) -> list[Order]:
         """
-        Zwraca wszystkie zamówienia o statusie NEW (NULL lub literał
-        "NEW"), niezależnie od daty, pomijając anulowane.
+        Zwraca wszystkie zamówienia o statusie realizacji dokładnie "NEW",
+        niezależnie od daty, pomijając anulowane.
+
+        NULL (etap realizacji nigdy nie pobrany z marketplace) NIE liczy
+        się jako NEW - patrz uzasadnienie w OrderRepository.get_new_status.
         """
         stmt = (
             select(OrderModel)
             .options(selectinload(OrderModel.products))
             .where(
                 func.upper(OrderModel.status) != _CANCELLED_STATUS,
-                or_(
-                    OrderModel.fulfillment_status.is_(None),
-                    func.upper(OrderModel.fulfillment_status) == FULFILLMENT_NEW,
-                ),
+                func.upper(OrderModel.fulfillment_status) == FULFILLMENT_NEW,
             )
             .order_by(OrderModel.order_date.desc())
         )

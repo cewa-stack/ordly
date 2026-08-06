@@ -59,9 +59,8 @@ class FakeOrderRepository(OrderRepository):
             o
             for o in self._orders
             if o.status.upper() != "CANCELLED"
-            and (
-                o.fulfillment_status is None or o.fulfillment_status.upper() == FULFILLMENT_NEW
-            )
+            and o.fulfillment_status is not None
+            and o.fulfillment_status.upper() == FULFILLMENT_NEW
         ]
         return sorted(new_status, key=lambda o: o.order_date, reverse=True)
 
