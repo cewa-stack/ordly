@@ -27,9 +27,11 @@ class ShippingReminderService:
         Buduje dane przypomnienia o zamówieniach o statusie NEW.
 
         Sprawdza WSZYSTKIE zamówienia o statusie NEW, niezależnie od tego,
-        kiedy wpłynęły - nie tylko dzisiejsze. Zamówienia w trakcie
-        pakowania (PROCESSING) nie są liczone - sprzedawca już się nimi
-        zajął, więc nie wymagają nagania.
+        kiedy wpłynęły - nie tylko dzisiejsze. Każdy inny etap realizacji
+        (PROCESSING, READY_FOR_SHIPMENT, SENT...) nie jest liczony -
+        sprzedawca już się nimi zajął, więc nie wymagają nagania. To samo
+        dotyczy zamówień bez znanego etapu realizacji (NULL) - patrz
+        OrderRepository.get_new_status.
 
         Zwraca None (brak przypomnienia), gdy nie ma ani jednego
         zamówienia o statusie NEW.

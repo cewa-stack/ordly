@@ -67,11 +67,19 @@ class OrderRepository(ABC):
         Zwraca WSZYSTKIE zamówienia o statusie realizacji NEW (jeszcze
         nietknięte), niezależnie od tego, kiedy wpłynęły.
 
-        Zamówienie liczy się jako NEW, gdy fulfillment_status to NULL lub
-        literał "NEW" (spójne z `fulfillmentLabel` używanym przez apki
-        mobilną/desktopową). Zamówienia w trakcie pakowania (PROCESSING)
-        i anulowane są pomijane - sprzedawca już się nimi zajął albo nie
-        wymagają uwagi. Używane przez przypomnienie 20:00.
+        Zamówienie liczy się jako NEW wyłącznie wtedy, gdy
+        fulfillment_status to dokładnie literał "NEW". Każdy inny etap
+        (PROCESSING, READY_FOR_SHIPMENT, SENT...) oraz zamówienia
+        anulowane są pomijane - sprzedawca już się nimi zajął.
+
+        NULL również NIE liczy się jako NEW, choć apki pokazują go jako
+        "Nowe". NULL oznacza "etapu realizacji nigdy nie pobrano z
+        marketplace" - tak wyglądają stare zamówienia, których Allegro
+        nie zwraca już w synchronizacji, więc ich status nigdy się nie
+        zaktualizuje. Traktowanie ich jak NEW sprawiało, że przypomnienie
+        20:00 przychodziło codziennie o zamówieniu sprzed miesięcy.
+
+        Używane przez przypomnienie 20:00.
         """
         raise NotImplementedError
 

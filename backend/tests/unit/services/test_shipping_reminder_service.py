@@ -10,7 +10,12 @@ import pytest
 from app.domain.entities.customer import Customer
 from app.domain.entities.order import Order
 from app.domain.entities.product import Product
-from app.domain.fulfillment import FULFILLMENT_NEW, FULFILLMENT_PROCESSING, FULFILLMENT_SENT
+from app.domain.fulfillment import (
+    FULFILLMENT_NEW,
+    FULFILLMENT_PROCESSING,
+    FULFILLMENT_READY_FOR_SHIPMENT,
+    FULFILLMENT_SENT,
+)
 from app.services.shipping_reminder_service import ShippingReminderService
 from tests.fakes.fake_order_repository import FakeOrderRepository
 
@@ -66,13 +71,42 @@ async def test_only_processing_and_sent_orders_returns_none(
     assert result is None
 
 
+async def test_ready_for_shipment_order_returns_none(
+    service: ShippingReminderService, repository: FakeOrderRepository
+) -> None:
+    """Spakowane, czekające na kuriera zamówienie nie wymaga nagania."""
+    await repository.save(_make_order("READY", _TODAY_UTC, FULFILLMENT_READY_FOR_SHIPMENT))
+
+    result = await service.build_reminder()
+
+    assert result is None
+
+
+async def test_order_without_known_fulfillment_stage_returns_none(
+    service: ShippingReminderService, repository: FakeOrderRepository
+) -> None:
+    """
+    NULL to "etapu nigdy nie pobrano z marketplace", nie "nowe".
+
+    Takie wiersze zostają po zamówieniach, których Allegro nie zwraca już
+    w synchronizacji - bez tego wykluczenia przypomnienie 20:00
+    przychodziło o nich codziennie, w nieskończoność.
+    """
+    await repository.save(_make_order("STARE-BEZ-ETAPU", _LAST_WEEK_UTC, None))
+
+    result = await service.build_reminder()
+
+    assert result is None
+
+
 async def test_new_status_orders_are_reported_regardless_of_age(
     service: ShippingReminderService, repository: FakeOrderRepository
 ) -> None:
     await repository.save(_make_order("SENT", _TODAY_UTC, FULFILLMENT_SENT))
     await repository.save(_make_order("PROCESSING", _TODAY_UTC, FULFILLMENT_PROCESSING))
+    await repository.save(_make_order("READY", _TODAY_UTC, FULFILLMENT_READY_FOR_SHIPMENT))
     await repository.save(_make_order("NEW-TODAY", _TODAY_UTC, FULFILLMENT_NEW))
-    await repository.save(_make_order("NEW-OLD", _LAST_WEEK_UTC, None))
+    await repository.save(_make_order("NEW-OLD", _LAST_WEEK_UTC, FULFILLMENT_NEW))
 
     result = await service.build_reminder()
 
