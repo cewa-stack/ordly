@@ -19,7 +19,7 @@ const NETWORK_ERROR_MESSAGE =
   "Nie widzę ORDLY API pod tym adresem. Sprawdź, czy backend działa i czy komputer jest w tej samej sieci (lub Tailscale).";
 
 interface RequestOptions {
-  method?: "GET" | "POST" | "DELETE" | "PATCH";
+  method?: "GET" | "POST" | "PUT" | "DELETE" | "PATCH";
   body?: unknown;
 }
 

@@ -52,6 +52,7 @@ from app.services.inventory_service import InventoryService
 from app.services.issues_service import IssuesService
 from app.services.mail_service import MailService
 from app.services.mailbox_service import MailboxService
+from app.services.offer_mapping_service import OfferMappingService
 from app.services.ordlak_service import OrdlakService
 from app.services.returns_service import ReturnsService
 from app.services.search_service import SearchService
@@ -198,6 +199,13 @@ class Container:
         return DashboardService(
             order_repository=SqliteOrderRepository(session),
             inventory_repository=SqliteInventoryRepository(session),
+        )
+
+    def offer_mapping_service(self, session: AsyncSession) -> OfferMappingService:
+        """Buduje OfferMappingService dla /api/v1/stock/offers/* (receptury ofert)."""
+        return OfferMappingService(
+            inventory_repository=SqliteInventoryRepository(session),
+            order_repository=SqliteOrderRepository(session),
         )
 
     def stock_sync_service(self, session: AsyncSession) -> StockSyncService:

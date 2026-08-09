@@ -15,6 +15,22 @@ export interface StockCreatePayload {
   min_stock: number;
 }
 
+export interface OfferRef {
+  marketplace: string;
+  externalProductId: string;
+}
+
+export interface OfferRecipePayload {
+  components: { sku: string; quantity: number }[];
+}
+
+/** Buduje ścieżkę receptury jednej oferty (identyfikatory bywają ze slashem). */
+function offerPath(offer: OfferRef): string {
+  return `/api/v1/stock/offers/${encodeURIComponent(offer.marketplace)}/${encodeURIComponent(
+    offer.externalProductId
+  )}`;
+}
+
 export function registerStockIpc(): void {
   ipcMain.handle("ordly:stock:list", async () =>
     toResult(async () => {
@@ -56,5 +72,56 @@ export function registerStockIpc(): void {
           { method: "POST", body: payload }
         );
       })
+  );
+
+  ipcMain.handle("ordly:stock:recipes", async () =>
+    toResult(async () => {
+      const session = requireSession();
+      return apiRequest(session.baseUrl, session.token, "/api/v1/stock/offers");
+    })
+  );
+
+  ipcMain.handle("ordly:stock:unmappedOffers", async () =>
+    toResult(async () => {
+      const session = requireSession();
+      return apiRequest(session.baseUrl, session.token, "/api/v1/stock/offers/unmapped");
+    })
+  );
+
+  ipcMain.handle(
+    "ordly:stock:setRecipe",
+    async (_event, offer: OfferRef, payload: OfferRecipePayload) =>
+      toResult(async () => {
+        const session = requireSession();
+        return apiRequest(session.baseUrl, session.token, offerPath(offer), {
+          method: "PUT",
+          body: payload,
+        });
+      })
+  );
+
+  ipcMain.handle("ordly:stock:deleteRecipe", async (_event, offer: OfferRef) =>
+    toResult(async () => {
+      const session = requireSession();
+      return apiRequest(session.baseUrl, session.token, offerPath(offer), {
+        method: "DELETE",
+      });
+    })
+  );
+
+  ipcMain.handle("ordly:stock:previewBackfill", async (_event, offer: OfferRef) =>
+    toResult(async () => {
+      const session = requireSession();
+      return apiRequest(session.baseUrl, session.token, `${offerPath(offer)}/backfill`);
+    })
+  );
+
+  ipcMain.handle("ordly:stock:applyBackfill", async (_event, offer: OfferRef) =>
+    toResult(async () => {
+      const session = requireSession();
+      return apiRequest(session.baseUrl, session.token, `${offerPath(offer)}/backfill`, {
+        method: "POST",
+      });
+    })
   );
 }

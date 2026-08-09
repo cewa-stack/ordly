@@ -6,6 +6,7 @@ from abc import ABC, abstractmethod
 from datetime import datetime
 
 from app.domain.entities.order import Order
+from app.shared.dto.offer_mapping_dto import OfferSale, SoldOffer
 
 
 class OrderRepository(ABC):
@@ -122,6 +123,25 @@ class OrderRepository(ABC):
         od podanej daty do teraz. Dni bez zamówień nie pojawiają się w
         wyniku - wywołujący uzupełnia braki zerami (patrz `DashboardService`,
         używane do sparkline'a sprzedaży na ekranie Start aplikacji mobilnej).
+        """
+        raise NotImplementedError
+
+    @abstractmethod
+    async def get_sold_offers_since(self, since: datetime) -> list[SoldOffer]:
+        """
+        Zwraca podsumowanie sprzedaży każdej oferty od podanej daty
+        (bez zamówień anulowanych) - podstawa wykrywania ofert, które
+        sprzedają się, ale nie mają receptury magazynowej.
+        """
+        raise NotImplementedError
+
+    @abstractmethod
+    async def get_offer_sales(
+        self, marketplace: str, external_product_id: str, since: datetime
+    ) -> list[OfferSale]:
+        """
+        Zwraca sprzedaże jednej oferty (po jednym wpisie na zamówienie)
+        od podanej daty - podstawa korekty wstecznej stanów.
         """
         raise NotImplementedError
 

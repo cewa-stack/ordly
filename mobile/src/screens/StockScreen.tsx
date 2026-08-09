@@ -23,7 +23,12 @@ import { useQueryClient } from "@tanstack/react-query";
 
 import { colors } from "@/theme/colors";
 import { radii, spacing, typography } from "@/theme/typography";
-import { useCreateStockItem, useStock, useStockReport } from "@/api/hooks";
+import {
+  useCreateStockItem,
+  useStock,
+  useStockReport,
+  useUnmappedOffers,
+} from "@/api/hooks";
 import { ApiError } from "@/api/client";
 import { StockRow } from "@/components/StockRow";
 import { FilterChip } from "@/components/FilterChip";
@@ -36,7 +41,7 @@ import { PrimaryButton } from "@/components/PrimaryButton";
 import { Skeleton } from "@/components/Skeleton";
 import { BoxIcon, PlusIcon } from "@/icons";
 import { formatMoney } from "@/utils/format";
-import type { StockItem } from "@/api/types";
+import type { StockItem, UnmappedOffer } from "@/api/types";
 import type { RootStackParamList } from "@/navigation/types";
 
 type Filter = "all" | "low" | "no-sales";
@@ -46,6 +51,7 @@ export function StockScreen() {
   const queryClient = useQueryClient();
   const stock = useStock();
   const report = useStockReport();
+  const unmapped = useUnmappedOffers();
   const createItem = useCreateStockItem();
 
   const [query, setQuery] = React.useState("");
@@ -122,6 +128,11 @@ export function StockScreen() {
   }
 
   const lowCount = report.data?.low_stock_items.length ?? 0;
+  const unmappedCount = unmapped.data?.length ?? 0;
+  const unmappedNames = (unmapped.data ?? [])
+    .slice(0, 2)
+    .map((offer: UnmappedOffer) => offer.name)
+    .join(", ");
 
   return (
     <View style={styles.screen}>
@@ -156,6 +167,22 @@ export function StockScreen() {
             </Text>
             <Text style={styles.summaryLabel}>Wartość</Text>
           </View>
+        </View>
+      ) : null}
+
+      {unmappedCount > 0 ? (
+        <View style={styles.warningCard}>
+          <Text style={styles.warningTitle}>
+            {unmappedCount === 1
+              ? "1 oferta sprzedaje się poza magazynem"
+              : `${unmappedCount} oferty sprzedają się poza magazynem`}
+          </Text>
+          <Text style={styles.warningBody}>
+            {unmappedNames}
+            {unmappedNames ? " — " : ""}
+            sprzedaż tych ofert nie zdejmuje nic ze stanów, bo nie mają przypisanych
+            składników. Powiązania ustawisz na desktopie: Magazyn → Powiązania ofert.
+          </Text>
         </View>
       ) : null}
 
@@ -339,6 +366,26 @@ const styles = StyleSheet.create({
     width: 1,
     backgroundColor: colors.border,
     marginHorizontal: spacing.md,
+  },
+  warningCard: {
+    backgroundColor: colors.warningTint,
+    borderWidth: 1,
+    borderColor: colors.warning,
+    borderRadius: radii.lg,
+    padding: spacing.lg,
+    marginHorizontal: spacing.xl,
+    marginTop: spacing.md,
+    gap: spacing.xs,
+  },
+  warningTitle: {
+    ...typography.body,
+    fontWeight: "600",
+    color: colors.warning,
+  },
+  warningBody: {
+    ...typography.caption,
+    color: colors.textSecondary,
+    lineHeight: 17,
   },
   searchWrap: {
     paddingHorizontal: spacing.xl,

@@ -8,6 +8,7 @@ from datetime import datetime
 from app.domain.entities.inventory_item import InventoryItem
 from app.domain.entities.inventory_movement import InventoryMovement
 from app.domain.entities.offer_component import OfferComponent
+from app.shared.dto.offer_mapping_dto import OfferRecipe
 
 
 class InventoryRepository(ABC):
@@ -103,4 +104,29 @@ class InventoryRepository(ABC):
     @abstractmethod
     async def remove_offer_links(self, marketplace: str, external_product_id: str) -> int:
         """Usuwa wszystkie składniki oferty. Zwraca liczbę usuniętych wpisów."""
+        raise NotImplementedError
+
+    @abstractmethod
+    async def get_all_offer_links(self) -> list[OfferRecipe]:
+        """Zwraca wszystkie receptury ofert pogrupowane po ofercie."""
+        raise NotImplementedError
+
+    @abstractmethod
+    async def replace_offer_links(
+        self, marketplace: str, external_product_id: str, components: list[OfferComponent]
+    ) -> None:
+        """
+        Zastępuje całą recepturę oferty podaną listą składników.
+
+        Raises:
+            InventoryItemNotFoundError: Gdy któreś SKU nie istnieje.
+        """
+        raise NotImplementedError
+
+    @abstractmethod
+    async def get_movement_references(self, sku: str) -> set[str]:
+        """
+        Zwraca numery dokumentów, dla których produkt ma już zapisany
+        ruch magazynowy (ochrona przed dwukrotną korektą wsteczną).
+        """
         raise NotImplementedError

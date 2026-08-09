@@ -25,11 +25,13 @@ import {
 } from "../components/ui";
 import { Modal } from "../components/Modal";
 import { Mascot } from "../components/Mascot";
+import { PowiazaniaOfertView } from "./PowiazaniaOfertView";
 import { useToast } from "../lib/toast";
 import { formatDateTime, formatStock } from "../lib/format";
 import type { StockItem } from "../types/api";
 
 type StockFilter = "all" | "low" | "zero";
+type MagazynTab = "items" | "links";
 
 const STOCK_FILTER_LABEL: Record<StockFilter, string> = {
   all: "Wszystkie",
@@ -177,11 +179,11 @@ function HistoryModal({ sku, onClose }: { sku: string | null; onClose: () => voi
       <div className="flex flex-col">
         {(historyQuery.data ?? []).map((movement, index) => (
           <div
-            key={`${movement.created_at}-${index}`}
+            key={`${movement.occurred_at}-${index}`}
             className="flex items-center gap-3 border-b border-line py-2.5 text-[12.5px] last:border-b-0"
           >
             <span className="o-mono w-[100px] shrink-0 text-[10.5px] text-slate-dim">
-              {formatDateTime(movement.created_at)}
+              {formatDateTime(movement.occurred_at)}
             </span>
             <span
               className={`o-mono w-12 shrink-0 text-right ${
@@ -198,9 +200,41 @@ function HistoryModal({ sku, onClose }: { sku: string | null; onClose: () => voi
   );
 }
 
+/**
+ * Przelacznik "Produkty / Powiazania ofert". Licznik przy powiazaniach
+ * jest istotny: oferta bez receptury sprzedaje sie, nie ruszajac stanow,
+ * a to widac dopiero po tym, ze magazyn stoi w miejscu.
+ */
+function TabBar({
+  tab,
+  onChange,
+  unmappedCount,
+}: {
+  tab: MagazynTab;
+  onChange: (tab: MagazynTab) => void;
+  unmappedCount: number;
+}) {
+  return (
+    <div className="flex items-center gap-2 border-b border-line px-[22px] py-[9px]">
+      <Chip active={tab === "items"} onClick={() => onChange("items")}>
+        Produkty
+      </Chip>
+      <Chip active={tab === "links"} onClick={() => onChange("links")}>
+        Powiązania ofert
+        {unmappedCount > 0 && (
+          <span className="o-mono ml-1.5 rounded-[5px] bg-[rgba(255,133,99,.16)] px-1.5 py-[1px] text-[10px] text-coral">
+            {unmappedCount}
+          </span>
+        )}
+      </Chip>
+    </div>
+  );
+}
+
 export function MagazynScreen({ focusSku, onFocusHandled }: MagazynScreenProps) {
   const queryClient = useQueryClient();
   const toast = useToast();
+  const [tab, setTab] = React.useState<MagazynTab>("items");
   const [filter, setFilter] = React.useState<StockFilter>("all");
   const [newOpen, setNewOpen] = React.useState(false);
   const [historySku, setHistorySku] = React.useState<string | null>(null);
@@ -215,6 +249,17 @@ export function MagazynScreen({ focusSku, onFocusHandled }: MagazynScreenProps) 
       return result.data;
     },
   });
+
+  // Licznik na zakladce - jedyny sygnal, ze sprzedaz omija magazyn.
+  const unmappedQuery = useQuery({
+    queryKey: ["unmapped-offers"],
+    queryFn: async () => {
+      const result = await window.ordly.stock.unmappedOffers();
+      if (!result.ok) throw new Error(result.message);
+      return result.data;
+    },
+  });
+  const unmappedCount = unmappedQuery.data?.length ?? 0;
 
   const adjustMutation = useMutation({
     mutationFn: async ({ sku, delta }: { sku: string; delta: number }) => {
@@ -260,20 +305,33 @@ export function MagazynScreen({ focusSku, onFocusHandled }: MagazynScreenProps) 
     return true;
   });
 
+  if (tab === "links") {
+    return (
+      <div className="flex min-h-0 flex-1 flex-col">
+        <TabBar tab={tab} onChange={setTab} unmappedCount={unmappedCount} />
+        <PowiazaniaOfertView />
+      </div>
+    );
+  }
+
   if (isError) {
     return (
-      <ErrorState
-        title="Nie udało się pobrać magazynu"
-        detail={`Pi nie odpowiedziało na zapytanie o stan magazynowy. ${
-          error instanceof Error ? error.message : ""
-        }`}
-        onRetry={() => void refetch()}
-      />
+      <div className="flex min-h-0 flex-1 flex-col">
+        <TabBar tab={tab} onChange={setTab} unmappedCount={unmappedCount} />
+        <ErrorState
+          title="Nie udało się pobrać magazynu"
+          detail={`Pi nie odpowiedziało na zapytanie o stan magazynowy. ${
+            error instanceof Error ? error.message : ""
+          }`}
+          onRetry={() => void refetch()}
+        />
+      </div>
     );
   }
 
   return (
     <div className="flex min-h-0 flex-1 flex-col">
+      <TabBar tab={tab} onChange={setTab} unmappedCount={unmappedCount} />
       <div className="flex flex-wrap items-center gap-2 border-b border-line px-[22px] py-[11px]">
         {(["all", "low", "zero"] as const).map((option) => (
           <Chip key={option} active={filter === option} onClick={() => setFilter(option)}>

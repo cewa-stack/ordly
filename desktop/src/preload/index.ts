@@ -21,6 +21,18 @@ const ordly = {
       sku: string,
       payload: { op: "set" | "add" | "remove" | "min"; quantity: number; reason?: string }
     ) => ipcRenderer.invoke("ordly:stock:adjust", sku, payload),
+    recipes: () => ipcRenderer.invoke("ordly:stock:recipes"),
+    unmappedOffers: () => ipcRenderer.invoke("ordly:stock:unmappedOffers"),
+    setRecipe: (
+      offer: { marketplace: string; externalProductId: string },
+      payload: { components: { sku: string; quantity: number }[] }
+    ) => ipcRenderer.invoke("ordly:stock:setRecipe", offer, payload),
+    deleteRecipe: (offer: { marketplace: string; externalProductId: string }) =>
+      ipcRenderer.invoke("ordly:stock:deleteRecipe", offer),
+    previewBackfill: (offer: { marketplace: string; externalProductId: string }) =>
+      ipcRenderer.invoke("ordly:stock:previewBackfill", offer),
+    applyBackfill: (offer: { marketplace: string; externalProductId: string }) =>
+      ipcRenderer.invoke("ordly:stock:applyBackfill", offer),
   },
   orders: {
     list: () => ipcRenderer.invoke("ordly:orders:list"),

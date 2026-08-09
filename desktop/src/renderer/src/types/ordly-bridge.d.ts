@@ -1,4 +1,5 @@
 import type {
+  BackfillPlan,
   BridgeResult,
   DashboardSummary,
   HealthStatus,
@@ -7,6 +8,9 @@ import type {
   MailboxStatus,
   MailMessage,
   MailSyncResult,
+  OfferRecipe,
+  OfferRecipePayload,
+  OfferRef,
   OlxOffer,
   OrdlakGeneratePayload,
   OrdlakGeneration,
@@ -24,6 +28,7 @@ import type {
   StockReport,
   SyncResult,
   SystemEvent,
+  UnmappedOffer,
   Wholesaler,
   WholesalerOrderRecord,
   WholesalerOrderSendPayload,
@@ -44,6 +49,15 @@ export interface OrdlyBridge {
     create: (payload: StockCreatePayload) => Promise<BridgeResult<StockItem>>;
     history: (sku: string) => Promise<BridgeResult<StockMovement[]>>;
     adjust: (sku: string, payload: StockAdjustPayload) => Promise<BridgeResult<StockItem>>;
+    recipes: () => Promise<BridgeResult<OfferRecipe[]>>;
+    unmappedOffers: () => Promise<BridgeResult<UnmappedOffer[]>>;
+    setRecipe: (
+      offer: OfferRef,
+      payload: OfferRecipePayload
+    ) => Promise<BridgeResult<OfferRecipe>>;
+    deleteRecipe: (offer: OfferRef) => Promise<BridgeResult<{ removed: number }>>;
+    previewBackfill: (offer: OfferRef) => Promise<BridgeResult<BackfillPlan>>;
+    applyBackfill: (offer: OfferRef) => Promise<BridgeResult<BackfillPlan>>;
   };
   orders: {
     list: () => Promise<BridgeResult<Order[]>>;
