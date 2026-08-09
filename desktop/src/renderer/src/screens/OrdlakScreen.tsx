@@ -389,10 +389,20 @@ export function OrdlakScreen() {
           <textarea
             value={note}
             onChange={(event) => setNote(event.target.value)}
-            rows={4}
-            placeholder="Np. kubek ceramiczny biały, 350 ml, porcelana, matowy, bez uszkodzeń"
+            rows={5}
+            placeholder={
+              "Marka i model, ilość w zestawie, pojemność/wymiary, materiał, " +
+              "kolor, do czego służy.\n\nNp. ADBL Leather Kit - zestaw do skóry " +
+              "samochodowej: Leather Cleaner 0,5 l, Leather Foamer 150 ml, " +
+              "Conditioner 0,2 l, Mist 0,2 l, szczotka z drewnianym uchwytem, " +
+              "mikrofibra. Nowy, w pudełku producenta."
+            }
             className="resize-y rounded-[9px] border border-line bg-panel-2 px-3 py-2.5 text-[12.5px] leading-[1.6] text-white outline-none transition-colors focus:border-teal-bright"
           />
+          <p className="text-[10.5px] leading-[1.5] text-slate-dim">
+            Im więcej konkretów tu wpiszesz, tym bogatszy opis. Ordlak nie zmyśla
+            parametrów, których nie podasz i których nie widać na zdjęciach.
+          </p>
         </label>
 
         <div className="flex flex-col gap-2">

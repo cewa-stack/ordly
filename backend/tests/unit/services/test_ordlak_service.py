@@ -26,7 +26,27 @@ from tests.fakes.fake_ordlak_repository import FakeOrdlakRepository
 # 70 znaków - powyżej celu 65, więc nie wywołuje ponowienia.
 DOBRY_TYTUL = "Kubek ceramiczny biały 350 ml porcelana matowa do kawy herbaty prezent"
 KROTKI_TYTUL = "Kubek ceramiczny biały"
-OPIS = "<p>Kubek ceramiczny o pojemności 350 ml.</p>"
+
+# Opis musi przekroczyć DESCRIPTION_TARGET_LENGTH, inaczej serwis słusznie
+# uzna go za szkielet i ponowi zapytanie - dopisek `x` dobija długość bez
+# zaciemniania czytelnej treści.
+DOBRY_OPIS = (
+    "<p><strong>⭐ Kubek ceramiczny biały 350 ml ⭐</strong></p>"
+    "<p>Wysokiej jakości <strong>kubek ceramiczny</strong> o pojemności 350 ml.</p>"
+    "<p><strong>Najważniejsze cechy produktu:</strong></p>"
+    "<ul><li><strong>Pojemność 350 ml:</strong> na dużą kawę lub herbatę.</li>"
+    "<li><strong>Materiał ceramika:</strong> długo utrzymuje temperaturę.</li></ul>"
+    "<p><strong>Wszechstronne zastosowanie:</strong></p>"
+    "<ul><li>✅ Kawa i herbata</li><li>✅ Prezent</li></ul>"
+    "<p><strong>Specyfikacja techniczna:</strong></p>"
+    "<ul><li><strong>Pojemność:</strong> 350 ml</li>"
+    "<li><strong>Materiał:</strong> ceramika</li></ul>"
+    "<p>Stan produktu: nowy, nieużywany.</p>"
+) + "<p>x</p>" * 120
+KROTKI_OPIS = "<p>Kubek ceramiczny o pojemności 350 ml.</p>"
+
+# Alias używany tam, gdzie treść opisu nie ma znaczenia dla testu.
+OPIS = DOBRY_OPIS
 
 
 @dataclass
@@ -68,7 +88,9 @@ class _FakeAnthropic:
 
 
 def _ok_response(
-    title: str = DOBRY_TYTUL, notes: str = "Bez widocznych rys."
+    title: str = DOBRY_TYTUL,
+    notes: str = "Bez widocznych rys.",
+    description: str = DOBRY_OPIS,
 ) -> _FakeResponse:
     return _FakeResponse(
         content=[
@@ -76,7 +98,7 @@ def _ok_response(
                 type="tool_use",
                 input={
                     "title": title,
-                    "description_html": OPIS,
+                    "description_html": description,
                     "condition_notes": notes,
                 },
             )
@@ -266,6 +288,70 @@ class TestWalidacjaWejscia:
         assert client.calls == []
 
 
+class TestJakoscOpisu:
+    """
+    Regresja: pierwsza wersja promptu była zbudowana z samych zakazów i model
+    oddawał 5-linijkowy szkielet zamiast pełnej oferty. Te testy pilnują, że
+    krótki opis jest wykrywany i ponawiany tak samo jak krótki tytuł.
+    """
+
+    async def test_krotki_opis_ponawia_zapytanie(self):
+        client = _FakeAnthropic(
+            responses=[
+                _ok_response(description=KROTKI_OPIS),
+                _ok_response(description=DOBRY_OPIS),
+            ]
+        )
+        service, _, _ = _service(client)
+
+        draft = await _generate(service)
+
+        assert len(client.calls) == 2
+        assert draft.generation.generated_description_html == DOBRY_OPIS
+
+    async def test_ponowienie_mowi_wprost_ze_chodzi_o_opis(self):
+        client = _FakeAnthropic(
+            responses=[
+                _ok_response(description=KROTKI_OPIS),
+                _ok_response(description=DOBRY_OPIS),
+            ]
+        )
+        service, _, _ = _service(client)
+
+        await _generate(service)
+
+        podpowiedz = client.calls[1]["system"]
+        assert "OPIS miał tylko" in podpowiedz
+        assert "TYTUŁ miał tylko" not in podpowiedz
+
+    async def test_dwa_krotkie_opisy_zwracaja_dluzszy(self):
+        """Gdy oba wyniki są słabe, oddajemy ten bogatszy - nie pierwszy z brzegu."""
+        dluzszy = KROTKI_OPIS + "<p>Dodatkowy akapit z cechami produktu.</p>"
+        client = _FakeAnthropic(
+            responses=[
+                _ok_response(description=KROTKI_OPIS),
+                _ok_response(description=dluzszy),
+            ]
+        )
+        service, _, _ = _service(client)
+
+        draft = await _generate(service)
+
+        assert draft.generation.generated_description_html == dluzszy
+
+    async def test_prompt_wymusza_strukture_i_dlugosc(self):
+        """Prompt musi POKAZYWAĆ wzorzec, nie tylko zakazywać - stąd te kotwice."""
+        service, client, _ = _service()
+
+        await _generate(service)
+
+        system = client.calls[0]["system"]
+        assert "minimum 1500 znaków" in system
+        assert "SPECYFIKACJA TECHNICZNA" in system
+        assert "ZASTOSOWANIE" in system
+        assert "PRZYKŁAD" in system
+
+
 class TestJakoscTytulu:
     async def test_krotki_tytul_ponawia_zapytanie_raz(self):
         client = _FakeAnthropic(
@@ -306,8 +392,9 @@ class TestJakoscTytulu:
 
         await _generate(service)
 
-        assert "za krótki" in client.calls[1]["system"]
-        assert "za krótki" not in client.calls[0]["system"]
+        assert "TYTUŁ miał tylko" in client.calls[1]["system"]
+        assert "OPIS miał tylko" not in client.calls[1]["system"]
+        assert "popraw poprzednią wersję" not in client.calls[0]["system"]
 
 
 class TestBledyModelu:
