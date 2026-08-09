@@ -22,6 +22,7 @@ from app.domain.exceptions.domain_exceptions import (
     InventoryItemNotFoundError,
 )
 from app.domain.interfaces.inventory_repository import InventoryRepository
+from app.shared.dto.offer_mapping_dto import OfferRecipe, RecipeComponent
 
 
 class SqliteInventoryRepository(InventoryRepository):
@@ -200,20 +201,119 @@ class SqliteInventoryRepository(InventoryRepository):
     async def add_offer_link(
         self, marketplace: str, external_product_id: str, sku: str, quantity: int
     ) -> None:
-        """Przypisuje produkt magazynowy jako składnik oferty marketplace."""
+        """
+        Przypisuje produkt magazynowy jako składnik oferty marketplace.
+
+        Ponowne przypisanie tego samego SKU do tej samej oferty nadpisuje
+        ilość zamiast dokładać drugi wiersz - inaczej poprawka literówki
+        w `/stock link` cicho podwajałaby odejmowanie przy każdej sprzedaży.
+        """
         model = await self._get_model_by_sku(sku)
         if model is None:
             raise InventoryItemNotFoundError(sku)
 
-        self._session.add(
-            OfferLinkModel(
-                marketplace=marketplace,
-                external_product_id=external_product_id,
-                item_id=model.id,
-                quantity=quantity,
+        existing = await self._session.execute(
+            select(OfferLinkModel).where(
+                OfferLinkModel.marketplace == marketplace,
+                OfferLinkModel.external_product_id == external_product_id,
+                OfferLinkModel.item_id == model.id,
             )
         )
+        link = existing.scalar_one_or_none()
+        if link is not None:
+            link.quantity = quantity
+        else:
+            self._session.add(
+                OfferLinkModel(
+                    marketplace=marketplace,
+                    external_product_id=external_product_id,
+                    item_id=model.id,
+                    quantity=quantity,
+                )
+            )
         await self._session.flush()
+
+    async def get_all_offer_links(self) -> list[OfferRecipe]:
+        """Zwraca wszystkie receptury ofert pogrupowane po ofercie."""
+        stmt = (
+            select(
+                OfferLinkModel.marketplace,
+                OfferLinkModel.external_product_id,
+                InventoryItemModel.sku,
+                InventoryItemModel.name,
+                OfferLinkModel.quantity,
+            )
+            .join(InventoryItemModel, OfferLinkModel.item_id == InventoryItemModel.id)
+            .order_by(OfferLinkModel.external_product_id, InventoryItemModel.name)
+        )
+        result = await self._session.execute(stmt)
+
+        grouped: dict[tuple[str, str], list[RecipeComponent]] = {}
+        for marketplace, external_product_id, sku, name, quantity in result.all():
+            grouped.setdefault((marketplace, external_product_id), []).append(
+                RecipeComponent(sku=sku, name=name, quantity=quantity)
+            )
+
+        return [
+            OfferRecipe(
+                marketplace=marketplace,
+                external_product_id=external_product_id,
+                offer_name=None,
+                components=tuple(components),
+            )
+            for (marketplace, external_product_id), components in grouped.items()
+        ]
+
+    async def replace_offer_links(
+        self, marketplace: str, external_product_id: str, components: list[OfferComponent]
+    ) -> None:
+        """
+        Zastępuje całą recepturę oferty podaną listą składników.
+
+        Raises:
+            InventoryItemNotFoundError: Gdy któreś SKU nie istnieje.
+        """
+        models = []
+        for component in components:
+            model = await self._get_model_by_sku(component.sku)
+            if model is None:
+                raise InventoryItemNotFoundError(component.sku)
+            models.append((model.id, component.quantity))
+
+        await self.remove_offer_links(marketplace, external_product_id)
+        for item_id, quantity in models:
+            self._session.add(
+                OfferLinkModel(
+                    marketplace=marketplace,
+                    external_product_id=external_product_id,
+                    item_id=item_id,
+                    quantity=quantity,
+                )
+            )
+        await self._session.flush()
+
+    async def get_movement_references(self, sku: str) -> set[str]:
+        """
+        Zwraca numery dokumentów (zamówień, zwrotów), dla których produkt
+        ma już zapisany ruch magazynowy.
+
+        Korekta wsteczna używa tego zbioru, żeby nie odjąć drugi raz
+        zamówienia, które kiedyś zostało rozliczone poprawnie.
+        """
+        stmt = (
+            select(InventoryMovementModel.reference)
+            .join(
+                InventoryItemModel,
+                InventoryMovementModel.item_id == InventoryItemModel.id,
+            )
+            .where(
+                InventoryItemModel.sku == sku,
+                InventoryMovementModel.reference.is_not(None),
+            )
+            .distinct()
+        )
+        result = await self._session.execute(stmt)
+        return {reference for (reference,) in result.all() if reference}
 
     async def remove_offer_links(self, marketplace: str, external_product_id: str) -> int:
         """Usuwa wszystkie składniki oferty. Zwraca liczbę usuniętych wpisów."""

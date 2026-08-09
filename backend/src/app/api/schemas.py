@@ -27,6 +27,7 @@ from app.services.dashboard_service import DashboardSummary
 from app.services.mailbox_service import MailboxStatus
 from app.services.ordlak_service import OrdlakDraft, calculate_price
 from app.shared.dto.inventory_dto import InventoryReport, ItemForecast
+from app.shared.dto.offer_mapping_dto import BackfillPlan, OfferRecipe, SoldOffer
 from app.shared.dto.stats_dto import HealthStatus, StatsSummary, SyncResult
 
 StockStatus = Literal["ok", "warning", "critical"]
@@ -608,6 +609,135 @@ class StockLinkIn(BaseModel):
     external_product_id: str = Field(min_length=1)
     sku: str = Field(min_length=1)
     quantity: int = Field(default=1, ge=1)
+
+
+class RecipeComponentIn(BaseModel):
+    """Jeden składnik receptury w żądaniu `PUT /api/v1/stock/offers/{...}`."""
+
+    sku: str = Field(min_length=1)
+    quantity: int = Field(default=1, ge=1)
+
+
+class OfferRecipeIn(BaseModel):
+    """Ciało żądania zapisu pełnej receptury oferty."""
+
+    components: list[RecipeComponentIn] = Field(min_length=1)
+
+
+class RecipeComponentOut(BaseModel):
+    """Składnik receptury zwracany przez API (z nazwą produktu)."""
+
+    sku: str
+    name: str
+    quantity: int
+
+
+class OfferRecipeOut(BaseModel):
+    """Receptura oferty zwracana przez `/api/v1/stock/offers`."""
+
+    marketplace: str
+    external_product_id: str
+    offer_name: str | None
+    components: list[RecipeComponentOut]
+
+
+def offer_recipe_out(recipe: OfferRecipe) -> OfferRecipeOut:
+    """Mapuje `OfferRecipe` na schemat odpowiedzi API."""
+    return OfferRecipeOut(
+        marketplace=recipe.marketplace,
+        external_product_id=recipe.external_product_id,
+        offer_name=recipe.offer_name,
+        components=[
+            RecipeComponentOut(sku=c.sku, name=c.name, quantity=c.quantity)
+            for c in recipe.components
+        ],
+    )
+
+
+class UnmappedOfferOut(BaseModel):
+    """Oferta sprzedana bez receptury - jej sprzedaż nie rusza magazynu."""
+
+    marketplace: str
+    external_product_id: str
+    name: str
+    sold_quantity: int
+    orders_count: int
+    last_sold_at: datetime
+
+
+def unmapped_offer_out(offer: SoldOffer) -> UnmappedOfferOut:
+    """Mapuje `SoldOffer` na schemat odpowiedzi API."""
+    return UnmappedOfferOut(
+        marketplace=offer.marketplace,
+        external_product_id=offer.external_product_id,
+        name=offer.name,
+        sold_quantity=offer.sold_quantity,
+        orders_count=offer.orders_count,
+        last_sold_at=offer.last_sold_at,
+    )
+
+
+class BackfillLineOut(BaseModel):
+    """Zamówienie objęte korektą wsteczną."""
+
+    order_external_id: str
+    order_date: datetime
+    quantity: int
+    already_applied: bool
+
+
+class BackfillComponentOut(BaseModel):
+    """Skutek korekty wstecznej dla jednego składnika."""
+
+    sku: str
+    name: str
+    current_stock: int
+    quantity: int
+    stock_after: int
+
+
+class BackfillPlanOut(BaseModel):
+    """Podgląd albo potwierdzenie korekty wstecznej stanów."""
+
+    marketplace: str
+    external_product_id: str
+    offer_name: str | None
+    since: datetime
+    applied: bool
+    pending_quantity: int
+    lines: list[BackfillLineOut]
+    components: list[BackfillComponentOut]
+
+
+def backfill_plan_out(plan: BackfillPlan) -> BackfillPlanOut:
+    """Mapuje `BackfillPlan` na schemat odpowiedzi API."""
+    return BackfillPlanOut(
+        marketplace=plan.marketplace,
+        external_product_id=plan.external_product_id,
+        offer_name=plan.offer_name,
+        since=plan.since,
+        applied=plan.applied,
+        pending_quantity=plan.pending_quantity,
+        lines=[
+            BackfillLineOut(
+                order_external_id=line.order_external_id,
+                order_date=line.order_date,
+                quantity=line.quantity,
+                already_applied=line.already_applied,
+            )
+            for line in plan.lines
+        ],
+        components=[
+            BackfillComponentOut(
+                sku=c.sku,
+                name=c.name,
+                current_stock=c.current_stock,
+                quantity=c.quantity,
+                stock_after=c.stock_after,
+            )
+            for c in plan.components
+        ],
+    )
 
 
 # --------------------------------------------------------------------------

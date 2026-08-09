@@ -270,8 +270,68 @@ export interface StockMovement {
   item_sku: string;
   item_name: string;
   change: number;
+  stock_after: number;
   reason: string;
-  created_at: string;
+  source: string;
+  reference: string | null;
+  occurred_at: string;
+}
+
+export interface RecipeComponent {
+  sku: string;
+  name: string;
+  quantity: number;
+}
+
+export interface OfferRecipe {
+  marketplace: string;
+  external_product_id: string;
+  offer_name: string | null;
+  components: RecipeComponent[];
+}
+
+export interface UnmappedOffer {
+  marketplace: string;
+  external_product_id: string;
+  name: string;
+  sold_quantity: number;
+  orders_count: number;
+  last_sold_at: string;
+}
+
+export interface OfferRecipePayload {
+  components: { sku: string; quantity: number }[];
+}
+
+export interface OfferRef {
+  marketplace: string;
+  externalProductId: string;
+}
+
+export interface BackfillLine {
+  order_external_id: string;
+  order_date: string;
+  quantity: number;
+  already_applied: boolean;
+}
+
+export interface BackfillComponent {
+  sku: string;
+  name: string;
+  current_stock: number;
+  quantity: number;
+  stock_after: number;
+}
+
+export interface BackfillPlan {
+  marketplace: string;
+  external_product_id: string;
+  offer_name: string | null;
+  since: string;
+  applied: boolean;
+  pending_quantity: number;
+  lines: BackfillLine[];
+  components: BackfillComponent[];
 }
 
 export interface StockCreatePayload {

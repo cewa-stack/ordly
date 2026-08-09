@@ -22,6 +22,7 @@ from app.domain.fulfillment import (
     SHIPPED_FULFILLMENT_STATUSES,
 )
 from app.domain.interfaces.order_repository import OrderRepository
+from app.shared.dto.offer_mapping_dto import OfferSale, SoldOffer
 from app.utils.time import utc_now
 
 _CANCELLED_STATUS = "CANCELLED"
@@ -239,6 +240,80 @@ class SqliteOrderRepository(OrderRepository):
         )
         result = await self._session.execute(stmt)
         return {str(row[0]): float(row[1]) for row in result.all()}
+
+    async def get_sold_offers_since(self, since: datetime) -> list[SoldOffer]:
+        """
+        Podsumowuje sprzedaż każdej oferty od podanej daty.
+
+        Zamówienia anulowane są pomijane - nie odjęły nic z magazynu,
+        więc nie mogą też sugerować brakującej receptury.
+        """
+        stmt = (
+            select(
+                OrderModel.marketplace,
+                ProductModel.external_product_id,
+                func.max(ProductModel.name),
+                func.sum(ProductModel.quantity),
+                func.count(func.distinct(OrderModel.id)),
+                func.max(OrderModel.order_date),
+            )
+            .join(OrderModel, ProductModel.order_id == OrderModel.id)
+            .where(
+                OrderModel.order_date >= since,
+                func.upper(OrderModel.status) != _CANCELLED_STATUS,
+                ProductModel.external_product_id != "",
+            )
+            .group_by(OrderModel.marketplace, ProductModel.external_product_id)
+            .order_by(func.sum(ProductModel.quantity).desc())
+        )
+        result = await self._session.execute(stmt)
+        return [
+            SoldOffer(
+                marketplace=marketplace,
+                external_product_id=external_product_id,
+                name=name,
+                sold_quantity=int(sold_quantity),
+                orders_count=int(orders_count),
+                last_sold_at=last_sold_at,
+            )
+            for marketplace, external_product_id, name, sold_quantity, orders_count, last_sold_at in result.all()
+        ]
+
+    async def get_offer_sales(
+        self, marketplace: str, external_product_id: str, since: datetime
+    ) -> list[OfferSale]:
+        """
+        Zwraca pojedyncze sprzedaże jednej oferty od podanej daty.
+
+        Ilości z jednego zamówienia są sumowane - to samo zamówienie
+        potrafi zawierać dwie pozycje wskazujące na tę samą ofertę,
+        a korekta wsteczna rozlicza się per zamówienie.
+        """
+        stmt = (
+            select(
+                OrderModel.external_id,
+                func.max(OrderModel.order_date),
+                func.sum(ProductModel.quantity),
+            )
+            .join(OrderModel, ProductModel.order_id == OrderModel.id)
+            .where(
+                OrderModel.marketplace == marketplace,
+                ProductModel.external_product_id == external_product_id,
+                OrderModel.order_date >= since,
+                func.upper(OrderModel.status) != _CANCELLED_STATUS,
+            )
+            .group_by(OrderModel.external_id)
+            .order_by(func.max(OrderModel.order_date))
+        )
+        result = await self._session.execute(stmt)
+        return [
+            OfferSale(
+                order_external_id=order_external_id,
+                order_date=order_date,
+                quantity=int(quantity),
+            )
+            for order_external_id, order_date, quantity in result.all()
+        ]
 
     async def update_status(self, marketplace: str, external_id: str, status: str) -> None:
         """Aktualizuje status zamówienia wykryty podczas synchronizacji."""

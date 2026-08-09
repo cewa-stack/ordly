@@ -16,17 +16,26 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.dependencies import get_container, get_session
 from app.api.schemas import (
+    BackfillPlanOut,
+    OfferRecipeIn,
+    OfferRecipeOut,
     StockAdjustIn,
     StockCreateIn,
     StockItemOut,
     StockLinkIn,
     StockMovementOut,
     StockReportOut,
+    UnmappedOfferOut,
+    backfill_plan_out,
+    offer_recipe_out,
     stock_item_out,
     stock_movement_out,
     stock_report_out,
+    unmapped_offer_out,
 )
 from app.container import Container
+from app.domain.entities.offer_component import OfferComponent
+from app.services.offer_mapping_service import DEFAULT_LOOKBACK_DAYS
 
 router = APIRouter()
 
@@ -80,6 +89,100 @@ async def unlink_offer(
     inventory_service = container.inventory_service(session)
     removed = await inventory_service.unlink_offer(marketplace, external_product_id)
     return {"removed": removed}
+
+
+@router.get("/stock/offers", response_model=list[OfferRecipeOut])
+async def list_offer_recipes(
+    container: Annotated[Container, Depends(get_container)],
+    session: Annotated[AsyncSession, Depends(get_session)],
+    days: Annotated[int, Query(ge=1, le=365)] = DEFAULT_LOOKBACK_DAYS,
+) -> list[OfferRecipeOut]:
+    """Receptury ofert - z czego magazynowo składa się każda oferta."""
+    service = container.offer_mapping_service(session)
+    recipes = await service.get_recipes(days)
+    return [offer_recipe_out(r) for r in recipes]
+
+
+@router.get("/stock/offers/unmapped", response_model=list[UnmappedOfferOut])
+async def list_unmapped_offers(
+    container: Annotated[Container, Depends(get_container)],
+    session: Annotated[AsyncSession, Depends(get_session)],
+    days: Annotated[int, Query(ge=1, le=365)] = DEFAULT_LOOKBACK_DAYS,
+) -> list[UnmappedOfferOut]:
+    """Oferty sprzedane bez receptury - ich sprzedaż nie rusza magazynu."""
+    service = container.offer_mapping_service(session)
+    offers = await service.get_unmapped_offers(days)
+    return [unmapped_offer_out(o) for o in offers]
+
+
+@router.put("/stock/offers/{marketplace}/{external_product_id}", response_model=OfferRecipeOut)
+async def set_offer_recipe(
+    container: Annotated[Container, Depends(get_container)],
+    session: Annotated[AsyncSession, Depends(get_session)],
+    marketplace: str,
+    external_product_id: str,
+    payload: OfferRecipeIn,
+) -> OfferRecipeOut:
+    """Zapisuje pełną recepturę oferty, zastępując poprzednią."""
+    service = container.offer_mapping_service(session)
+    recipe = await service.set_recipe(
+        marketplace,
+        external_product_id,
+        [OfferComponent(sku=c.sku, quantity=c.quantity) for c in payload.components],
+    )
+    return offer_recipe_out(recipe)
+
+
+@router.delete("/stock/offers/{marketplace}/{external_product_id}", response_model=dict)
+async def delete_offer_recipe(
+    container: Annotated[Container, Depends(get_container)],
+    session: Annotated[AsyncSession, Depends(get_session)],
+    marketplace: str,
+    external_product_id: str,
+) -> dict:
+    """Usuwa recepturę oferty. Zwraca liczbę usuniętych składników."""
+    service = container.offer_mapping_service(session)
+    removed = await service.delete_recipe(marketplace, external_product_id)
+    return {"removed": removed}
+
+
+@router.get(
+    "/stock/offers/{marketplace}/{external_product_id}/backfill",
+    response_model=BackfillPlanOut,
+)
+async def preview_offer_backfill(
+    container: Annotated[Container, Depends(get_container)],
+    session: Annotated[AsyncSession, Depends(get_session)],
+    marketplace: str,
+    external_product_id: str,
+    days: Annotated[int, Query(ge=1, le=365)] = DEFAULT_LOOKBACK_DAYS,
+) -> BackfillPlanOut:
+    """Podgląd korekty wstecznej: co zostanie odjęte i jaki będzie stan."""
+    service = container.offer_mapping_service(session)
+    plan = await service.plan_backfill(marketplace, external_product_id, days)
+    return backfill_plan_out(plan)
+
+
+@router.post(
+    "/stock/offers/{marketplace}/{external_product_id}/backfill",
+    response_model=BackfillPlanOut,
+)
+async def apply_offer_backfill(
+    container: Annotated[Container, Depends(get_container)],
+    session: Annotated[AsyncSession, Depends(get_session)],
+    marketplace: str,
+    external_product_id: str,
+    days: Annotated[int, Query(ge=1, le=365)] = DEFAULT_LOOKBACK_DAYS,
+) -> BackfillPlanOut:
+    """
+    Wykonuje korektę wsteczną - odejmuje sprzedaż sprzed powstania receptury.
+
+    Rozliczenie idzie per zamówienie, więc powtórzenie żądania nie odejmie
+    tych samych sztuk drugi raz.
+    """
+    service = container.offer_mapping_service(session)
+    plan = await service.apply_backfill(marketplace, external_product_id, days)
+    return backfill_plan_out(plan)
 
 
 @router.get("/stock", response_model=list[StockItemOut])

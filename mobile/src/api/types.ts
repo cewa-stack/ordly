@@ -88,6 +88,15 @@ export interface StockReport {
   recent_movements: StockMovement[];
 }
 
+export interface UnmappedOffer {
+  marketplace: string;
+  external_product_id: string;
+  name: string;
+  sold_quantity: number;
+  orders_count: number;
+  last_sold_at: string;
+}
+
 export interface Stats {
   orders_today: number;
   orders_this_month: number;

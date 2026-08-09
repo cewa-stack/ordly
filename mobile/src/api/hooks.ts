@@ -29,6 +29,7 @@ import type {
   StockMovement,
   StockReport,
   SyncResult,
+  UnmappedOffer,
   VapidStatus,
 } from "./types";
 
@@ -141,6 +142,17 @@ export function useStockReport() {
   return useQuery({
     queryKey: ["stock-report"],
     queryFn: () => api.get<StockReport>("/api/v1/stock/report"),
+  });
+}
+
+/**
+ * Oferty sprzedane bez powiązania z magazynem. Ich sprzedaż nie zmienia
+ * stanów, więc bez tego ostrzeżenia magazyn po prostu „stoi w miejscu”.
+ */
+export function useUnmappedOffers() {
+  return useQuery({
+    queryKey: ["unmapped-offers"],
+    queryFn: () => api.get<UnmappedOffer[]>("/api/v1/stock/offers/unmapped"),
   });
 }
 

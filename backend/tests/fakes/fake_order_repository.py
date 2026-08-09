@@ -12,6 +12,7 @@ from app.domain.fulfillment import (
     SHIPPED_FULFILLMENT_STATUSES,
 )
 from app.domain.interfaces.order_repository import OrderRepository
+from app.shared.dto.offer_mapping_dto import OfferSale, SoldOffer
 
 
 class FakeOrderRepository(OrderRepository):
@@ -123,6 +124,59 @@ class FakeOrderRepository(OrderRepository):
             )
             for o in self._orders
         ]
+
+    async def get_sold_offers_since(self, since: datetime) -> list[SoldOffer]:
+        grouped: dict[tuple[str, str], list[Order]] = {}
+        names: dict[tuple[str, str], str] = {}
+        quantities: dict[tuple[str, str], int] = {}
+        for order in self._orders:
+            if order.order_date < since or order.status.upper() == "CANCELLED":
+                continue
+            for product in order.products:
+                if not product.external_id:
+                    continue
+                key = (order.marketplace, product.external_id)
+                grouped.setdefault(key, []).append(order)
+                names[key] = product.name
+                quantities[key] = quantities.get(key, 0) + product.quantity
+
+        return sorted(
+            (
+                SoldOffer(
+                    marketplace=marketplace,
+                    external_product_id=external_product_id,
+                    name=names[(marketplace, external_product_id)],
+                    sold_quantity=quantities[(marketplace, external_product_id)],
+                    orders_count=len({o.external_id for o in orders}),
+                    last_sold_at=max(o.order_date for o in orders),
+                )
+                for (marketplace, external_product_id), orders in grouped.items()
+            ),
+            key=lambda offer: offer.sold_quantity,
+            reverse=True,
+        )
+
+    async def get_offer_sales(
+        self, marketplace: str, external_product_id: str, since: datetime
+    ) -> list[OfferSale]:
+        sales: dict[str, OfferSale] = {}
+        for order in self._orders:
+            if order.marketplace != marketplace or order.order_date < since:
+                continue
+            if order.status.upper() == "CANCELLED":
+                continue
+            quantity = sum(
+                p.quantity for p in order.products if p.external_id == external_product_id
+            )
+            if quantity == 0:
+                continue
+            existing = sales.get(order.external_id)
+            sales[order.external_id] = OfferSale(
+                order_external_id=order.external_id,
+                order_date=order.order_date,
+                quantity=quantity + (existing.quantity if existing else 0),
+            )
+        return sorted(sales.values(), key=lambda sale: sale.order_date)
 
     async def mark_as_notified(self, marketplace: str, external_id: str) -> None:
         self._notified.add((marketplace, external_id))

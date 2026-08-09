@@ -15,8 +15,6 @@ zamówienia jest pomijane, co zapobiega podwójnemu odjęciu stanów.
 
 from __future__ import annotations
 
-from dataclasses import replace
-
 from loguru import logger
 
 from app.domain.entities.inventory_item import InventoryItem
@@ -24,7 +22,6 @@ from app.domain.entities.inventory_movement import (
     MOVEMENT_SOURCE_CANCELLATION,
     MOVEMENT_SOURCE_ORDER,
     MOVEMENT_SOURCE_RETURN,
-    InventoryMovement,
 )
 from app.domain.entities.offer_component import OfferComponent
 from app.domain.entities.order import Order
@@ -33,8 +30,8 @@ from app.domain.entities.product import Product
 from app.domain.interfaces.inventory_repository import InventoryRepository
 from app.domain.interfaces.stock_sync_repository import StockSyncRepository
 from app.services.component_resolver import ComponentResolver
+from app.services.stock_ledger import apply_stock_change
 from app.shared.dto.inventory_dto import StockSyncOutcome
-from app.utils.time import utc_now
 
 OPERATION_DEDUCT = "DEDUCT"
 OPERATION_RESTORE_CANCEL = "RESTORE_CANCEL"
@@ -240,49 +237,14 @@ class StockSyncService:
         """
         Zmienia stan jednego składnika i zapisuje ruch w historii.
 
-        Stan nigdy nie spada poniżej zera - przy rozjeździe danych
-        odejmowana jest maksymalna dostępna ilość (z ostrzeżeniem w logu).
-
         Returns:
             Zaktualizowany produkt lub None, gdy SKU składnika nie istnieje.
         """
-        item = await self._inventory.get_by_sku(component.sku)
-        if item is None:
-            logger.warning("Składnik '{}' nie istnieje w magazynie - pomijam", component.sku)
-            return None
-
-        change = sign * component.quantity * quantity
-        new_stock = item.stock + change
-        if new_stock < 0:
-            logger.warning(
-                "Stan produktu '{}' spadłby poniżej zera ({} szt., zmiana {}) - "
-                "przycinam do zera",
-                item.sku,
-                item.stock,
-                change,
-            )
-            new_stock = 0
-            change = new_stock - item.stock
-
-        await self._inventory.set_stock(item.sku, new_stock)
-        await self._inventory.record_movement(
-            InventoryMovement(
-                item_sku=item.sku,
-                item_name=item.name,
-                change=change,
-                stock_after=new_stock,
-                reason=reason,
-                source=source,
-                reference=reference,
-                occurred_at=utc_now(),
-            )
+        return await apply_stock_change(
+            inventory=self._inventory,
+            sku=component.sku,
+            change=sign * component.quantity * quantity,
+            reason=reason,
+            source=source,
+            reference=reference,
         )
-        logger.info(
-            "Magazyn: {} {}{} szt. -> stan {} ({})",
-            item.sku,
-            "+" if change >= 0 else "",
-            change,
-            new_stock,
-            reason,
-        )
-        return replace(item, stock=new_stock)

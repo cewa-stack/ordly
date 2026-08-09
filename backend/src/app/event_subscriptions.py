@@ -49,6 +49,32 @@ def register_event_subscriptions(container: Container) -> None:
             },
         )
 
+    async def _warn_unmatched_products(outcome: StockSyncOutcome | None) -> None:
+        """
+        Ostrzega, że sprzedane pozycje nie ruszyły magazynu.
+
+        Bez tego brak receptury oferty objawia się wyłącznie tym, że stan
+        magazynowy stoi w miejscu - a to wygląda jak awaria, nie jak brak
+        konfiguracji. Alarm wskazuje konkretną ofertę do powiązania.
+        """
+        if outcome is None or not outcome.unmatched_products:
+            return
+
+        products = "\n".join(f"• {name}" for name in outcome.unmatched_products)
+        try:
+            await container.notifier().send_text(
+                "⚠️ <b>Sprzedaż poza magazynem</b>\n"
+                f"Zamówienie {outcome.reference} zawiera pozycje bez powiązania "
+                "z magazynem, więc stany się nie zmieniły:\n"
+                f"{products}\n\n"
+                "Przypisz składniki w Magazyn → Powiązania ofert "
+                "(albo <code>/stock link [oferta] [SKU] [ilość]</code>)."
+            )
+        except Exception:
+            logger.exception(
+                "Nie udało się wysłać ostrzeżenia o pozycjach bez mapowania magazynowego"
+            )
+
     async def _publish_low_stock(outcome: StockSyncOutcome | None) -> None:
         """Publikuje LowStockDetected dla produktów, które osiągnęły minimum."""
         if outcome is None:
@@ -123,6 +149,7 @@ def register_event_subscriptions(container: Container) -> None:
                 )
                 stock_outcome = None
 
+        await _warn_unmatched_products(stock_outcome)
         await _publish_low_stock(stock_outcome)
 
     async def handle_order_cancelled(event: OrderCancelled) -> None:
