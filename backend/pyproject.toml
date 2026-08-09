@@ -19,6 +19,8 @@ dependencies = [
     "pywebpush>=2.0.0",
     "aiosmtplib>=5.1.2",
     "aioimaplib>=2.0.1",
+    "anthropic>=0.69.0",
+    "python-multipart>=0.0.9",
 ]
 
 [tool.uv]

@@ -325,17 +325,49 @@ class MailWatchSettings(BaseSettings):
     port: int = Field(default=993, alias="IMAP_PORT")
     user: str = Field(default="", alias="IMAP_USER")
     password: SecretStr = Field(default=SecretStr(""), alias="IMAP_PASS")
-    watch_senders_raw: str = Field(default="allegro.pl,olx.pl", alias="MAIL_WATCH_SENDERS")
+    # Fragmenty nagłówka "From:", nie pełne domeny. IMAP SEARCH FROM dopasowuje
+    # PODCIĄG, więc "allegro.pl" NIE złapie realnego nadawcy
+    # `noreply@allegromail.pl` (po "allegro" idzie tam "mail.pl") - a to z niego
+    # Allegro wysyła powiadomienia. Krótkie tokeny łapią wszystkie warianty
+    # (allegro.pl, allegromail.pl, powiadomienia@allegromail.pl) i są spójne z
+    # `classify_sender`, które klasyfikuje źródło dokładnie tak samo.
+    watch_senders_raw: str = Field(default="allegro,olx", alias="MAIL_WATCH_SENDERS")
 
     @property
     def watch_senders(self) -> list[str]:
-        """Lista domen/adresów nadawców do obserwowania, jako lista bez pustych wpisów."""
+        """Lista fragmentów adresów nadawców do obserwowania, bez pustych wpisów."""
         return [s.strip() for s in self.watch_senders_raw.split(",") if s.strip()]
 
     @property
     def enabled(self) -> bool:
         """Obserwator IMAP jest aktywny tylko, gdy host, użytkownik i hasło są ustawione."""
         return bool(self.host) and bool(self.user) and bool(self.password.get_secret_value())
+
+
+class OrdlakSettings(BaseSettings):
+    """
+    Konfiguracja Ordlaka - generatora ofert Allegro opartego o Anthropic API.
+
+    WAŻNE: `ANTHROPIC_API_KEY` to osobny klucz API z billingiem per-użycie
+    (console.anthropic.com), a NIE subskrypcja Claude Pro/Claude Code.
+    Pusty klucz = ekran Ordlak działa, ale generowanie zwraca czytelny błąd
+    zamiast próbować wywołać AI.
+    """
+
+    model_config = SettingsConfigDict(
+        env_file=".env",
+        env_file_encoding="utf-8",
+        extra="ignore",
+    )
+
+    api_key: SecretStr = Field(default=SecretStr(""), alias="ANTHROPIC_API_KEY")
+    model: str = Field(default="claude-sonnet-5", alias="ANTHROPIC_MODEL")
+    max_photo_size_mb: int = Field(default=5, alias="ORDLAK_MAX_PHOTO_SIZE_MB", ge=1)
+
+    @property
+    def enabled(self) -> bool:
+        """Ordlak jest aktywny tylko wtedy, gdy klucz API jest ustawiony."""
+        return bool(self.api_key.get_secret_value())
 
 
 class LoggingSettings(BaseSettings):
@@ -383,6 +415,7 @@ class Settings:
         self.web_push = WebPushSettings()
         self.smtp = SmtpSettings()
         self.mail_watch = MailWatchSettings()
+        self.ordlak = OrdlakSettings()
 
 
 @lru_cache

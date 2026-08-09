@@ -76,7 +76,7 @@ class TestParseMessage:
 class TestExtractMessageBytes:
     def test_wybiera_najdluzsza_linie_jako_tresc(self):
         lines = [
-            b"1 FETCH (RFC822 {123}",
+            b"1 FETCH (BODY[] {123}",
             b"x" * 500,
             b")",
         ]
@@ -84,6 +84,24 @@ class TestExtractMessageBytes:
         result = _extract_message_bytes(lines)
 
         assert result == b"x" * 500
+
+    def test_czyta_tresc_podana_jako_bytearray(self):
+        """
+        aioimaplib oddaje treść literału jako `bytearray`, a nie `bytes` -
+        `isinstance(bytearray(...), bytes)` jest False, więc dawny filtr
+        wycinał dokładnie tę linię i każdy mail przepadał. Pełna ścieżka
+        protokołu jest sprawdzana w `tests/integration/mail/`.
+        """
+        lines = [
+            b"1 FETCH (BODY[] {500}",
+            bytearray(b"x" * 500),
+            b")",
+        ]
+
+        result = _extract_message_bytes(lines)
+
+        assert result == b"x" * 500
+        assert isinstance(result, bytes)
 
     def test_brak_kandydatow_zwraca_none(self):
         assert _extract_message_bytes([b"short", b")"]) is None

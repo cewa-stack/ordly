@@ -9,6 +9,7 @@ import { registerWholesalersIpc } from "./ipc/wholesalers";
 import { registerMailboxIpc } from "./ipc/mailbox";
 import { registerOlxIpc } from "./ipc/olx";
 import { registerStatsIpc } from "./ipc/stats";
+import { registerOrdlakIpc } from "./ipc/ordlak";
 
 /**
  * Okno jest bezramkowe (`frame: false`) - wlasny pasek tytulowy w
@@ -95,6 +96,7 @@ app.whenReady().then(() => {
   registerMailboxIpc();
   registerOlxIpc();
   registerStatsIpc();
+  registerOrdlakIpc();
   createWindow();
 
   app.on("activate", () => {

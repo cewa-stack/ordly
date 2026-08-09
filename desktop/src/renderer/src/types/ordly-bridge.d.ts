@@ -8,6 +8,10 @@ import type {
   MailMessage,
   MailSyncResult,
   OlxOffer,
+  OrdlakGeneratePayload,
+  OrdlakGeneration,
+  OrdlakHistoryItem,
+  OrdlakStatus,
   Order,
   ReturnItem,
   Session,
@@ -82,6 +86,16 @@ export interface OrdlyBridge {
     status: () => Promise<BridgeResult<MailboxStatus>>;
     sync: () => Promise<BridgeResult<MailSyncResult>>;
     markRead: (messageId: string) => Promise<BridgeResult<null>>;
+  };
+  ordlak: {
+    status: () => Promise<BridgeResult<OrdlakStatus>>;
+    generate: (payload: OrdlakGeneratePayload) => Promise<BridgeResult<OrdlakGeneration>>;
+    history: (limit?: number) => Promise<BridgeResult<OrdlakHistoryItem[]>>;
+    finalize: (input: {
+      id: number;
+      finalTitle: string;
+      finalDescriptionHtml: string;
+    }) => Promise<BridgeResult<OrdlakHistoryItem>>;
   };
   wholesalers: {
     list: () => Promise<Wholesaler[]>;
