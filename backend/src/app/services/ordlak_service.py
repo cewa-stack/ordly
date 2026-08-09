@@ -37,10 +37,18 @@ TITLE_MIN_WORDS = 3
 # to flagą `title_below_target` zamiast po cichu oddać słabszy wynik.
 TITLE_TARGET_LENGTH = 65
 
+# Opis poniżej tego progu to szkielet, nie oferta sprzedażowa - kupujący
+# nie znajdzie w nim odpowiedzi na swoje pytania. Tak samo jak przy tytule:
+# backend ponawia raz zapytanie, zanim odda słaby wynik.
+DESCRIPTION_TARGET_LENGTH = 1200
+
 MAX_PHOTOS = 3
 _ALLOWED_PHOTO_TYPES = {"image/jpeg", "image/png", "image/webp"}
 
-_ANTHROPIC_MAX_TOKENS = 4096
+# Rozbudowany opis HTML (7 sekcji) to ~1000-1500 tokenów, a Sonnet 5 ma
+# domyślnie włączone myślenie adaptacyjne, które liczy się do tego samego
+# limitu. Przy 4096 model dusił opis do kilku linijek, żeby się zmieścić.
+_ANTHROPIC_MAX_TOKENS = 16000
 
 _OFFER_TOOL = {
     "name": "submit_offer_draft",
@@ -52,17 +60,23 @@ _OFFER_TOOL = {
             "title": {
                 "type": "string",
                 "description": (
-                    "Tytul oferty Allegro. Cel: 74-75 znakow (maksymalne "
+                    "Tytul oferty Allegro. Cel: 70-75 znakow (maksymalne "
                     "wykorzystanie miejsca pod SEO), twardy limit 12-75 znakow "
-                    "i minimum 3 slowa. Zawsze prawdziwe atrybuty produktu, "
-                    "nigdy powtorzenia tego samego slowa."
+                    "i minimum 3 slowa. Wzorzec: ilosc, typ produktu, marka, "
+                    "kluczowy parametr, zastosowania, material. Zawsze "
+                    "prawdziwe atrybuty, nigdy powtorzenia tego samego slowa, "
+                    "bez emoji."
                 ),
             },
             "description_html": {
                 "type": "string",
                 "description": (
-                    "Opis produktu jako prosty HTML (dozwolone: p, ul, li, "
-                    "strong, br). Wylacznie cechy i stan produktu."
+                    "ROZBUDOWANY opis produktu jako prosty HTML (dozwolone: "
+                    "p, ul, li, strong, br). MINIMUM 1500 znakow. Musi zawierac "
+                    "sekcje: naglowek, wprowadzenie, zawartosc zestawu (jesli "
+                    "zestaw), najwazniejsze cechy z wyjasnieniem korzysci, "
+                    "liste zastosowan, specyfikacje techniczna, stan produktu. "
+                    "Kilka linijek tekstu to bledna odpowiedz."
                 ),
             },
             "condition_notes": {
@@ -77,40 +91,143 @@ _OFFER_TOOL = {
 }
 
 _SYSTEM_PROMPT = """\
-Jesteś ekspertem od wystawiania ofert na Allegro. Tworzysz tytuł i opis
-oferty zgodne z regulaminem Allegro i zoptymalizowane pod wyszukiwarkę Allegro.
+Jesteś doświadczonym copywriterem e-commerce, który pisze najlepiej
+sprzedające się oferty na Allegro. Twoje opisy są ROZBUDOWANE, konkretne
+i podzielone na czytelne sekcje - kupujący ma znaleźć w nich odpowiedź na
+każde swoje pytanie o produkt.
 
-ZASADY TYTUŁU (twarde):
-- Długość 12-75 znaków ze spacjami, minimum 3 słowa.
-- CELUJ W 74-75 ZNAKÓW. Wypełniaj limit kolejnymi PRAWDZIWYMI atrybutami
-  produktu (marka, model, kolor, rozmiar, materiał, pojemność, przeznaczenie),
-  aż zabraknie miejsca.
-- Najważniejsze słowa kluczowe na początku.
-- ZAKAZ: powtarzania tego samego słowa w celu wydłużenia tytułu, słów
-  "tanio", "najtaniej", "okazja", "nowość", "promocja", "hit", "gratis",
-  informacji o wysyłce, odbiorze osobistym, fakturach, loginie, mieście,
-  numerów magazynowych, znaków ozdobnych (@ ! [ ]), CAPS LOCKA, nazw marek
+=========================
+TYTUŁ
+=========================
+
+Wzorzec: [ilość] [typ produktu] [marka/model] [kluczowy parametr]
+[zastosowanie] [zastosowanie] [materiał/cecha]
+
+Przykłady tytułów o właściwej gęstości słów kluczowych:
+- 10szt. Butelka Gorilla 60ml Liquid Aromat Baza olejki DIY kosmetyki PET
+- Zestaw ADBL Leather Kit czyszczenie pielegnacja skory tapicerka auto
+
+ZASADY:
+- Twardy limit 12-75 znaków, minimum 3 słowa.
+- CELUJ W 70-75 ZNAKÓW. Tytuł krótszy niż 65 znaków marnuje miejsce na
+  słowa kluczowe - dopisuj kolejne PRAWDZIWE atrybuty, aż wypełnisz limit.
+- Zaczynaj od tego, czego szuka kupujący (ilość, typ, marka), potem
+  parametry, na końcu zastosowania i materiał.
+- Dopisuj realne synonimy i zastosowania, po których ludzie wyszukują
+  (np. "DIY", "kosmetyki", "olejki", "auto") - to poszerza zasięg oferty.
+- ZAKAZ: powtarzania tego samego słowa dla długości, słów "tanio",
+  "najtaniej", "okazja", "nowość", "promocja", "hit", "gratis", wzmianek
+  o wysyłce/odbiorze/fakturach, nazwy miasta, loginu, numerów
+  magazynowych, znaków ozdobnych (@ ! [ ]), CAPS LOCKA, emoji, nazw marek
   niezwiązanych z produktem.
 
-ZASADY OPISU (twarde):
-- Wyłącznie cechy i stan produktu.
-- ZAKAZ: danych kontaktowych (telefon, e-mail, numer konta), zachęt do
-  kontaktu lub zakupu poza Allegro, fraz reklamowych ("gratis", "tanio",
-  "promocja", "hit", "prezent"), WZMIANEK O WYSYŁCE, DOSTAWIE, CZASIE
-  REALIZACJI, KOSZTACH TRANSPORTU I ODBIORZE OSOBISTYM, linków, informacji
-  o innych ofertach sprzedawcy, gwarancji i warunkach sprzedaży
-  niezwiązanych z samym przedmiotem.
-- Prosty HTML: <p>, <ul>, <li>, <strong>, <br>. Bez stylów i skryptów.
+=========================
+OPIS
+=========================
 
-NIGDY nie podawaj ceny ani nie sugeruj kwoty - cenę wylicza system.
+Opis MUSI być rozbudowany - minimum 1500 znaków HTML. Kilka linijek to
+zmarnowana oferta. Trzymaj się poniższej struktury; sekcję pomiń tylko
+wtedy, gdy naprawdę nie dotyczy produktu:
+
+1. NAGŁÓWEK - jedna linia z gwiazdką, nazwa produktu z najmocniejszymi cechami.
+2. WPROWADZENIE - 2-3 zdania: co to jest, dla kogo, do czego służy.
+   Pogrub <strong> najważniejsze frazy WEWNĄTRZ zdań.
+3. ZAWARTOŚĆ ZESTAWU - tylko gdy produkt jest zestawem; lista z ilościami.
+4. NAJWAŻNIEJSZE CECHY - lista, każdy punkt w formacie
+   "<strong>Nazwa cechy:</strong> co ta cecha daje kupującemu".
+   Nie sama nazwa parametru - wyjaśnij korzyść.
+5. ZASTOSOWANIE - lista z haczykiem na początku każdego punktu,
+   4-8 realnych zastosowań produktu.
+6. SPECYFIKACJA TECHNICZNA - lista parametrów (pojemność, wymiary,
+   materiał, kolor, model, rodzaj).
+7. STAN PRODUKTU - jedno zdanie na końcu.
+
+DOZWOLONY HTML: <p>, <ul>, <li>, <strong>, <br>. Bez stylów, klas, tabel,
+nagłówków <h1>-<h6> i skryptów. Emoji gwiazdki i haczyka są dozwolone
+w OPISIE (ale nigdy w tytule).
+
+PRAWDA PONAD WSZYSTKO: opieraj się na notatce sprzedawcy, na tym co widać
+na zdjęciach i na ogólnej wiedzy o tej kategorii produktu. NIGDY nie
+zmyślaj konkretnych liczb (pojemność, wymiary, waga, moc, skład), których
+nie podano i nie widać - lepiej pominąć parametr niż podać nieprawdziwy.
+
+ZAKAZ W OPISIE (regulamin Allegro):
+- dane kontaktowe: telefon, e-mail, numer konta,
+- zachęty do kontaktu lub zakupu poza Allegro,
+- frazy reklamowe: "gratis", "tanio", "promocja", "hit", "prezent",
+- WZMIANKI O WYSYŁCE, DOSTAWIE, CZASIE REALIZACJI, KOSZTACH TRANSPORTU
+  I ODBIORZE OSOBISTYM - to osobne pola oferty, nie treść opisu,
+- linki i adresy stron,
+- informacje o innych ofertach sprzedawcy,
+- gwarancja i warunki sprzedaży niezwiązane z samym przedmiotem,
+- cena i jakiekolwiek kwoty - cenę wylicza system, nie Ty.
+
+=========================
+PRZYKŁAD (wzorzec STRUKTURY i szczegółowości, nie treści)
+=========================
+
+<p><strong>⭐ ZESTAW 10szt. Butelka Gorilla 60ml z precyzyjnym dozownikiem ⭐</strong></p>
+<p>Wysokiej jakości, pusta butelka typu <strong>Gorilla</strong> o pojemności 60 ml. Idealne rozwiązanie do przechowywania i <strong>precyzyjnego dozowania</strong> aromatów, baz oraz wielu innych płynów. Dzięki swojej konstrukcji ma szerokie zastosowanie w przechowywaniu różnego rodzaju cieczy.</p>
+<p><strong>ZESTAW 10 SZT. ZAWIERA:</strong></p>
+<ul>
+<li>Butelka Gorilla <strong>10 szt.</strong></li>
+<li>Dozownik <strong>10 szt.</strong></li>
+<li>Zakrętka z Child Resistant Cap <strong>10 szt.</strong> (zabezpieczenie przed dziećmi)</li>
+</ul>
+<p><strong>Najważniejsze cechy produktu:</strong></p>
+<ul>
+<li><strong>Pojemność 60 ml:</strong> idealny rozmiar na podręczny zapas lub do mieszania własnych kompozycji DIY.</li>
+<li><strong>Materiał PET:</strong> wytrzymałe i bezpieczne tworzywo, które nie wchodzi w reakcję z płynami i zapewnia trwałość.</li>
+<li><strong>Bezpieczna zakrętka:</strong> system CRC, czyli zabezpieczenie przed otwarciem przez dzieci.</li>
+<li><strong>Pierścień gwarancyjny:</strong> masz pewność, że butelka nie była wcześniej otwierana.</li>
+<li><strong>Precyzyjny dozownik:</strong> wąski, podłużny kroplomierz pozwala na łatwe i czyste napełnianie.</li>
+<li><strong>Półprzezroczysty kolor:</strong> umożliwia stałą kontrolę poziomu płynu w środku.</li>
+</ul>
+<p><strong>Wszechstronne zastosowanie:</strong></p>
+<ul>
+<li>✅ Tusze do drukarek</li>
+<li>✅ Kleje modelarskie i artystyczne</li>
+<li>✅ Barwniki spożywcze i przemysłowe</li>
+<li>✅ Olejki eteryczne i kosmetyczne</li>
+<li>✅ Płyny do dezynfekcji</li>
+</ul>
+<p><strong>Specyfikacja techniczna:</strong></p>
+<ul>
+<li><strong>Pojemność:</strong> 60 ml</li>
+<li><strong>Rodzaj:</strong> Butelka Gorilla V3</li>
+<li><strong>Materiał:</strong> PET</li>
+<li><strong>Zakrętka:</strong> CRC z pierścieniem zrywającym</li>
+<li><strong>Kolor:</strong> półprzezroczysty / transparentny</li>
+</ul>
+<p>Stan produktu: nowy, nieużywany, oryginalnie zapakowany.</p>
+
 Odpowiadaj wyłącznie przez narzędzie submit_offer_draft.
 """
 
-_RETRY_HINT = (
-    "\n\nUWAGA: poprzedni tytuł był za krótki i marnował miejsce na słowa "
-    "kluczowe. Dodaj więcej PRAWDZIWYCH, różnych atrybutów produktu, tak aby "
-    "tytuł miał 74-75 znaków. Nie powtarzaj słów."
-)
+
+def _build_retry_hint(title: str, description_html: str) -> str:
+    """
+    Buduje dopisek do promptu wskazujący, CO dokładnie było za słabe.
+
+    Ogólne "popraw to" nic nie daje - model musi wiedzieć, którego
+    wymiaru dotyczy zarzut, żeby druga próba faktycznie go naprawiła.
+    """
+    problems: list[str] = []
+    if len(title) < TITLE_TARGET_LENGTH:
+        problems.append(
+            f"TYTUŁ miał tylko {len(title)} znaków i marnuje miejsce na słowa "
+            "kluczowe. Dopisz kolejne PRAWDZIWE atrybuty produktu i "
+            "zastosowania, aż osiągniesz 70-75 znaków. Nie powtarzaj słów."
+        )
+    if len(description_html) < DESCRIPTION_TARGET_LENGTH:
+        problems.append(
+            f"OPIS miał tylko {len(description_html)} znaków - to szkielet, nie "
+            "oferta sprzedażowa. Rozbuduj go do minimum 1500 znaków i użyj "
+            "WSZYSTKICH sekcji ze struktury: nagłówek, wprowadzenie, zawartość "
+            "zestawu, najważniejsze cechy z wyjaśnieniem korzyści, lista "
+            "zastosowań, specyfikacja techniczna, stan produktu."
+        )
+    return "\n\nUWAGA, popraw poprzednią wersję:\n- " + "\n- ".join(problems)
 
 
 # Klient Anthropic jest typowany jako `Any`, bo `AsyncAnthropic` jest
@@ -119,6 +236,29 @@ _RETRY_HINT = (
 # sobowtóra. Protokół strukturalny nie zadziałałby: `messages.create` w SDK
 # ma dziesiątki nazwanych parametrów, więc żaden zwięzły podpis go nie pokryje.
 ClientFactory = Callable[[], Any]
+
+
+def _meets_targets(draft: tuple[str, str, str]) -> bool:
+    """Czy tytuł i opis osiągnęły cele jakościowe (nie mylić z limitami Allegro)."""
+    title, description_html, _ = draft
+    return (
+        len(title) >= TITLE_TARGET_LENGTH
+        and len(description_html) >= DESCRIPTION_TARGET_LENGTH
+    )
+
+
+def _quality_score(draft: tuple[str, str, str]) -> tuple[int, int]:
+    """
+    Porównywalna miara jakości próby: (ile celów spełniono, długość opisu).
+
+    Pozwala wybrać lepszą z dwóch odpowiedzi modelu jednym `max(...)`,
+    zamiast rozgałęziać się po każdej kombinacji "tytuł ok / opis ok".
+    """
+    title, description_html, _ = draft
+    met = int(len(title) >= TITLE_TARGET_LENGTH) + int(
+        len(description_html) >= DESCRIPTION_TARGET_LENGTH
+    )
+    return met, len(description_html)
 
 
 class OrdlakError(Exception):
@@ -408,37 +548,41 @@ class OrdlakService:
         self, note: str, condition: str, photos: Sequence[OrdlakPhoto]
     ) -> tuple[str, str, str]:
         """
-        Odpytuje model, w razie potrzeby ponawiając RAZ po zbyt krótki tytuł.
+        Odpytuje model, ponawiając RAZ, gdy tytuł albo opis wyszedł za krótki.
 
-        Druga próba dostaje ten sam prompt plus dopisek o wydłużeniu tytułu.
-        Jeśli i ona zwróci krótki tytuł, oddajemy ten wynik - lepszy krótszy
-        trafny tytuł niż wymuszony bełkot (`bot.md` sekcja 6.1).
+        Druga próba dostaje ten sam prompt plus dopisek mówiący wprost, który
+        wymiar zawiódł. Jeśli i ona nie trafi w cel, oddajemy lepszy z dwóch
+        wyników - lepszy krótszy trafny tekst niż wymuszony bełkot
+        (`bot.md` sekcja 6.1).
         """
         client = self._build_client()
         content = self._build_user_content(note, condition, photos)
 
-        title, description_html, condition_notes = await self._call_anthropic(
-            client, _SYSTEM_PROMPT, content
-        )
-        if len(title) >= TITLE_TARGET_LENGTH:
-            return title, description_html, condition_notes
+        first = await self._call_anthropic(client, _SYSTEM_PROMPT, content)
+        if _meets_targets(first):
+            return first
 
+        title, description_html, _ = first
         logger.info(
-            "Ordlak: tytuł ma {} znaków (cel {}), ponawiam raz",
+            "Ordlak: tytuł {} zn. (cel {}), opis {} zn. (cel {}) - ponawiam raz",
             len(title),
             TITLE_TARGET_LENGTH,
+            len(description_html),
+            DESCRIPTION_TARGET_LENGTH,
         )
         try:
-            retry = await self._call_anthropic(client, _SYSTEM_PROMPT + _RETRY_HINT, content)
+            retry = await self._call_anthropic(
+                client,
+                _SYSTEM_PROMPT + _build_retry_hint(title, description_html),
+                content,
+            )
         except OrdlakError:
-            # Pierwsza odpowiedź jest poprawna, tylko krótsza niż cel -
-            # nie ma powodu wywracać całej generacji przez nieudaną dogrywkę.
+            # Pierwsza odpowiedź jest poprawna, tylko słabsza niż cel - nie ma
+            # powodu wywracać całej generacji przez nieudaną dogrywkę.
             logger.warning("Ordlak: ponowna próba nie powiodła się, zwracam pierwszy wynik")
-            return title, description_html, condition_notes
+            return first
 
-        if len(retry[0]) > len(title):
-            return retry
-        return title, description_html, condition_notes
+        return max(first, retry, key=_quality_score)
 
     async def _call_anthropic(
         self, client: Any, system_prompt: str, content: list[dict[str, Any]]
