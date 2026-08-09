@@ -32,6 +32,7 @@ import { ReturnsScreen } from "./ReturnsScreen";
 import { HurtowniaScreen } from "./HurtowniaScreen";
 import { OlxScreen } from "./OlxScreen";
 import { StatystykiScreen } from "./StatystykiScreen";
+import { KalendarzScreen } from "./KalendarzScreen";
 import { UstawieniaScreen } from "./UstawieniaScreen";
 
 /** Skroty `G` + litera do ekranow (sekcja 9.1 pkt 14). */
@@ -45,6 +46,7 @@ const GOTO_KEYS: Record<string, ViewId> = {
   o: "ordlak",
   h: "hurtownie",
   t: "statystyki",
+  k: "kalendarz",
   u: "ustawienia",
 };
 
@@ -224,6 +226,7 @@ export function ShellLayout() {
     hurtownie: "Dostawcy i zamówienia",
     olx: "Oferty prowadzone ręcznie",
     statystyki: "Ostatnie 7 dni",
+    kalendarz: "Święta i okresy sprzedażowe",
     ustawienia: "Synchronizacja i połączenie",
   };
 
@@ -238,6 +241,7 @@ export function ShellLayout() {
     hurtownie: "Hurtownie",
     olx: "OLX",
     statystyki: "Statystyki",
+    kalendarz: "Kalendarz",
     ustawienia: "Ustawienia",
   };
 
@@ -288,6 +292,7 @@ export function ShellLayout() {
             {view === "hurtownie" && <HurtowniaScreen />}
             {view === "olx" && <OlxScreen />}
             {view === "statystyki" && <StatystykiScreen />}
+            {view === "kalendarz" && <KalendarzScreen />}
             {view === "ustawienia" && <UstawieniaScreen />}
           </div>
         </main>

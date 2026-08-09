@@ -9,6 +9,7 @@
 import type { ReactNode } from "react";
 import {
   BoxIcon,
+  CalendarIcon,
   ChartIcon,
   ChatIcon,
   GearIcon,
@@ -33,6 +34,7 @@ export type ViewId =
   | "hurtownie"
   | "olx"
   | "statystyki"
+  | "kalendarz"
   | "ustawienia";
 
 interface NavItemDef {
@@ -55,6 +57,7 @@ export const BACKSTAGE_NAV: NavItemDef[] = [
   { id: "hurtownie", label: "Hurtownie", icon: <TruckIcon /> },
   { id: "olx", label: "OLX", icon: <TagIcon /> },
   { id: "statystyki", label: "Statystyki", icon: <ChartIcon /> },
+  { id: "kalendarz", label: "Kalendarz", icon: <CalendarIcon /> },
 ];
 
 /** Liczniki po prawej stronie pozycji - `alert` gdy wymagaja uwagi. */
