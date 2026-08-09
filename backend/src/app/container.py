@@ -15,7 +15,7 @@ from contextlib import asynccontextmanager
 from aiogram import Bot
 from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession, async_sessionmaker
 
-from app.core.config import Settings
+from app.core.config import OrdlakSettings, Settings
 from app.core.event_bus.bus import EventBus
 from app.database.engine import create_engine, create_session_factory
 from app.domain.interfaces.marketplace_plugin import MarketplacePlugin
@@ -31,6 +31,7 @@ from app.repositories.sqlite_event_repository import SqliteEventRepository
 from app.repositories.sqlite_inventory_repository import SqliteInventoryRepository
 from app.repositories.sqlite_mail_repository import SqliteMailRepository
 from app.repositories.sqlite_order_repository import SqliteOrderRepository
+from app.repositories.sqlite_ordlak_repository import SqliteOrdlakRepository
 from app.repositories.sqlite_push_subscription_repository import (
     SqlitePushSubscriptionRepository,
 )
@@ -51,6 +52,7 @@ from app.services.inventory_service import InventoryService
 from app.services.issues_service import IssuesService
 from app.services.mail_service import MailService
 from app.services.mailbox_service import MailboxService
+from app.services.ordlak_service import OrdlakService
 from app.services.returns_service import ReturnsService
 from app.services.search_service import SearchService
 from app.services.shipping_reminder_service import ShippingReminderService
@@ -158,6 +160,14 @@ class Container:
     def mailbox_service(self, session: AsyncSession) -> MailboxService:
         """Buduje MailboxService dla /api/v1/mail/messages (Skrzynka) i joba IMAP."""
         return MailboxService(SqliteMailRepository(session), self._settings.mail_watch)
+
+    def ordlak_service(self, session: AsyncSession) -> OrdlakService:
+        """Buduje OrdlakService dla /api/v1/ordlak/* (generator ofert AI)."""
+        return OrdlakService(SqliteOrdlakRepository(session), self._settings.ordlak)
+
+    def ordlak_settings(self) -> OrdlakSettings:
+        """Zwraca konfigurację Ordlaka dla `GET /api/v1/ordlak/status`."""
+        return self._settings.ordlak
 
     def health_service(self, session: AsyncSession) -> HealthService:
         """

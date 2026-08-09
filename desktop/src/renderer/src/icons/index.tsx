@@ -321,6 +321,16 @@ export function TagIcon(props: IconProps) {
   );
 }
 
+/** Iskra - generowanie oferty przez AI (Ordlak). */
+export function SparkIcon(props: IconProps) {
+  return (
+    <svg {...base(props)}>
+      <path d="M12 3.5 13.9 9l5.6 2-5.6 2-1.9 5.5L10.1 13 4.5 11l5.6-2Z" />
+      <path d="M18.5 4v3M20 5.5h-3" />
+    </svg>
+  );
+}
+
 export function ClockIcon(props: IconProps) {
   return (
     <svg {...base(props)}>

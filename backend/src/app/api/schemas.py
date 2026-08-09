@@ -20,10 +20,12 @@ from app.domain.entities.issue import Issue, IssueMessage
 from app.domain.entities.mail_message import MailMessage
 from app.domain.entities.order import Order
 from app.domain.entities.order_return import ReturnRecord
+from app.domain.entities.ordlak_generation import OrdlakGeneration, PriceBreakdown
 from app.domain.entities.shipment import Shipment
 from app.repositories.sqlite_event_repository import EventRecord
 from app.services.dashboard_service import DashboardSummary
 from app.services.mailbox_service import MailboxStatus
+from app.services.ordlak_service import OrdlakDraft, calculate_price
 from app.shared.dto.inventory_dto import InventoryReport, ItemForecast
 from app.shared.dto.stats_dto import HealthStatus, StatsSummary, SyncResult
 
@@ -334,6 +336,131 @@ class MailSyncResultOut(BaseModel):
 
     new_count: int
     configured: bool
+
+
+# --------------------------------------------------------------------------
+# Ordlak (generator ofert AI)
+# --------------------------------------------------------------------------
+
+
+class OrdlakPriceBreakdownOut(BaseModel):
+    """Rozbicie kalkulacji ceny - to samo w wyniku generacji i w historii."""
+
+    purchase_cost: float
+    inbound_shipping_cost: float
+    buyer_shipping_cost: float
+    commission_percent: float
+    target_margin_percent: float
+    commission_amount: float
+    suggested_price: float
+
+
+class OrdlakGenerationOut(BaseModel):
+    """Wygenerowana oferta zwracana przez `POST /api/v1/ordlak/generate`."""
+
+    id: int
+    created_at: datetime
+    title: str
+    description_html: str
+    condition_notes: str | None
+    condition: str
+    photo_count: int
+    title_below_target: bool
+    price_breakdown: OrdlakPriceBreakdownOut
+
+
+class OrdlakHistoryItemOut(BaseModel):
+    """Pozycja historii generacji (`GET /api/v1/ordlak/history`)."""
+
+    id: int
+    created_at: datetime
+    title: str
+    description_html: str
+    condition_notes: str | None
+    condition: str
+    photo_count: int
+    user_note: str
+    is_edited: bool
+    price_breakdown: OrdlakPriceBreakdownOut
+
+
+class OrdlakFinalizeIn(BaseModel):
+    """Ręcznie poprawiony tytuł/opis zapisywany do historii."""
+
+    final_title: str = Field(min_length=1, max_length=200)
+    final_description_html: str = Field(min_length=1)
+
+
+class OrdlakStatusOut(BaseModel):
+    """
+    Stan modułu Ordlak (`GET /api/v1/ordlak/status`).
+
+    Pozwala ekranowi powiedzieć wprost "brak klucza API na Pi" zamiast
+    czekać, aż użytkownik kliknie "Generuj" i dostanie błąd - ta sama
+    zasada co przy `GET /api/v1/mail/status`.
+    """
+
+    configured: bool
+    model: str
+    max_photos: int
+    max_photo_size_mb: int
+
+
+def _ordlak_price_breakdown_out(breakdown: PriceBreakdown) -> OrdlakPriceBreakdownOut:
+    return OrdlakPriceBreakdownOut(
+        purchase_cost=breakdown.purchase_cost,
+        inbound_shipping_cost=breakdown.inbound_shipping_cost,
+        buyer_shipping_cost=breakdown.buyer_shipping_cost,
+        commission_percent=breakdown.commission_percent,
+        target_margin_percent=breakdown.target_margin_percent,
+        commission_amount=breakdown.commission_amount,
+        suggested_price=breakdown.suggested_price,
+    )
+
+
+def ordlak_generation_out(draft: OrdlakDraft) -> OrdlakGenerationOut:
+    """Mapuje świeżo wygenerowaną ofertę na schemat odpowiedzi API."""
+    generation = draft.generation
+    return OrdlakGenerationOut(
+        id=generation.id or 0,
+        created_at=generation.created_at,
+        title=generation.title,
+        description_html=generation.description_html,
+        condition_notes=generation.ai_condition_notes,
+        condition=generation.condition,
+        photo_count=generation.photo_count,
+        title_below_target=draft.title_below_target,
+        price_breakdown=_ordlak_price_breakdown_out(draft.price_breakdown),
+    )
+
+
+def ordlak_history_item_out(generation: OrdlakGeneration) -> OrdlakHistoryItemOut:
+    """
+    Mapuje zapisaną generację na pozycję historii.
+
+    Rozbicie ceny odtwarzamy z zapisanych parametrów wejściowych, żeby
+    historia pokazywała dokładnie tę samą kartę ceny co świeży wynik -
+    bez duplikowania siedmiu kolumn w bazie.
+    """
+    breakdown = calculate_price(
+        purchase_cost=generation.purchase_cost,
+        inbound_shipping_cost=generation.inbound_shipping_cost,
+        buyer_shipping_cost=generation.buyer_shipping_cost,
+        commission_percent=generation.commission_percent,
+        target_margin_percent=generation.target_margin_percent,
+    )
+    return OrdlakHistoryItemOut(
+        id=generation.id or 0,
+        created_at=generation.created_at,
+        title=generation.title,
+        description_html=generation.description_html,
+        condition_notes=generation.ai_condition_notes,
+        condition=generation.condition,
+        photo_count=generation.photo_count,
+        user_note=generation.user_note,
+        is_edited=generation.final_title is not None,
+        price_breakdown=_ordlak_price_breakdown_out(breakdown),
+    )
 
 
 # --------------------------------------------------------------------------

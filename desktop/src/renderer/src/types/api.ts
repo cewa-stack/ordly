@@ -174,6 +174,74 @@ export interface MailSyncResult {
   configured: boolean;
 }
 
+/** Stan produktu w formularzu Ordlaka - te same kody co w backendzie. */
+export type OrdlakCondition = "new" | "very_good" | "good" | "damaged";
+
+/**
+ * Rozbicie kalkulacji ceny. Prowizja Allegro liczy sie od sumy
+ * `suggested_price + buyer_shipping_cost`, nie od samej ceny - dlatego
+ * `commission_amount` przychodzi z backendu gotowe, a nie jest liczone w UI.
+ */
+export interface OrdlakPriceBreakdown {
+  purchase_cost: number;
+  inbound_shipping_cost: number;
+  buyer_shipping_cost: number;
+  commission_percent: number;
+  target_margin_percent: number;
+  commission_amount: number;
+  suggested_price: number;
+}
+
+export interface OrdlakGeneration {
+  id: number;
+  created_at: string;
+  title: string;
+  description_html: string;
+  condition_notes: string | null;
+  condition: OrdlakCondition;
+  photo_count: number;
+  /** true = tytul jest regulaminowo poprawny, ale ponizej celu SEO (65+ znakow). */
+  title_below_target: boolean;
+  price_breakdown: OrdlakPriceBreakdown;
+}
+
+export interface OrdlakHistoryItem {
+  id: number;
+  created_at: string;
+  title: string;
+  description_html: string;
+  condition_notes: string | null;
+  condition: OrdlakCondition;
+  photo_count: number;
+  user_note: string;
+  is_edited: boolean;
+  price_breakdown: OrdlakPriceBreakdown;
+}
+
+export interface OrdlakStatus {
+  configured: boolean;
+  model: string;
+  max_photos: number;
+  max_photo_size_mb: number;
+}
+
+export interface OrdlakPhotoPayload {
+  fileName: string;
+  mimeType: string;
+  bytes: Uint8Array;
+}
+
+export interface OrdlakGeneratePayload {
+  note: string;
+  condition: OrdlakCondition;
+  purchaseCost: number;
+  inboundShippingCost: number;
+  buyerShippingCost: number;
+  commissionPercent: number;
+  targetMarginPercent: number;
+  photos?: OrdlakPhotoPayload[];
+}
+
 export interface DashboardSummary {
   orders_today: number;
   revenue_today: number;

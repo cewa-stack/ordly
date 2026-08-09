@@ -26,6 +26,7 @@ from app.api.endpoints import (
     logs,
     mail,
     orders,
+    ordlak,
     push,
     returns,
     stats,
@@ -61,6 +62,9 @@ mobile_api_router.include_router(
 )
 mobile_api_router.include_router(
     mail.router, tags=["mobile-mail"], dependencies=[Depends(require_api_token)]
+)
+mobile_api_router.include_router(
+    ordlak.router, tags=["mobile-ordlak"], dependencies=[Depends(require_api_token)]
 )
 mobile_api_router.include_router(
     stats.router, tags=["mobile-stats"], dependencies=[Depends(require_api_token)]

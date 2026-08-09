@@ -16,6 +16,7 @@ import {
   HomeIcon,
   MailIcon,
   ReturnIcon,
+  SparkIcon,
   TagIcon,
   TruckIcon,
 } from "../icons";
@@ -28,6 +29,7 @@ export type ViewId =
   | "magazyn"
   | "poczta"
   | "zwroty"
+  | "ordlak"
   | "hurtownie"
   | "olx"
   | "statystyki"
@@ -46,6 +48,7 @@ export const MAIN_NAV: NavItemDef[] = [
   { id: "magazyn", label: "Magazyn", icon: <GridIcon /> },
   { id: "poczta", label: "Poczta", icon: <MailIcon /> },
   { id: "zwroty", label: "Zwroty", icon: <ReturnIcon /> },
+  { id: "ordlak", label: "Ordlak", icon: <SparkIcon /> },
 ];
 
 export const BACKSTAGE_NAV: NavItemDef[] = [

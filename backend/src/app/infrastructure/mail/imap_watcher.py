@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import email
 import email.utils
+from collections.abc import Callable
 from datetime import UTC, datetime
 from email.header import decode_header
 from email.message import Message
@@ -21,19 +22,54 @@ from app.utils.time import utc_now
 
 _BODY_PREVIEW_LENGTH = 500
 
+# Skróty miesięcy wymagane przez IMAP SEARCH (RFC 3501). Świadomie NIE
+# uzywamy `strftime("%b")` - to formatowanie zalezy od LC_TIME procesu, wiec
+# na maszynie z polska lokalizacja dawaloby "sie" zamiast "Aug" i serwer
+# odrzucalby kazde zapytanie SEARCH.
+_IMAP_MONTHS = (
+    "Jan", "Feb", "Mar", "Apr", "May", "Jun",
+    "Jul", "Aug", "Sep", "Oct", "Nov", "Dec",
+)  # fmt: skip
+
 
 class ImapConnectionError(Exception):
     """Połączenie, logowanie albo wyszukiwanie IMAP nie powiodło się."""
 
 
+ClientFactory = Callable[[], aioimaplib.IMAP4]
+
+
 class ImapWatcher:
     """Odczytuje maile od skonfigurowanych nadawców przez IMAP (tylko odczyt)."""
 
-    def __init__(self, host: str, port: int, user: str, password: str) -> None:
+    def __init__(
+        self,
+        host: str,
+        port: int,
+        user: str,
+        password: str,
+        client_factory: ClientFactory | None = None,
+    ) -> None:
+        """
+        Args:
+            host: Serwer IMAP.
+            port: Port IMAP (zwykle 993).
+            user: Login skrzynki.
+            password: Hasło aplikacji (nie zwykłe hasło konta).
+            client_factory: Fabryka klienta IMAP - domyślnie `IMAP4_SSL`.
+                Podmienialna w testach na zwykłe `IMAP4` wskazujące lokalny
+                serwer testowy, żeby dało się przejść PRAWDZIWY protokół
+                (SEARCH + FETCH z literałami) bez ręcznego udawania kształtu
+                odpowiedzi - to właśnie takie udawanie przepuściło błąd
+                `bytearray` opisany przy `_extract_message_bytes`.
+        """
         self._host = host
         self._port = port
         self._user = user
         self._password = password
+        self._client_factory = client_factory or (
+            lambda: aioimaplib.IMAP4_SSL(host=host, port=port)
+        )
 
     async def fetch_new_from_senders(
         self, senders: list[str], since: datetime
@@ -45,7 +81,7 @@ class ImapWatcher:
         czytelnie OR na wszystkich serwerach, więc bezpieczniej iterować.
         """
         try:
-            client = aioimaplib.IMAP4_SSL(host=self._host, port=self._port)
+            client = self._client_factory()
             await client.wait_hello_from_server()
         except (OSError, TimeoutError, aioimaplib.Abort) as exc:
             # Nieosiągalny host/port albo zerwane TLS - bez tego opakowania
@@ -66,7 +102,7 @@ class ImapWatcher:
         if select_response.result != "OK":
             raise ImapConnectionError("Nie udało się otworzyć skrzynki INBOX")
 
-        since_str = since.strftime("%d-%b-%Y")
+        since_str = _format_imap_date(since)
         messages: list[MailMessage] = []
         seen_ids: set[str] = set()
         try:
@@ -77,7 +113,12 @@ class ImapWatcher:
                 raw_ids = search_response.lines[0].split()
                 for raw_id in raw_ids:
                     msg_num = raw_id.decode() if isinstance(raw_id, bytes) else str(raw_id)
-                    fetch_response = await client.fetch(msg_num, "(RFC822)")
+                    # BODY.PEEK[] zamiast RFC822: obie komendy zwracaja te
+                    # sama tresc, ale RFC822 (== BODY[]) ustawia na serwerze
+                    # flage \Seen, czyli oznaczalo uzytkownikowi maile jako
+                    # przeczytane w Gmailu przy kazdej synchronizacji. Modul
+                    # ma byc tylko-do-odczytu (patrz docstring), wiec PEEK.
+                    fetch_response = await client.fetch(msg_num, "(BODY.PEEK[])")
                     if fetch_response.result != "OK":
                         continue
                     raw_bytes = _extract_message_bytes(fetch_response.lines)
@@ -93,18 +134,32 @@ class ImapWatcher:
         return messages
 
 
-def _extract_message_bytes(lines: list[bytes]) -> bytes | None:
+def _format_imap_date(value: datetime) -> str:
+    """Formatuje datę jako `09-Aug-2026` niezależnie od locale procesu."""
+    return f"{value.day:02d}-{_IMAP_MONTHS[value.month - 1]}-{value.year}"
+
+
+def _extract_message_bytes(lines: list[bytes | bytearray]) -> bytes | None:
     """
     Wyciąga surowe bajty wiadomości z odpowiedzi FETCH.
 
     Odpowiedź to lista linii - krótkie to ramki protokołu IMAP
-    (np. "1 FETCH (RFC822 {1234}", zamykający nawias), a najdłuższa
+    (np. "1 FETCH (BODY[] {1234}", zamykający nawias), a najdłuższa
     to zawsze faktyczna treść maila.
+
+    UWAGA na typ: aioimaplib zwraca ramki protokołu jako `bytes`, ale samą
+    treść literału (czyli wiadomość) jako **`bytearray`** - a `bytearray`
+    NIE jest instancją `bytes`. Wcześniejszy filtr `isinstance(line, bytes)`
+    wycinał więc dokładnie tę jedną linię, po którą tu przychodzimy: każdy
+    mail był po cichu pomijany, `sync` zawsze raportował "0 nowych", a
+    aplikacja pokazywała pustą skrzynkę mimo poprawnego logowania IMAP.
     """
-    candidates = [line for line in lines if isinstance(line, bytes) and len(line) > 50]
+    candidates = [
+        line for line in lines if isinstance(line, bytes | bytearray) and len(line) > 50
+    ]
     if not candidates:
         return None
-    return max(candidates, key=len)
+    return bytes(max(candidates, key=len))
 
 
 def _decode_mime_header(raw_value: str | None) -> str:

@@ -27,6 +27,7 @@ import { ZamowieniaScreen } from "./ZamowieniaScreen";
 import { DiscussionsScreen } from "./DiscussionsScreen";
 import { MagazynScreen } from "./MagazynScreen";
 import { MailboxScreen } from "./MailboxScreen";
+import { OrdlakScreen } from "./OrdlakScreen";
 import { ReturnsScreen } from "./ReturnsScreen";
 import { HurtowniaScreen } from "./HurtowniaScreen";
 import { OlxScreen } from "./OlxScreen";
@@ -41,6 +42,7 @@ const GOTO_KEYS: Record<string, ViewId> = {
   m: "magazyn",
   p: "poczta",
   w: "zwroty",
+  o: "ordlak",
   h: "hurtownie",
   t: "statystyki",
   u: "ustawienia",
@@ -218,6 +220,7 @@ export function ShellLayout() {
       : "Wczytuję stan magazynu…",
     poczta: "Skrzynka główna · IMAP",
     zwroty: "Ostatnie 30 dni",
+    ordlak: "Generator ofert Allegro",
     hurtownie: "Dostawcy i zamówienia",
     olx: "Oferty prowadzone ręcznie",
     statystyki: "Ostatnie 7 dni",
@@ -231,6 +234,7 @@ export function ShellLayout() {
     magazyn: "Magazyn",
     poczta: "Poczta",
     zwroty: "Zwroty",
+    ordlak: "Ordlak",
     hurtownie: "Hurtownie",
     olx: "OLX",
     statystyki: "Statystyki",
@@ -280,6 +284,7 @@ export function ShellLayout() {
             )}
             {view === "poczta" && <MailboxScreen />}
             {view === "zwroty" && <ReturnsScreen />}
+            {view === "ordlak" && <OrdlakScreen />}
             {view === "hurtownie" && <HurtowniaScreen />}
             {view === "olx" && <OlxScreen />}
             {view === "statystyki" && <StatystykiScreen />}
