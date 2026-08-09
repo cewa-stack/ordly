@@ -102,6 +102,18 @@ export function ChartIcon(props: IconProps) {
   );
 }
 
+export function CalendarIcon(props: IconProps) {
+  return (
+    <svg {...base(props)}>
+      <rect x="3.5" y="5" width="17" height="15" rx="1.6" />
+      <path d="M3.5 9.5h17M8 3v4M16 3v4" />
+      <circle cx="8" cy="14" r="1" fill="currentColor" stroke="none" />
+      <circle cx="12" cy="14" r="1" fill="currentColor" stroke="none" />
+      <circle cx="16" cy="14" r="1" fill="currentColor" stroke="none" />
+    </svg>
+  );
+}
+
 export function GearIcon(props: IconProps) {
   return (
     <svg {...base(props)}>
