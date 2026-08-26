@@ -8,6 +8,10 @@ anulowanie, zwrot) i automatycznie koryguje stany w centralnym magazynie:
 2. Anulowanie        -> przywraca wcześniej odjęte sztuki.
 3. Zwrot klienta     -> przywraca zwrócone sztuki.
 
+Każda z tych zmian schodzi też na PODPRODUKTY składnika w proporcji 1:1
+(butelka -> nakrętka, kroplomierz) - patrz `sub_item_cascade`. Ręczne
+korekty stanu tego nie robią i robić nie mają.
+
 Każda operacja jest chroniona znacznikiem synchronizacji
 (marketplace, reference, operation) - ponowne przetworzenie tego samego
 zamówienia jest pomijane, co zapobiega podwójnemu odjęciu stanów.
@@ -31,6 +35,7 @@ from app.domain.interfaces.inventory_repository import InventoryRepository
 from app.domain.interfaces.stock_sync_repository import StockSyncRepository
 from app.services.component_resolver import ComponentResolver
 from app.services.stock_ledger import apply_stock_change
+from app.services.sub_item_cascade import cascade_to_sub_items
 from app.shared.dto.inventory_dto import StockSyncOutcome
 
 OPERATION_DEDUCT = "DEDUCT"
@@ -189,11 +194,14 @@ class StockSyncService:
         reference: str,
     ) -> tuple[list[InventoryItem], list[str]]:
         """
-        Stosuje zmianę stanów dla wszystkich produktów dokumentu.
+        Stosuje zmianę stanów dla wszystkich produktów dokumentu wraz
+        z kaskadą na podprodukty każdego składnika.
 
         Returns:
             Krotka (produkty z niskim stanem po operacji, produkty
-            bez mapowania na magazyn).
+            bez mapowania na magazyn). Podprodukty, które zeszły poniżej
+            progu, też trafiają do pierwszej listy - próg niskiego stanu
+            nakrętek pilnuje się sam, niezależnie od butelki.
         """
         low_stock: list[InventoryItem] = []
         unmatched: list[str] = []
@@ -209,6 +217,12 @@ class StockSyncService:
                 unmatched.append(f"{product.name} ({product.external_id})")
                 continue
 
+            # Receptura bywa jeszcze napisana po staremu - butelka,
+            # nakrętka i kroplomierz jako trzy osobne składniki. Wtedy
+            # kaskada musi pominąć te, które ta receptura już odjęła,
+            # inaczej nakrętka zeszłaby ze stanu dwa razy.
+            recipe_skus = {component.sku for component in components}
+
             for component in components:
                 updated = await self._apply_component_change(
                     component=component,
@@ -220,8 +234,21 @@ class StockSyncService:
                 )
                 if updated is None:
                     unmatched.append(component.sku)
-                elif sign < 0 and updated.is_low_stock:
+                    continue
+                if sign < 0 and updated.is_low_stock:
                     low_stock.append(updated)
+
+                cascaded = await cascade_to_sub_items(
+                    inventory=self._inventory,
+                    parent_sku=component.sku,
+                    change=sign * component.quantity * product.quantity,
+                    reason=reason,
+                    source=source,
+                    reference=reference,
+                    skip_skus=recipe_skus,
+                )
+                if sign < 0:
+                    low_stock.extend(item for item in cascaded if item.is_low_stock)
 
         return low_stock, unmatched
 

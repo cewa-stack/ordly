@@ -8,10 +8,24 @@
  *
  * Nowosc wobec poprzedniej wersji: formularz produktu (sekcja 9.1 pkt 6)
  * i historia ruchow magazynowych - wczesniej byl tylko stepper korekty.
+ *
+ * Produkty glowne i podprodukty: butelka 10 ml sprzedaje sie zawsze
+ * z nakretka i kroplomierzem, wiec te dwa sa jej PODPRODUKTAMI. Glowna
+ * lista pokazuje wtedy sama butelke - nakretka i kroplomierz siedza pod
+ * strzalka rozwijania, zeby nie zasmiecac widoku trzema wierszami o tym
+ * samym. Filtry "Ponizej progu" i "Zerowy stan" celowo lamia te zasade
+ * i pokazuja podprodukty wprost: ich zadaniem jest znalezc to, co sie
+ * konczy, a schowana nakretka skonczylaby sie po cichu.
+ *
+ * Warunki na `parent_sku` sa CELOWO luzne (`!item.parent_sku`), a nie
+ * `=== null`: starszy backend tego pola w ogole nie zwraca, a wtedy
+ * `undefined === null` jest falszem i cala lista magazynowa zniknelaby
+ * z ekranu. Brak pola ma znaczyc "produkt samodzielny", bo dokladnie
+ * tym byly wszystkie produkty przed ta zmiana.
  */
 import * as React from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { ClockIcon, PlusIcon } from "../icons";
+import { ChevronIcon, ClockIcon, LinkIcon, PlusIcon } from "../icons";
 import {
   Button,
   Chip,
@@ -201,6 +215,156 @@ function HistoryModal({ sku, onClose }: { sku: string | null; onClose: () => voi
 }
 
 /**
+ * Zarzadzanie podproduktami jednego produktu glownego.
+ *
+ * Dlaczego modal od strony PRODUKTU GLOWNEGO, a nie pole "produkt
+ * glowny" w edycji podproduktu: gdy produkt zostanie podproduktem,
+ * znika z glownej listy - nie byloby wiersza, z ktorego mozna by go
+ * odwiazac. Stad oba kierunki (dodaj / odlacz) siedza tutaj, w jednym
+ * miejscu, przy produkcie, ktory na liscie zostaje.
+ *
+ * Lista kandydatow jest filtrowana po tych samych regulach, ktore
+ * egzekwuje backend (jeden poziom zagniezdzenia) - front tylko chowa
+ * niedozwolone opcje, decyduje serwer.
+ */
+function SubItemsModal({
+  parent,
+  items,
+  onClose,
+}: {
+  parent: StockItem | null;
+  items: StockItem[];
+  onClose: () => void;
+}) {
+  const queryClient = useQueryClient();
+  const toast = useToast();
+  const [pickedSku, setPickedSku] = React.useState("");
+
+  React.useEffect(() => {
+    setPickedSku("");
+  }, [parent?.sku]);
+
+  const subItems = React.useMemo(
+    () => (parent ? items.filter((item) => item.parent_sku === parent.sku) : []),
+    [items, parent]
+  );
+
+  const candidates = React.useMemo(() => {
+    if (!parent) return [];
+    const parents = new Set(
+      items.map((item) => item.parent_sku).filter((sku): sku is string => sku !== null)
+    );
+    return items.filter(
+      (item) =>
+        item.sku !== parent.sku && !item.parent_sku && !parents.has(item.sku)
+    );
+  }, [items, parent]);
+
+  const mutation = useMutation({
+    mutationFn: async ({ sku, parentSku }: { sku: string; parentSku: string | null }) => {
+      const result = await window.ordly.stock.setParent(sku, parentSku);
+      if (!result.ok) throw new Error(result.message);
+      return result.data;
+    },
+    onSuccess: (item) => {
+      void queryClient.invalidateQueries({ queryKey: ["stock"] });
+      setPickedSku("");
+      toast.success(
+        item.parent_sku ? "Dodano podprodukt" : "Odłączono podprodukt",
+        item.parent_sku
+          ? `${item.sku} będzie schodzić razem z ${item.parent_sku}`
+          : `${item.sku} jest znowu samodzielnym produktem`
+      );
+    },
+    onError: (error) => {
+      toast.error(
+        "Nie udało się zmienić powiązania",
+        error instanceof Error ? error.message : "Spróbuj ponownie."
+      );
+    },
+  });
+
+  return (
+    <Modal
+      open={parent !== null}
+      onClose={onClose}
+      title="Podprodukty"
+      subtitle={parent ? `${parent.name} · ${parent.sku}` : ""}
+      width={520}
+      footer={
+        <Button variant="ghost" onClick={onClose}>
+          Zamknij
+        </Button>
+      }
+    >
+      <div className="flex flex-col gap-4">
+        <p className="text-[12px] leading-relaxed text-slate-dim">
+          Podprodukty schodzą ze stanu razem z tym produktem, sztuka za sztukę, przy
+          każdej sprzedaży - niezależnie od oferty i serwisu. Ręczne korekty stanu
+          (dostawa, inwentaryzacja) ich nie ruszają.
+        </p>
+
+        <div className="flex flex-col">
+          {subItems.length === 0 && (
+            <p className="text-[12.5px] text-slate-dim">
+              Ten produkt nie ma jeszcze podproduktów.
+            </p>
+          )}
+          {subItems.map((item) => (
+            <div
+              key={item.sku}
+              className="flex items-center gap-3 border-b border-line py-2.5 text-[12.5px] last:border-b-0"
+            >
+              <span className="min-w-0 flex-1 truncate text-white">{item.name}</span>
+              <span className="o-mono shrink-0 text-[11px] text-slate-dim">{item.sku}</span>
+              <span className="o-mono w-16 shrink-0 text-right text-slate">
+                {item.stock} szt.
+              </span>
+              <MiniButton
+                onClick={() => mutation.mutate({ sku: item.sku, parentSku: null })}
+                disabled={mutation.isPending}
+              >
+                Odłącz
+              </MiniButton>
+            </div>
+          ))}
+        </div>
+
+        <div className="flex items-end gap-2 border-t border-line pt-4">
+          <Field
+            label="Dodaj podprodukt"
+            hint="Widać tylko produkty samodzielne - zagnieżdżenie jest jednopoziomowe"
+          >
+            <select
+              value={pickedSku}
+              onChange={(event) => setPickedSku(event.target.value)}
+              className="w-full rounded-sm border border-line bg-ink-raised px-3 py-2.5 text-[12.5px] text-white outline-none focus:border-teal-bright"
+            >
+              <option value="">Wybierz produkt…</option>
+              {candidates.map((item) => (
+                <option key={item.sku} value={item.sku}>
+                  {item.name} ({item.sku})
+                </option>
+              ))}
+            </select>
+          </Field>
+          <div className="pb-[22px]">
+            <Button
+              onClick={() =>
+                mutation.mutate({ sku: pickedSku, parentSku: parent?.sku ?? null })
+              }
+              disabled={pickedSku === "" || mutation.isPending}
+            >
+              Dodaj
+            </Button>
+          </div>
+        </div>
+      </div>
+    </Modal>
+  );
+}
+
+/**
  * Przelacznik "Produkty / Powiazania ofert". Licznik przy powiazaniach
  * jest istotny: oferta bez receptury sprzedaje sie, nie ruszajac stanow,
  * a to widac dopiero po tym, ze magazyn stoi w miejscu.
@@ -238,6 +402,8 @@ export function MagazynScreen({ focusSku, onFocusHandled }: MagazynScreenProps) 
   const [filter, setFilter] = React.useState<StockFilter>("all");
   const [newOpen, setNewOpen] = React.useState(false);
   const [historySku, setHistorySku] = React.useState<string | null>(null);
+  const [subItemsSku, setSubItemsSku] = React.useState<string | null>(null);
+  const [expanded, setExpanded] = React.useState<Set<string>>(new Set());
   const [highlightSku, setHighlightSku] = React.useState<string | null>(null);
   const rowRefs = React.useRef<Record<string, HTMLTableRowElement | null>>({});
 
@@ -299,11 +465,41 @@ export function MagazynScreen({ focusSku, onFocusHandled }: MagazynScreenProps) 
     };
   }, [focusSku, onFocusHandled]);
 
-  const visible = (data ?? []).filter((item) => {
-    if (filter === "low") return item.is_low_stock;
-    if (filter === "zero") return item.stock === 0;
-    return true;
-  });
+  const items = React.useMemo(() => data ?? [], [data]);
+
+  /** Podprodukty pogrupowane po SKU produktu glownego. */
+  const subItemsByParent = React.useMemo(() => {
+    const grouped = new Map<string, StockItem[]>();
+    for (const item of items) {
+      if (!item.parent_sku) continue;
+      const bucket = grouped.get(item.parent_sku);
+      if (bucket) bucket.push(item);
+      else grouped.set(item.parent_sku, [item]);
+    }
+    return grouped;
+  }, [items]);
+
+  // "Wszystkie" pokazuje hierarchie (same produkty glowne i samodzielne).
+  // Filtry problemow pokazuja wszystko, co pasuje - lacznie z
+  // podproduktami, bo po to sie ich uzywa.
+  const visible =
+    filter === "all"
+      ? items.filter((item) => !item.parent_sku)
+      : items.filter((item) =>
+          filter === "low" ? item.is_low_stock : item.stock === 0
+        );
+
+  const subItemsParent =
+    subItemsSku === null ? null : (items.find((i) => i.sku === subItemsSku) ?? null);
+
+  function toggleExpanded(sku: string) {
+    setExpanded((previous) => {
+      const next = new Set(previous);
+      if (next.has(sku)) next.delete(sku);
+      else next.add(sku);
+      return next;
+    });
+  }
 
   if (tab === "links") {
     return (
@@ -379,9 +575,11 @@ export function MagazynScreen({ focusSku, onFocusHandled }: MagazynScreenProps) 
             <tbody>
               {visible.map((item) => {
                 const max = item.max_stock ?? Math.max(item.min_stock * 2, item.stock, 1);
+                const subItems = subItemsByParent.get(item.sku) ?? [];
+                const isExpanded = expanded.has(item.sku);
                 return (
+                  <React.Fragment key={item.sku}>
                   <tr
-                    key={item.sku}
                     ref={(element) => {
                       rowRefs.current[item.sku] = element;
                     }}
@@ -395,8 +593,41 @@ export function MagazynScreen({ focusSku, onFocusHandled }: MagazynScreenProps) 
                       }`}
                     >
                       <span className="flex items-center gap-2.5">
+                        {subItems.length > 0 ? (
+                          <button
+                            type="button"
+                            onClick={() => toggleExpanded(item.sku)}
+                            aria-expanded={isExpanded}
+                            aria-label={
+                              isExpanded
+                                ? `Zwiń podprodukty ${item.name}`
+                                : `Rozwiń podprodukty ${item.name}`
+                            }
+                            className="flex h-5 w-5 shrink-0 items-center justify-center rounded-[4px] text-slate-dim transition-colors duration-150 ease-ordly hover:bg-panel-2 hover:text-white"
+                          >
+                            <ChevronIcon
+                              size={13}
+                              className={`transition-transform duration-150 ease-ordly ${
+                                isExpanded ? "rotate-90" : ""
+                              }`}
+                            />
+                          </button>
+                        ) : (
+                          <span className="w-5 shrink-0" />
+                        )}
                         {item.is_low_stock && <Mascot pose="think" size={22} floaty={false} />}
                         {item.name}
+                        {subItems.length > 0 && (
+                          <span className="o-mono shrink-0 rounded-[5px] bg-teal-dim px-1.5 py-[1px] text-[10px] text-teal-bright">
+                            +{subItems.length}{" "}
+                            {subItems.length === 1 ? "podprodukt" : "podprodukty"}
+                          </span>
+                        )}
+                        {item.parent_sku ? (
+                          <span className="o-mono shrink-0 text-[10px] text-slate-dim">
+                            podprodukt {item.parent_sku}
+                          </span>
+                        ) : null}
                       </span>
                     </td>
                     <td className="o-mono border-b border-line px-3 py-3 text-[12px] text-slate">
@@ -420,14 +651,50 @@ export function MagazynScreen({ focusSku, onFocusHandled }: MagazynScreenProps) 
                     </td>
                     <td className="border-b border-line px-3 py-3">{statusPill(item)}</td>
                     <td className="border-b border-line px-[22px] py-3 text-right">
-                      <MiniButton
-                        icon={<ClockIcon size={13} />}
-                        onClick={() => setHistorySku(item.sku)}
-                      >
-                        Historia
-                      </MiniButton>
+                      <span className="flex items-center justify-end gap-1.5">
+                        {!item.parent_sku && (
+                          <MiniButton
+                            icon={<LinkIcon size={13} />}
+                            onClick={() => setSubItemsSku(item.sku)}
+                          >
+                            Podprodukty
+                          </MiniButton>
+                        )}
+                        <MiniButton
+                          icon={<ClockIcon size={13} />}
+                          onClick={() => setHistorySku(item.sku)}
+                        >
+                          Historia
+                        </MiniButton>
+                      </span>
                     </td>
                   </tr>
+                  {isExpanded &&
+                    subItems.map((sub) => (
+                      <tr key={sub.sku} className="bg-panel-2/40">
+                        <td className="border-b border-line py-2.5 pl-[52px] pr-[22px] text-[12.5px] text-slate">
+                          <span className="flex items-center gap-2.5">
+                            {sub.is_low_stock && (
+                              <Mascot pose="think" size={18} floaty={false} />
+                            )}
+                            {sub.name}
+                          </span>
+                        </td>
+                        <td className="o-mono border-b border-line px-3 py-2.5 text-[11.5px] text-slate-dim">
+                          {sub.sku}
+                        </td>
+                        <td className="o-mono border-b border-line px-3 py-2.5 text-[11.5px] text-slate">
+                          {sub.stock} szt.
+                        </td>
+                        <td
+                          className="border-b border-line px-3 py-2.5 text-[11px] text-slate-dim"
+                          colSpan={3}
+                        >
+                          Schodzi razem z „{item.name}"
+                        </td>
+                      </tr>
+                    ))}
+                  </React.Fragment>
                 );
               })}
             </tbody>
@@ -437,6 +704,11 @@ export function MagazynScreen({ focusSku, onFocusHandled }: MagazynScreenProps) 
 
       <NewProductModal open={newOpen} onClose={() => setNewOpen(false)} />
       <HistoryModal sku={historySku} onClose={() => setHistorySku(null)} />
+      <SubItemsModal
+        parent={subItemsParent}
+        items={items}
+        onClose={() => setSubItemsSku(null)}
+      />
     </div>
   );
 }

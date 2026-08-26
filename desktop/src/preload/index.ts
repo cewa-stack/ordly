@@ -21,6 +21,9 @@ const ordly = {
       sku: string,
       payload: { op: "set" | "add" | "remove" | "min"; quantity: number; reason?: string }
     ) => ipcRenderer.invoke("ordly:stock:adjust", sku, payload),
+    subItems: (sku: string) => ipcRenderer.invoke("ordly:stock:subItems", sku),
+    setParent: (sku: string, parentSku: string | null) =>
+      ipcRenderer.invoke("ordly:stock:setParent", sku, parentSku),
     recipes: () => ipcRenderer.invoke("ordly:stock:recipes"),
     unmappedOffers: () => ipcRenderer.invoke("ordly:stock:unmappedOffers"),
     setRecipe: (

@@ -526,6 +526,11 @@ class StockItemOut(BaseModel):
     is_low_stock: bool
     status: StockStatus
 
+    #: SKU produktu głównego, jeśli ten produkt jest podproduktem.
+    #: Lista magazynowa w desktopie chowa takie pozycje pod produktem
+    #: głównym, zamiast pokazywać je płasko obok niego.
+    parent_sku: str | None = None
+
 
 def stock_item_out(item: InventoryItem) -> StockItemOut:
     """Mapuje encję domenową `InventoryItem` na schemat odpowiedzi API."""
@@ -543,7 +548,19 @@ def stock_item_out(item: InventoryItem) -> StockItemOut:
         stock_value=item.stock_value,
         is_low_stock=item.is_low_stock,
         status=_stock_status(item),
+        parent_sku=item.parent_sku,
     )
+
+
+class StockSetParentIn(BaseModel):
+    """
+    Ciało żądania `PUT /api/v1/stock/{sku}/parent`.
+
+    `parent_sku=None` (albo pominięte pole) zdejmuje powiązanie -
+    produkt wraca na listę magazynową jako samodzielny.
+    """
+
+    parent_sku: str | None = None
 
 
 class StockCreateIn(BaseModel):

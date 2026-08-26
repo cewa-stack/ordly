@@ -36,7 +36,22 @@ class FakeInventoryRepository(InventoryRepository):
     async def create(self, item: InventoryItem) -> None:
         if item.sku in self.items:
             raise DuplicateInventoryItemError(item.sku)
+        if item.parent_sku is not None and item.parent_sku not in self.items:
+            raise InventoryItemNotFoundError(item.parent_sku)
         self.items[item.sku] = item
+
+    async def get_sub_items(self, parent_sku: str) -> list[InventoryItem]:
+        return sorted(
+            (i for i in self.items.values() if i.parent_sku == parent_sku),
+            key=lambda i: i.name,
+        )
+
+    async def set_parent(self, sku: str, parent_sku: str | None) -> None:
+        if sku not in self.items:
+            raise InventoryItemNotFoundError(sku)
+        if parent_sku is not None and parent_sku not in self.items:
+            raise InventoryItemNotFoundError(parent_sku)
+        self.items[sku] = replace(self.items[sku], parent_sku=parent_sku)
 
     async def set_stock(self, sku: str, new_stock: int) -> None:
         if sku not in self.items:

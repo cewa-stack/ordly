@@ -13,6 +13,7 @@ Podkomendy:
     /stock report               - raport magazynowy z prognozą
     /stock link OFERTA SKU [n]  - przypisz składnik oferty (zestawy)
     /stock unlink OFERTA        - usuń mapowanie oferty
+    /stock parent SKU GŁÓWNY    - podprodukt schodzący razem z produktem głównym
 """
 
 from __future__ import annotations
@@ -47,7 +48,8 @@ _USAGE_TEXT = (
     "/stock buy — lista zakupów\n"
     "/stock report — raport magazynowy\n"
     "/stock link [oferta] [SKU] [ilość] — składnik oferty\n"
-    "/stock unlink [oferta] — usuń mapowanie oferty"
+    "/stock unlink [oferta] — usuń mapowanie oferty\n"
+    "/stock parent [SKU] [produkt główny] — podprodukt (- odłącza)"
 )
 
 
@@ -79,6 +81,8 @@ async def handle_stock(
             await _link_offer(message, inventory_service, args[1:])
         elif subcommand == "unlink":
             await _unlink_offer(message, inventory_service, args[1:])
+        elif subcommand == "parent":
+            await _set_parent(message, inventory_service, args[1:])
         else:
             await message.answer(_USAGE_TEXT)
     except InventoryItemNotFoundError as exc:
@@ -273,6 +277,41 @@ async def _link_offer(message: Message, service: InventoryService, args: list[st
         f"🔗 Oferta <code>{html.quote(external_product_id)}</code> → "
         f"{quantity} × <code>{html.quote(sku)}</code>.\n"
         "Sprzedaż tej oferty będzie automatycznie zdejmować składnik z magazynu."
+    )
+
+
+async def _set_parent(message: Message, service: InventoryService, args: list[str]) -> None:
+    """
+    Wiąże podprodukt z produktem głównym: /stock parent SKU GŁÓWNY.
+
+    Myślnik w miejscu produktu głównego zdejmuje powiązanie. To jedyny
+    sposób, żeby zrobić to z czatu - a przydatny, bo podprodukt znika
+    z listy magazynowej w aplikacji desktopowej.
+    """
+    if len(args) != 2:
+        await message.answer(
+            "Podaj SKU podproduktu i SKU produktu głównego:\n"
+            "<code>/stock parent NAK10 BUT10</code>\n"
+            "Myślnik odłącza: <code>/stock parent NAK10 -</code>"
+        )
+        return
+
+    sku, parent = args[0], args[1]
+    if parent == "-":
+        await service.set_parent(sku, None)
+        await message.answer(
+            f"🔓 <code>{html.quote(sku)}</code> jest znowu samodzielnym produktem."
+        )
+        return
+
+    item = await service.set_parent(sku, parent)
+    sub_items = await service.get_sub_items(parent)
+    ile = "podprodukt" if len(sub_items) == 1 else "podprodukty"
+    await message.answer(
+        f"🔗 <code>{html.quote(item.sku)}</code> schodzi teraz razem z "
+        f"<code>{html.quote(parent)}</code> (razem {len(sub_items)} {ile}).\n"
+        "Sprzedaż produktu głównego zdejmie tyle samo sztuk podproduktu. "
+        "Ręczne korekty stanu ich nie ruszają."
     )
 
 

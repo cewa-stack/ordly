@@ -352,6 +352,15 @@ export function SparkIcon(props: IconProps) {
   );
 }
 
+/** Strzalka rozwijania - obracana przez CSS, wiec rysowana raz, w prawo. */
+export function ChevronIcon(props: IconProps) {
+  return (
+    <svg {...base(props)}>
+      <path d="m9 5 7 7-7 7" />
+    </svg>
+  );
+}
+
 export function ClockIcon(props: IconProps) {
   return (
     <svg {...base(props)}>

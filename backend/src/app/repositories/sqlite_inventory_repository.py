@@ -3,10 +3,12 @@
 from __future__ import annotations
 
 from datetime import datetime
+from typing import cast
 
-from sqlalchemy import delete, func, select, update
+from sqlalchemy import Select, delete, func, select, update
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import aliased
 
 from app.database.models.inventory_item_model import InventoryItemModel
 from app.database.models.inventory_movement_model import InventoryMovementModel
@@ -38,14 +40,51 @@ class SqliteInventoryRepository(InventoryRepository):
 
     async def get_all(self) -> list[InventoryItem]:
         """Zwraca wszystkie produkty magazynowe posortowane po nazwie."""
-        stmt = select(InventoryItemModel).order_by(InventoryItemModel.name)
+        stmt = self._select_items().order_by(InventoryItemModel.name)
         result = await self._session.execute(stmt)
-        return [self._to_domain(m) for m in result.scalars().all()]
+        return [self._to_domain(model, parent_sku) for model, parent_sku in result.all()]
 
     async def get_by_sku(self, sku: str) -> InventoryItem | None:
         """Zwraca produkt po SKU lub None, gdy nie istnieje."""
+        stmt = self._select_items().where(InventoryItemModel.sku == sku)
+        row = (await self._session.execute(stmt)).first()
+        if row is None:
+            return None
+        model, parent_sku = row
+        return self._to_domain(model, parent_sku)
+
+    async def get_sub_items(self, parent_sku: str) -> list[InventoryItem]:
+        """Zwraca podprodukty przypisane do danego produktu głównego."""
+        parent = aliased(InventoryItemModel)
+        stmt = (
+            select(InventoryItemModel)
+            .join(parent, InventoryItemModel.parent_item_id == parent.id)
+            .where(parent.sku == parent_sku)
+            .order_by(InventoryItemModel.name)
+        )
+        result = await self._session.execute(stmt)
+        return [self._to_domain(model, parent_sku) for model in result.scalars().all()]
+
+    async def set_parent(self, sku: str, parent_sku: str | None) -> None:
+        """
+        Wiąże produkt z produktem głównym albo zdejmuje to powiązanie.
+
+        Raises:
+            InventoryItemNotFoundError: Gdy `sku` albo `parent_sku` nie istnieje.
+        """
         model = await self._get_model_by_sku(sku)
-        return self._to_domain(model) if model else None
+        if model is None:
+            raise InventoryItemNotFoundError(sku)
+
+        parent_id: int | None = None
+        if parent_sku is not None:
+            parent = await self._get_model_by_sku(parent_sku)
+            if parent is None:
+                raise InventoryItemNotFoundError(parent_sku)
+            parent_id = parent.id
+
+        model.parent_item_id = parent_id
+        await self._session.flush()
 
     async def create(self, item: InventoryItem) -> None:
         """
@@ -56,7 +95,18 @@ class SqliteInventoryRepository(InventoryRepository):
 
         Raises:
             DuplicateInventoryItemError: Gdy SKU już istnieje.
+            InventoryItemNotFoundError: Gdy wskazany produkt główny nie istnieje.
         """
+        parent_id: int | None = None
+        if item.parent_sku is not None:
+            # Dziś żadna ścieżka nie tworzy produktu od razu jako
+            # podproduktu, ale encja to pole ma - ciche zgubienie go
+            # przy zapisie byłoby pułapką dla następnej zmiany.
+            parent = await self._get_model_by_sku(item.parent_sku)
+            if parent is None:
+                raise InventoryItemNotFoundError(item.parent_sku)
+            parent_id = parent.id
+
         model = InventoryItemModel(
             sku=item.sku,
             name=item.name,
@@ -68,6 +118,7 @@ class SqliteInventoryRepository(InventoryRepository):
             purchase_cost=item.purchase_cost,
             sale_price=item.sale_price,
             location=item.location,
+            parent_item_id=parent_id,
         )
         try:
             async with self._session.begin_nested():
@@ -153,9 +204,15 @@ class SqliteInventoryRepository(InventoryRepository):
         ]
 
     async def get_low_stock(self) -> list[InventoryItem]:
-        """Zwraca produkty, które osiągnęły minimalny stan magazynowy."""
+        """
+        Zwraca produkty, które osiągnęły minimalny stan magazynowy.
+
+        Podprodukty są tu równoprawne z produktami głównymi - kończące
+        się nakrętki trzeba dokupić tak samo jak butelki, mimo że lista
+        magazynowa chowa je pod produktem głównym.
+        """
         stmt = (
-            select(InventoryItemModel)
+            self._select_items()
             .where(
                 InventoryItemModel.min_stock > 0,
                 InventoryItemModel.stock <= InventoryItemModel.min_stock,
@@ -163,7 +220,7 @@ class SqliteInventoryRepository(InventoryRepository):
             .order_by(InventoryItemModel.name)
         )
         result = await self._session.execute(stmt)
-        return [self._to_domain(m) for m in result.scalars().all()]
+        return [self._to_domain(model, parent_sku) for model, parent_sku in result.all()]
 
     async def get_sales_since(self, since: datetime) -> dict[str, int]:
         """Sumuje sprzedane sztuki (ruchy o źródle 'order') od podanej daty."""
@@ -332,7 +389,29 @@ class SqliteInventoryRepository(InventoryRepository):
         return result.scalar_one_or_none()
 
     @staticmethod
-    def _to_domain(model: InventoryItemModel) -> InventoryItem:
+    def _select_items() -> Select[tuple[InventoryItemModel, str | None]]:
+        """
+        Zapytanie o produkty wraz z SKU produktu głównego.
+
+        LEFT JOIN po tej samej tabeli, bo encja domenowa mówi
+        `parent_sku`, a w bazie leży `parent_item_id`. Bez tego joinu
+        każdy odczyt listy musiałby dociągać rodzica osobnym zapytaniem
+        na wiersz.
+        """
+        parent = aliased(InventoryItemModel)
+        # `cast` zamiast wnioskowania: kolumna `sku` jest NOT NULL, więc
+        # SQLAlchemy typuje ją jako `str` - ale LEFT JOIN zwraca dla niej
+        # NULL przy każdym produkcie bez produktu głównego. Prawdą jest
+        # typ z adnotacji, nie ten z modelu.
+        return cast(
+            "Select[tuple[InventoryItemModel, str | None]]",
+            select(InventoryItemModel, parent.sku).outerjoin(
+                parent, InventoryItemModel.parent_item_id == parent.id
+            ),
+        )
+
+    @staticmethod
+    def _to_domain(model: InventoryItemModel, parent_sku: str | None = None) -> InventoryItem:
         """Mapuje model ORM na encję domenową InventoryItem."""
         return InventoryItem(
             sku=model.sku,
@@ -345,4 +424,5 @@ class SqliteInventoryRepository(InventoryRepository):
             purchase_cost=model.purchase_cost,
             sale_price=model.sale_price,
             location=model.location,
+            parent_sku=parent_sku,
         )

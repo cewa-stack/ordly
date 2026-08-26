@@ -21,6 +21,12 @@ export interface StockItem {
   stock_value: number;
   is_low_stock: boolean;
   status: StockStatus;
+  /**
+   * SKU produktu glownego, jesli ten produkt jest podproduktem.
+   * Lista magazynowa pokazuje tylko wiersze z `null` - podprodukty
+   * chowaja sie pod produktem glownym, po rozwinieciu.
+   */
+  parent_sku: string | null;
 }
 
 export interface StockAdjustPayload {
