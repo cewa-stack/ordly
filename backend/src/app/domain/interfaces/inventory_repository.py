@@ -83,6 +83,30 @@ class InventoryRepository(ABC):
         raise NotImplementedError
 
     @abstractmethod
+    async def get_sub_items(self, parent_sku: str) -> list[InventoryItem]:
+        """
+        Zwraca podprodukty przypisane do danego produktu głównego.
+
+        Pusta lista, gdy produkt nie ma podproduktów albo w ogóle nie
+        istnieje - to zapytanie o listę, nie o konkretny rekord.
+        """
+        raise NotImplementedError
+
+    @abstractmethod
+    async def set_parent(self, sku: str, parent_sku: str | None) -> None:
+        """
+        Ustawia lub czyści (parent_sku=None) produkt główny dla danego SKU.
+
+        Repozytorium sprawdza wyłącznie istnienie obu produktów. Reguły
+        biznesowe (brak samoprzypisania, jeden poziom zagnieżdżenia)
+        pilnuje `InventoryService.set_parent`.
+
+        Raises:
+            InventoryItemNotFoundError: Gdy `sku` albo `parent_sku` nie istnieje.
+        """
+        raise NotImplementedError
+
+    @abstractmethod
     async def get_offer_links(
         self, marketplace: str, external_product_id: str
     ) -> list[OfferComponent]:

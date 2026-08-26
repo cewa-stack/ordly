@@ -50,6 +50,8 @@ export interface OrdlyBridge {
     create: (payload: StockCreatePayload) => Promise<BridgeResult<StockItem>>;
     history: (sku: string) => Promise<BridgeResult<StockMovement[]>>;
     adjust: (sku: string, payload: StockAdjustPayload) => Promise<BridgeResult<StockItem>>;
+    subItems: (sku: string) => Promise<BridgeResult<StockItem[]>>;
+    setParent: (sku: string, parentSku: string | null) => Promise<BridgeResult<StockItem>>;
     recipes: () => Promise<BridgeResult<OfferRecipe[]>>;
     unmappedOffers: () => Promise<BridgeResult<UnmappedOffer[]>>;
     setRecipe: (

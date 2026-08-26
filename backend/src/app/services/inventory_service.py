@@ -143,6 +143,62 @@ class InventoryService:
         """
         return await self._repository.get_low_stock()
 
+    async def get_sub_items(self, sku: str) -> list[InventoryItem]:
+        """
+        Zwraca podprodukty danego produktu głównego (pusta lista, gdy brak).
+
+        Raises:
+            InventoryItemNotFoundError: Gdy produkt główny nie istnieje -
+                pusta lista dla nieistniejącego SKU udawałaby, że produkt
+                jest, tylko nie ma podproduktów.
+        """
+        await self._require_item(sku)
+        return await self._repository.get_sub_items(sku)
+
+    async def set_parent(self, sku: str, parent_sku: str | None) -> InventoryItem:
+        """
+        Ustawia produkt główny dla podanego SKU (albo czyści, gdy None).
+
+        Od tej chwili stan `sku` porusza się w parze ze stanem produktu
+        głównego przy każdej sprzedaży - proporcja zawsze 1:1, bez
+        mnożników. Ręczne korekty stanu produktu głównego (`/stock
+        add|remove|set`) podproduktów NIE ruszają: inwentaryzację i
+        dostawy liczy się osobno dla każdego SKU.
+
+        Zagnieżdżenie jest jednopoziomowe i egzekwowane tutaj, a nie
+        w interfejsie - UI może tylko schować niedozwolone opcje, ale
+        API stoi otworem dla bota i skryptów.
+
+        Raises:
+            InventoryItemNotFoundError: Gdy `sku` albo `parent_sku` nie istnieje.
+            ValueError: Gdy powiązanie łamie regułę jednego poziomu
+                zagnieżdżenia albo produkt wskazuje sam na siebie.
+        """
+        item = await self._require_item(sku)
+        if parent_sku is None:
+            await self._repository.set_parent(sku, None)
+            return replace(item, parent_sku=None)
+
+        if sku == parent_sku:
+            raise ValueError("Produkt nie może być swoim własnym produktem głównym")
+
+        parent = await self._require_item(parent_sku)
+        if parent.parent_sku is not None:
+            raise ValueError(
+                f"Produkt {parent.sku} sam jest podproduktem "
+                f"({parent.parent_sku}) - zagnieżdżenie jest jednopoziomowe"
+            )
+
+        own_sub_items = await self._repository.get_sub_items(sku)
+        if own_sub_items:
+            raise ValueError(
+                f"Produkt {sku} ma własne podprodukty "
+                f"({len(own_sub_items)}) i nie może jednocześnie być podproduktem"
+            )
+
+        await self._repository.set_parent(sku, parent_sku)
+        return replace(item, parent_sku=parent_sku)
+
     async def link_offer(
         self, marketplace: str, external_product_id: str, sku: str, quantity: int
     ) -> None:

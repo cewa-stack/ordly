@@ -1,6 +1,6 @@
 # ORDLY — wdrożenie zmian z 26 sierpnia 2026
 
-Ta paczka to pięć rzeczy naraz:
+Ta paczka to sześć rzeczy naraz:
 
 1. **Dyskusje** — wiadomości były ułożone od najnowszej i pokazywały surowe
    `<br>` oraz `<strong>` jako tekst.
@@ -16,10 +16,13 @@ Ta paczka to pięć rzeczy naraz:
    w ogóle nie zwraca.
 5. **Powiadomienia push** — koniec z `<b>` na ekranie blokady, wszystkie
    treści skrócone do „ile, czego, za ile”.
+6. **Produkty główne i podprodukty** — butelka sprzedaje się razem
+   z nakrętką i kroplomierzem, więc ich stany schodzą teraz same, bez
+   wpisywania trzech składników do każdej receptury. Patrz CZĘŚĆ F.
 
 > **Kolejność ma znaczenie.** CZĘŚĆ A (GitHub) → CZĘŚĆ B (Pi) →
 > CZĘŚĆ C (telefon) → CZĘŚĆ D (komputer) → CZĘŚĆ E (powiązanie ofert
-> Allegro Lokalnie). Aplikacje pytają backend o rzeczy, których stara wersja
+> Allegro Lokalnie) → CZĘŚĆ F (podprodukty). Aplikacje pytają backend o rzeczy, których stara wersja
 > na Pi jeszcze nie zna — bez aktualizacji Pi ekran Poczty pokaże błąd 404.
 
 ---
@@ -50,8 +53,11 @@ git add backend desktop mobile docs
 ### A4. Zrób commit
 
 ```bash
-git commit -m "Naprawa dyskusji, poczty i powiadomien push + Allegro Lokalnie i push o nowej dyskusji"
+git commit -m "Produkty glowne i podprodukty w magazynie"
 ```
+
+Jeśli `git status --short` w kroku A2 nic nie pokazał, poprzednia paczka
+jest już zacommitowana — pomiń A3 i A4, idź od razu do A5.
 
 ### A5. Wypchnij na GitHub
 
@@ -134,6 +140,10 @@ MAIL_WATCH_SENDERS=allegro,olx
 Zapisz i wyjdź: `Ctrl+O`, `Enter`, `Ctrl+X`.
 
 ### B7. Wykonaj migrację bazy
+
+Ta paczka niesie DWIE migracje: `0008` (rozdzielenie kanału Allegro
+Lokalnie od Allegro.pl) i `0009` (kolumna produktu głównego
+w magazynie). Polecenie poniżej wykonuje obie za jednym razem.
 
 Migracja `0008` nie zmienia struktury tabel — poprawia **dane**: maile
 z Allegro Lokalnie zapisane wcześniej pod etykietą „Allegro” dostają własny
@@ -397,6 +407,198 @@ nie ruszyły magazynu. Bez tego stany będą zawyżone o tamtą sprzedaż.
 - **Nie ma anulowania ani zwrotów.** Mail o anulowaniu nie tworzy dziś korekty
   stanów; gdyby taka sytuacja wystąpiła, stan trzeba poprawić ręcznie
   w Magazynie. Nie mam próbki takiego maila, więc nie zgaduję jego formatu.
+
+---
+
+## CZĘŚĆ F — produkty główne i podprodukty
+
+Do tej pory, żeby sprzedaż butelki zdejmowała też nakrętkę i kroplomierz,
+trzeba było wpisać wszystkie trzy do receptury KAŻDEJ oferty osobno.
+Od teraz relacja jest własnością samego produktu: ustawiasz ją raz,
+a działa przy każdej ofercie i w każdym serwisie.
+
+---
+
+### F0. Skrót: masz już wdrożone A–E
+
+Ta zmiana dotyka tylko backendu i aplikacji na komputerze. Poniżej pełna
+lista kroków — **CZĘŚĆ C (telefon) odpada w całości**, bo aplikacja
+mobilna nie zmieniła się ani o linijkę.
+
+**Kolejność jest ważna: najpierw Pi, potem komputer.** Nowy ekran Magazynu
+korzysta z endpointów, których stary backend nie zna.
+
+#### 1. Komputer — wypchnij zmiany
+
+```bash
+cd C:\Users\kukil\Desktop\Projects\toom
+```
+
+```bash
+git add backend desktop docs
+```
+
+```bash
+git commit -m "Produkty glowne i podprodukty w magazynie"
+```
+
+```bash
+git push origin main
+```
+
+#### 2. Pi — pobierz i zmigruj
+
+```bash
+ssh cewastack2@cewastack2
+```
+
+```bash
+cd ~/ordly/backend
+```
+
+```bash
+git pull
+```
+
+```bash
+uv run alembic upgrade head
+```
+
+Ma wypisać dokładnie jedną linię:
+`Running upgrade 0008 -> 0009, add parent_item_id to inventory_items`.
+
+Jeśli wypisze też `0007 -> 0008` — poprzednia paczka nie była wdrożona
+i właśnie się dołożyła. Nic złego, obie migracje są bezpieczne.
+
+**`uv sync` nie jest potrzebne** — ta zmiana nie dokłada żadnej biblioteki.
+
+```bash
+sudo systemctl restart ordly
+```
+
+```bash
+sudo systemctl status ordly --no-pager
+```
+
+Szukasz `Active: active (running)`.
+
+#### 3. Pi — sprawdź, że nowe endpointy odpowiadają
+
+Weź token (jak w kroku B10):
+
+```bash
+curl -s -X POST http://localhost:8000/api/v1/auth/login -H "Content-Type: application/json" -d '{"username":"admin","password":"admin"}'
+```
+
+```bash
+TOKEN=TU_TOKEN
+```
+
+Lista magazynowa ma teraz nieść pole `parent_sku` przy każdym produkcie:
+
+```bash
+curl -s -H "Authorization: Bearer $TOKEN" http://localhost:8000/api/v1/stock | python3 -m json.tool | grep -m3 parent_sku
+```
+
+Jeśli `grep` nic nie zwróci, backend nadal chodzi na starym kodzie —
+wróć do kroku 2.
+
+```bash
+exit
+```
+
+#### 4. Komputer — przebuduj aplikację
+
+```bash
+cd C:\Users\kukil\Desktop\Projects\toom\desktop
+```
+
+```bash
+npm run dist
+```
+
+Zainstaluj `desktop\release\ORDLY-Setup-0.1.0.exe`. Jeśli wyskoczy
+`EBUSY: resource busy or locked`, zamknij działającą aplikację:
+
+```bash
+taskkill /IM ORDLY.exe /F
+```
+
+#### 5. Sprawdź w aplikacji
+
+Otwórz **Magazyn → Produkty**. Lista ma wyglądać jak dotąd — każdy
+produkt osobno, bo żadnej relacji jeszcze nie ma. Przy każdym wierszu
+pojawił się nowy przycisk **Podprodukty**. Od tego momentu idź do F1.
+
+> Gdyby lista magazynowa była pusta, a wcześniej nie była: to znak, że
+> aplikacja rozmawia ze starym backendem. Wróć do kroku 2.
+
+---
+
+### Zasady, które warto znać zanim zaczniesz
+
+- **Proporcja zawsze 1:1.** Sto butelek to sto nakrętek. Nie ma pola
+  „ile sztuk na jedną" i nie będzie — dla zestawów typu „2 butelki
+  w komplecie" nadal służy ilość w recepturze oferty.
+- **Ręczna korekta NIE kaskaduje.** `/stock add BUT10 50`, stepper
+  w Magazynie i inwentaryzacja zmieniają stan tylko tego jednego SKU.
+  To celowe: nakrętki przyjeżdżają osobnym kartonem i liczy się je
+  osobno. Kaskada dotyczy wyłącznie sprzedaży, anulowania i zwrotu.
+- **Jeden poziom zagnieżdżenia.** Podprodukt nie może mieć własnych
+  podproduktów. Próba kończy się czytelnym błędem, nie zapisem.
+- **Podprodukty znikają z listy magazynowej**, ale zostają na liście
+  zakupów — kończące się nakrętki nadal Cię o sobie przypomną.
+
+### F1. Ustaw relację (raz na trójkę produktów)
+
+W aplikacji desktopowej: **Magazyn → Produkty**, wiersz produktu
+głównego → przycisk **Podprodukty** → wybierz produkt z listy → **Dodaj**.
+Ten sam modal służy do odłączania.
+
+Albo z Telegrama:
+
+```bash
+/stock parent NAK10 BUT10
+```
+
+Myślnik odłącza:
+
+```bash
+/stock parent NAK10 -
+```
+
+### F2. Uprość istniejące receptury (opcjonalnie, ale warto)
+
+Jeżeli masz już receptury wypisane po staremu — butelka, nakrętka
+i kroplomierz jako trzy składniki jednej oferty — **nic się nie psuje**:
+ORDLY wykrywa, że nakrętka jest już w recepturze, i nie odejmuje jej
+drugi raz przez kaskadę. Możesz jednak zostawić w recepturze sam produkt
+główny (Magazyn → Powiązania ofert → edycja) i mieć o dwie pozycje mniej
+do pilnowania przy każdej nowej ofercie.
+
+Stary, wieloskładnikowy sposób zostaje na stałe — jest potrzebny do
+prawdziwych zestawów, łączących niezależne produkty główne.
+
+### F3. Sprawdź, że działa
+
+Po pierwszej sprzedaży powiązanej oferty otwórz historię (ikona zegara
+w Magazynie) dla nakrętki. Powinien tam być wpis z tym samym numerem
+zamówienia co przy butelce i dopiskiem „(podprodukt: BUT10)".
+
+Z linii poleceń na Pi:
+
+```bash
+curl -s -H "Authorization: Bearer $TOKEN" "http://localhost:8000/api/v1/stock/BUT10/sub-items" | python3 -m json.tool
+```
+
+### Czego ta zmiana NIE robi
+
+- **Nie rusza aplikacji na telefonie.** Mobilny Magazyn to podgląd,
+  więc pokazuje nadal płaską listę — nakrętka i kroplomierz są tam
+  osobnymi pozycjami. Hierarchię widać w aplikacji na komputerze.
+- **Nie kaskaduje przy korekcie wstecznej** („Powiązania ofert →
+  korekta wsteczna"). Ta funkcja odejmuje sprzedaż sprzed powstania
+  receptury i rusza wyłącznie składniki wypisane w recepturze.
 
 ---
 

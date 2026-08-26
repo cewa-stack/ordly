@@ -13,6 +13,12 @@ class InventoryItem:
 
     `sku` jest unikalnym kluczem biznesowym produktu - to po nim
     odwołują się komendy /stock oraz mapowania ofert marketplace.
+
+    Produkt może mieć produkt główny (`parent_sku`) - wtedy jego stan
+    porusza się w parze ze stanem produktu głównego przy KAŻDEJ sprzedaży,
+    niezależnie od oferty i serwisu (butelka -> nakrętka, kroplomierz).
+    Zagnieżdżenie jest jednopoziomowe: podprodukt nie może mieć własnych
+    podproduktów. Pilnuje tego `InventoryService.set_parent`.
     """
 
     sku: str
@@ -25,6 +31,11 @@ class InventoryItem:
     purchase_cost: Decimal | None = None
     sale_price: Decimal | None = None
     location: str | None = None
+
+    #: SKU produktu głównego, jeśli ten produkt jest podproduktem.
+    #: Encja adresuje produkt główny po SKU, nie po identyfikatorze
+    #: bazodanowym - tak jak cała reszta kodu, która nigdy nie widzi ID.
+    parent_sku: str | None = None
 
     @property
     def is_low_stock(self) -> bool:

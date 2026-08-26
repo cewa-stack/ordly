@@ -4,7 +4,9 @@ aplikacji mobilnej (Inventory Management System).
 
 Uwaga o kolejności tras: `/stock/report` i `/stock/shopping-list` muszą
 być zadeklarowane PRZED `/stock/{sku}`, z tego samego powodu co w
-`orders.py`.
+`orders.py`. Dotyczy to wyłącznie tras o TEJ SAMEJ liczbie segmentów -
+`/stock/{sku}/sub-items` czy `/stock/{sku}/parent` nie kolidują
+z niczym, bo ostatni segment jest w nich literałem.
 """
 
 from __future__ import annotations
@@ -25,6 +27,7 @@ from app.api.schemas import (
     StockLinkIn,
     StockMovementOut,
     StockReportOut,
+    StockSetParentIn,
     UnmappedOfferOut,
     backfill_plan_out,
     offer_recipe_out,
@@ -270,3 +273,36 @@ async def get_stock_history(
     inventory_service = container.inventory_service(session)
     movements = await inventory_service.get_history(sku, limit)
     return [stock_movement_out(m) for m in movements]
+
+
+@router.get("/stock/{sku}/sub-items", response_model=list[StockItemOut])
+async def get_stock_sub_items(
+    container: Annotated[Container, Depends(get_container)],
+    session: Annotated[AsyncSession, Depends(get_session)],
+    sku: str,
+) -> list[StockItemOut]:
+    """Podprodukty przypisane do produktu głównego (butelka -> nakrętka)."""
+    inventory_service = container.inventory_service(session)
+    items = await inventory_service.get_sub_items(sku)
+    return [stock_item_out(i) for i in items]
+
+
+@router.put("/stock/{sku}/parent", response_model=StockItemOut)
+async def set_stock_parent(
+    container: Annotated[Container, Depends(get_container)],
+    session: Annotated[AsyncSession, Depends(get_session)],
+    sku: str,
+    payload: StockSetParentIn,
+) -> StockItemOut:
+    """
+    Ustawia produkt główny dla danego SKU albo zdejmuje powiązanie
+    (`parent_sku: null`).
+
+    Złamanie reguły jednego poziomu zagnieżdżenia kończy się kodem 422
+    z czytelnym komunikatem - `InventoryService` rzuca `ValueError`,
+    a globalny handler z `api/errors.py` mapuje go tak jak każdą inną
+    walidację w ORDLY.
+    """
+    inventory_service = container.inventory_service(session)
+    item = await inventory_service.set_parent(sku, payload.parent_sku)
+    return stock_item_out(item)

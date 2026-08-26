@@ -440,6 +440,12 @@ export function PowiazaniaOfertView() {
       {!isLoading && (
         <section>
           <SectionLabel>Powiązane oferty</SectionLabel>
+          <p className="mt-2 mb-1 text-[12px] leading-[1.6] text-slate-dim">
+            Jeśli oferta sprzedaje produkt złożony z podproduktów (np. butelka
+            z nakrętką i kroplomierzem), wystarczy powiązać ją z samym produktem
+            głównym — podprodukty odejmą się automatycznie. Skonfigurujesz je
+            w Magazyn → Produkty → Podprodukty.
+          </p>
           {offerRecipes.length === 0 ? (
             <div className="mt-2">
               <EmptyState

@@ -185,6 +185,7 @@ Najważniejsze komendy:
 /stock buy                  # lista zakupów
 /stock history [SKU]        # historia zmian
 /stock link 12345678 PET60 2  # mapowanie oferty (zestawy)
+/stock parent NAK10 BUT10   # podprodukt (myślnik zamiast SKU odłącza)
 ```
 
 Oferty marketplace są dopasowywane do produktów magazynowych po
@@ -192,6 +193,28 @@ mapowaniu `/stock link` (obsługa zestawów wieloskładnikowych), a gdy go
 brak - po SKU równym identyfikatorowi produktu z oferty. Odejmowanie
 składników zestawu jest w pełni transakcyjne (savepoint) - błąd przy
 którymkolwiek składniku wycofuje całą operację.
+
+### Produkty główne i podprodukty
+
+Butelka 10 ml sprzedaje się zawsze z nakrętką i kroplomierzem, więc te
+dwa są jej **podproduktami**: przy każdej sprzedaży, anulowaniu i zwrocie
+ich stan zmienia się o dokładnie tyle samo sztuk, co stan butelki -
+niezależnie od oferty i serwisu. Receptura oferty wymienia wtedy sam
+produkt główny, a nie trzy pozycje.
+
+Dwie rzeczy, które łatwo pomylić z błędem:
+
+- **Ręczne korekty nie kaskadują.** `/stock add BUT10 50` zmienia stan
+  butelki i tylko butelki - dostawa nakrętek przyjeżdża osobnym kartonem
+  i liczy się ją osobno.
+- **Zagnieżdżenie jest jednopoziomowe.** Podprodukt nie może mieć
+  własnych podproduktów; próba kończy się błędem 422 z wyjaśnieniem.
+
+Relację ustawia się w aplikacji desktopowej (Magazyn → Produkty →
+Podprodukty) albo komendą `/stock parent`. Podprodukty znikają z głównej
+listy magazynowej i chowają się pod produktem głównym, ale **nadal
+pojawiają się na liście zakupów** - kończące się nakrętki trzeba dokupić
+tak samo jak butelki.
 
 ## Automatyzacje
 

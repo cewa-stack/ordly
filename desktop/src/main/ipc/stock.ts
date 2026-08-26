@@ -74,6 +74,31 @@ export function registerStockIpc(): void {
       })
   );
 
+  ipcMain.handle("ordly:stock:subItems", async (_event, sku: string) =>
+    toResult(async () => {
+      const session = requireSession();
+      return apiRequest(
+        session.baseUrl,
+        session.token,
+        `/api/v1/stock/${encodeURIComponent(sku)}/sub-items`
+      );
+    })
+  );
+
+  ipcMain.handle(
+    "ordly:stock:setParent",
+    async (_event, sku: string, parentSku: string | null) =>
+      toResult(async () => {
+        const session = requireSession();
+        return apiRequest(
+          session.baseUrl,
+          session.token,
+          `/api/v1/stock/${encodeURIComponent(sku)}/parent`,
+          { method: "PUT", body: { parent_sku: parentSku } }
+        );
+      })
+  );
+
   ipcMain.handle("ordly:stock:recipes", async () =>
     toResult(async () => {
       const session = requireSession();

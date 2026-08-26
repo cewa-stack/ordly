@@ -182,3 +182,96 @@ async def test_stock_sync_markers_are_unique(
     assert other is True
     assert await repository.was_processed("allegro", "ORDER-1", "DEDUCT") is True
     assert await repository.was_processed("allegro", "ORDER-2", "DEDUCT") is False
+
+
+class TestProduktGlownyIPodprodukty:
+    """
+    Relacja produkt główny -> podprodukt na PRAWDZIWEJ bazie.
+
+    W encji domenowej to `parent_sku`, a w tabeli `parent_item_id` -
+    jedno miejsce, gdzie repozytorium tłumaczy jedno na drugie. Fake
+    repozytorium tego tłumaczenia nie ma, więc błąd w joinie
+    zobaczyłby dopiero użytkownik.
+    """
+
+    @staticmethod
+    async def _magazyn(repository: SqliteInventoryRepository) -> None:
+        await repository.create(_make_item("BUT10", name="Butelka 10 ml", stock=500))
+        await repository.create(_make_item("NAK10", name="Nakrętka 10 ml", stock=500))
+        await repository.create(_make_item("KRO10", name="Kroplomierz 10 ml", stock=500))
+
+    async def test_set_parent_i_odczyt_podproduktow(
+        self, repository: SqliteInventoryRepository
+    ) -> None:
+        await self._magazyn(repository)
+
+        await repository.set_parent("NAK10", "BUT10")
+        await repository.set_parent("KRO10", "BUT10")
+
+        sub_items = await repository.get_sub_items("BUT10")
+        assert [i.sku for i in sub_items] == ["KRO10", "NAK10"]  # po nazwie
+        assert all(i.parent_sku == "BUT10" for i in sub_items)
+
+    async def test_get_by_sku_zwraca_parent_sku(
+        self, repository: SqliteInventoryRepository
+    ) -> None:
+        await self._magazyn(repository)
+        await repository.set_parent("NAK10", "BUT10")
+
+        assert (await repository.get_by_sku("NAK10")).parent_sku == "BUT10"
+        assert (await repository.get_by_sku("BUT10")).parent_sku is None
+
+    async def test_get_all_zwraca_parent_sku(
+        self, repository: SqliteInventoryRepository
+    ) -> None:
+        """Lista magazynowa desktopu grupuje wiersze po tym właśnie polu."""
+        await self._magazyn(repository)
+        await repository.set_parent("NAK10", "BUT10")
+
+        po_sku = {i.sku: i.parent_sku for i in await repository.get_all()}
+        assert po_sku == {"BUT10": None, "NAK10": "BUT10", "KRO10": None}
+
+    async def test_zdjecie_powiazania(self, repository: SqliteInventoryRepository) -> None:
+        await self._magazyn(repository)
+        await repository.set_parent("NAK10", "BUT10")
+
+        await repository.set_parent("NAK10", None)
+
+        assert (await repository.get_by_sku("NAK10")).parent_sku is None
+        assert await repository.get_sub_items("BUT10") == []
+
+    async def test_nieistniejacy_produkt_glowny(
+        self, repository: SqliteInventoryRepository
+    ) -> None:
+        await self._magazyn(repository)
+
+        with pytest.raises(InventoryItemNotFoundError):
+            await repository.set_parent("NAK10", "NIE-MA")
+
+    async def test_nieistniejacy_podprodukt(
+        self, repository: SqliteInventoryRepository
+    ) -> None:
+        await self._magazyn(repository)
+
+        with pytest.raises(InventoryItemNotFoundError):
+            await repository.set_parent("NIE-MA", "BUT10")
+
+    async def test_podprodukty_produktu_bez_podproduktow(
+        self, repository: SqliteInventoryRepository
+    ) -> None:
+        await self._magazyn(repository)
+
+        assert await repository.get_sub_items("BUT10") == []
+
+    async def test_low_stock_widzi_podprodukty(
+        self, repository: SqliteInventoryRepository
+    ) -> None:
+        """Lista zakupów nie chowa nakrętek pod butelką."""
+        await self._magazyn(repository)
+        await repository.set_parent("NAK10", "BUT10")
+        await repository.set_stock("NAK10", 1)
+
+        niskie = await repository.get_low_stock()
+
+        assert [i.sku for i in niskie] == ["NAK10"]
+        assert niskie[0].parent_sku == "BUT10"
