@@ -22,6 +22,7 @@ import {
 } from "../components/ui";
 import { useToast } from "../lib/toast";
 import { formatAge, formatDateTime } from "../lib/format";
+import { htmlToPlainText, looksLikeHtml, sanitizeMessageHtml } from "../lib/sanitizeHtml";
 import type { Issue } from "../types/api";
 
 /**
@@ -66,6 +67,43 @@ const TEMPLATES: { name: string; text: string }[] = [
     text: "Dzień dobry,\n\nzwrot przyjęty. Zwrot środków uruchamiam po odbiorze przesyłki - księgowanie zajmuje zwykle 2-3 dni robocze.\n\nPozdrawiam",
   },
 ];
+
+/**
+ * Tresc jednej wiadomosci w watku.
+ *
+ * Komunikaty systemowe Allegro ("Dyskusja trwa juz 14 dni...") przychodza
+ * jako HTML, wiec renderowane jako zwykly tekst pokazywaly uzytkownikowi
+ * doslowne `<br>` i `<strong>`. Wiadomosci wpisane przez czlowieka to z
+ * kolei czysty tekst ze znakami nowej linii - dla nich zostaje
+ * `whitespace-pre-wrap`, bo przepuszczenie ich przez parser HTML
+ * zjadloby te znaki.
+ */
+function MessageBody({ text }: { text: string }) {
+  const html = React.useMemo(
+    () => (looksLikeHtml(text) ? sanitizeMessageHtml(text) : null),
+    [text]
+  );
+
+  if (!text.trim()) {
+    return <p className="whitespace-pre-wrap">(wiadomość bez treści)</p>;
+  }
+  if (html === null) {
+    return <p className="whitespace-pre-wrap">{text}</p>;
+  }
+  return <div className="o-html-preview" dangerouslySetInnerHTML={{ __html: html }} />;
+}
+
+/**
+ * Dwuliniowy podglad watku na liscie - zawsze czysty tekst.
+ *
+ * Opis dyskusji potrafi przyjsc z Allegro z tymi samymi znacznikami co
+ * tresc wiadomosci, a `<br>` w podgladzie wyglada jak blad aplikacji.
+ */
+function issuePreview(issue: Issue): string {
+  const raw = issue.description ?? issue.subject ?? "";
+  const text = looksLikeHtml(raw) ? htmlToPlainText(raw) : raw;
+  return text.trim() || "Bez treści";
+}
 
 function useIssues() {
   return useQuery({
@@ -159,7 +197,7 @@ function Conversation({ issue }: { issue: Issue }) {
                   : "rounded-tl-[4px] bg-panel-2 text-white"
               }`}
             >
-              <p className="whitespace-pre-wrap">{message.text || "(wiadomość bez treści)"}</p>
+              <MessageBody text={message.text} />
               <span className="o-mono mt-1.5 block text-[9.5px] text-slate-dim">
                 {isSeller ? "Ty" : message.author_login} ·{" "}
                 {formatDateTime(message.created_at)}
@@ -279,7 +317,7 @@ export function DiscussionsScreen() {
                   </span>
                 </span>
                 <span className="line-clamp-2 block text-[12.5px] leading-[1.5] text-slate">
-                  {issue.description ?? issue.subject ?? "Bez treści"}
+                  {issuePreview(issue)}
                 </span>
               </span>
               {issue.chat_active && (

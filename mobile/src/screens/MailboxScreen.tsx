@@ -25,6 +25,7 @@ import type { RootStackParamList } from "@/navigation/types";
 const SOURCE_FILTERS: { key: MailSource | "all"; label: string }[] = [
   { key: "all", label: "Wszystkie" },
   { key: "allegro", label: "Allegro" },
+  { key: "allegro_lokalnie", label: "Allegro Lokalnie" },
   { key: "olx", label: "OLX" },
 ];
 

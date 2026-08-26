@@ -69,6 +69,37 @@ class TestIssuesService:
         assert messages == [_SAMPLE_MESSAGE]
 
     @pytest.mark.asyncio
+    async def test_watek_jest_sortowany_chronologicznie(self, fake_marketplace_plugin):
+        """
+        Allegro oddaje czat od najnowszej wiadomości - serwis ma go
+        odwrócić, żeby UI czytało się jak komunikator (najstarsza u góry).
+        """
+        najnowsza = IssueMessage(
+            id="MSG-3",
+            text="Dziękuję, sprawa zamknięta.",
+            author_login="kupujacy_testowy",
+            author_role="BUYER",
+            created_at=datetime(2026, 7, 3, 9, 0, 0),
+        )
+        srodkowa = IssueMessage(
+            id="MSG-2",
+            text="Paczka poszła dziś rano.",
+            author_login="Ty",
+            author_role="SELLER",
+            created_at=datetime(2026, 7, 2, 8, 0, 0),
+        )
+        fake_marketplace_plugin.issue_messages_to_return = [
+            najnowsza,
+            srodkowa,
+            _SAMPLE_MESSAGE,
+        ]
+        service = IssuesService(fake_marketplace_plugin)
+
+        messages = await service.get_thread("ISSUE-1")
+
+        assert [m.id for m in messages] == ["MSG-1", "MSG-2", "MSG-3"]
+
+    @pytest.mark.asyncio
     async def test_wysyla_odpowiedz_przez_plugin(self, fake_marketplace_plugin):
         """reply() powinno przekazać issue_id i tekst do pluginu bez zmian."""
         service = IssuesService(fake_marketplace_plugin)

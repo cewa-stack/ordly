@@ -103,3 +103,36 @@ class MailNotConfiguredError(DomainError):
 
 class MailSendError(DomainError):
     """Wysyłka maila nie powiodła się (błąd połączenia/logowania SMTP)."""
+
+
+class MailboxNotConfiguredError(DomainError):
+    """
+    IMAP nie jest skonfigurowany w .env - skrzynka jest niedostępna.
+
+    Osobno od `MailNotConfiguredError`, bo tamten dotyczy WYSYŁKI (SMTP)
+    i podpowiada inne zmienne środowiskowe - wspólny komunikat wysyłałby
+    użytkownika do złej sekcji `.env`.
+    """
+
+    def __init__(self) -> None:
+        super().__init__(
+            "Skrzynka nie jest podłączona - ustaw IMAP_HOST/IMAP_USER/IMAP_PASS "
+            "w pliku .env na Raspberry Pi"
+        )
+
+
+class MailMessageNotFoundError(DomainError):
+    """
+    Maila nie ma już na serwerze IMAP, mimo że ORDLY zna jego metadane.
+
+    Normalna sytuacja: wiadomość została skasowana albo przeniesiona
+    poza INBOX w kliencie pocztowym. ORDLY trzyma tylko metadane, więc
+    treści nie ma skąd odtworzyć.
+    """
+
+    def __init__(self, message_id: str) -> None:
+        self.message_id = message_id
+        super().__init__(
+            f"Wiadomości {message_id} nie ma już w skrzynce - mogła zostać "
+            "usunięta lub przeniesiona poza INBOX"
+        )

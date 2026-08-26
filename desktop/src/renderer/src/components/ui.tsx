@@ -102,10 +102,15 @@ export function Chip({
 
 // --------------------------------------------------------- Odznaka kanalu
 
-export type MarketplaceCode = "allegro" | "amazon" | "olx" | "ebay";
+export type MarketplaceCode = "allegro" | "allegro_lokalnie" | "amazon" | "olx" | "ebay";
 
 const MARKETPLACE_STYLE: Record<MarketplaceCode, string> = {
   allegro: "bg-[rgba(255,133,99,.14)] text-coral",
+  // TEN SAM odcien co Allegro.pl (ta sama rodzina serwisow), ale
+  // slabszy - kanal bez API, w ktorym ORDLY tylko pokazuje. Amber jest
+  // zajety przez Amazon, a dwa kanaly w jednym kolorze przestalyby byc
+  // etykietami.
+  allegro_lokalnie: "bg-[rgba(255,133,99,.09)] text-[rgba(255,133,99,.72)]",
   amazon: "bg-[rgba(245,192,101,.14)] text-amber",
   olx: "bg-[rgba(167,155,255,.14)] text-violet",
   ebay: "bg-teal-dim text-teal-bright",
@@ -113,6 +118,10 @@ const MARKETPLACE_STYLE: Record<MarketplaceCode, string> = {
 
 const MARKETPLACE_LABEL: Record<MarketplaceCode, string> = {
   allegro: "Allegro",
+  // Badge ma 60 px w ukladzie listy - pelna nazwa "AllegroLokalnie"
+  // by sie nie zmiescila, a samo "AL" nic nie mowi. "Lokalnie" jest
+  // jednoznaczne obok sasiedniego "Allegro".
+  allegro_lokalnie: "Lokalnie",
   amazon: "Amazon",
   olx: "OLX",
   ebay: "eBay",
@@ -120,7 +129,11 @@ const MARKETPLACE_LABEL: Record<MarketplaceCode, string> = {
 
 function normalizeMarketplace(code: string): MarketplaceCode | null {
   const lower = code.toLowerCase();
-  return lower === "allegro" || lower === "amazon" || lower === "olx" || lower === "ebay"
+  return lower === "allegro" ||
+    lower === "allegro_lokalnie" ||
+    lower === "amazon" ||
+    lower === "olx" ||
+    lower === "ebay"
     ? lower
     : null;
 }
@@ -133,7 +146,7 @@ export function MarketplaceBadge({ marketplace }: { marketplace: string }) {
   const code = normalizeMarketplace(marketplace);
   return (
     <span
-      className={`o-mono w-[60px] shrink-0 rounded-[5px] px-1.5 py-[3.5px] text-center text-[9px] font-semibold uppercase tracking-[.05em] ${
+      className={`o-mono w-[68px] shrink-0 rounded-[5px] px-1.5 py-[3.5px] text-center text-[9px] font-semibold uppercase tracking-[.05em] ${
         code ? MARKETPLACE_STYLE[code] : "bg-panel-3 text-slate"
       }`}
     >

@@ -21,21 +21,109 @@ import {
 import { Mascot } from "../components/Mascot";
 import { useToast } from "../lib/toast";
 import { formatDateTime, formatTime } from "../lib/format";
+import { buildMailDocument, hasRemoteImages } from "../lib/mailDocument";
 import type { MailMessage } from "../types/api";
 
-type SourceFilter = "all" | "allegro" | "olx";
+type SourceFilter = "all" | "allegro" | "allegro_lokalnie" | "olx";
 
 const SOURCE_LABEL: Record<string, string> = {
   all: "Wszystkie",
   allegro: "Allegro",
+  allegro_lokalnie: "Allegro Lokalnie",
   olx: "OLX",
   other: "Inne",
 };
 
-/** Otwiera pelna tresc maila w Gmailu - ORDLY cache'uje tylko podglad. */
+/**
+ * Otwiera mail w Gmailu - juz nie jako jedyna droga do tresci, tylko
+ * jako wyjscie do pelnego klienta (obrazki, zalaczniki, odpowiadanie).
+ */
 function gmailSearchUrl(messageId: string): string {
   const cleaned = messageId.replace(/[<>]/g, "");
   return `https://mail.google.com/mail/u/0/#search/rfc822msgid:${encodeURIComponent(cleaned)}`;
+}
+
+/**
+ * Tresc maila - dociagana ze skrzynki dopiero przy otwarciu wiadomosci.
+ *
+ * W bazie na Pi leza wylacznie metadane i krotki podglad, wiec pelna
+ * tresc wymaga jednego zapytania do backendu (a tam: do IMAP). Stad
+ * wskaznik ladowania i zapasowe sciezki: gdy backend nie odpowie albo
+ * mail zniknal ze skrzynki, pokazujemy zapisany podglad zamiast pustego
+ * miejsca.
+ */
+function MailBody({ message }: { message: MailMessage }) {
+  const bodyQuery = useQuery({
+    queryKey: ["mail-body", message.message_id],
+    queryFn: async () => {
+      const result = await window.ordly.mailbox.body(message.message_id);
+      if (!result.ok) throw new Error(result.message);
+      return result.data;
+    },
+    retry: false,
+    staleTime: 5 * 60_000,
+  });
+
+  if (bodyQuery.isLoading) {
+    return (
+      <div className="flex min-h-0 flex-1 flex-col gap-2">
+        <span className="o-skeleton-bar h-4 w-[70%]" />
+        <span className="o-skeleton-bar h-4 w-[85%]" />
+        <span className="o-skeleton-bar h-4 w-[60%]" />
+      </div>
+    );
+  }
+
+  if (bodyQuery.isError) {
+    return (
+      <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto">
+        <div className="flex items-start gap-2 rounded-[9px] border border-line bg-panel-2 px-3.5 py-3 text-[12px] leading-[1.6] text-slate-dim">
+          <AlertIcon size={14} className="mt-[2px] shrink-0 text-amber" />
+          <span>
+            Nie udało się pobrać pełnej treści ze skrzynki.{" "}
+            {bodyQuery.error instanceof Error ? bodyQuery.error.message : ""} Poniżej
+            zapisany podgląd.
+          </span>
+        </div>
+        <p className="whitespace-pre-wrap text-[13px] leading-[1.72] text-slate">
+          {message.body_preview}
+        </p>
+      </div>
+    );
+  }
+
+  const html = bodyQuery.data?.html_body;
+  if (html) {
+    return (
+      <div className="flex min-h-0 flex-1 flex-col gap-2">
+        <iframe
+          key={message.message_id}
+          title="Treść wiadomości"
+          // Bez `allow-scripts` i bez `allow-same-origin`: skrypt z maila
+          // sie nie wykona, a `allow-popups` pozwala tylko na to, zeby
+          // klikniety link trafil do systemowej przegladarki.
+          sandbox="allow-popups allow-popups-to-escape-sandbox"
+          srcDoc={buildMailDocument(html)}
+          className="min-h-0 w-full flex-1 rounded-[9px] border border-line bg-white"
+        />
+        {hasRemoteImages(html) && (
+          <p className="shrink-0 text-[11px] leading-[1.5] text-slate-dim">
+            Obrazki z sieci są zablokowane - to zwykle piksele śledzące, które
+            potwierdzałyby nadawcy otwarcie wiadomości. Żeby je zobaczyć, otwórz mail w
+            Gmailu.
+          </p>
+        )}
+      </div>
+    );
+  }
+
+  return (
+    <div className="min-h-0 flex-1 overflow-y-auto">
+      <p className="whitespace-pre-wrap text-[13px] leading-[1.72] text-slate">
+        {bodyQuery.data?.plain_body || message.body_preview || "(wiadomość bez treści)"}
+      </p>
+    </div>
+  );
 }
 
 /** Nadawca w formie "Allegro <noreply@allegro.pl>" -> sama nazwa. */
@@ -222,7 +310,7 @@ export function MailboxScreen() {
   return (
     <div className="flex min-h-0 flex-1 flex-col">
       <div className="flex flex-wrap items-center gap-2 border-b border-line px-[22px] py-[11px]">
-        {(["all", "allegro", "olx"] as const).map((option) => (
+        {(["all", "allegro", "allegro_lokalnie", "olx"] as const).map((option) => (
           <Chip key={option} active={source === option} onClick={() => setSource(option)}>
             {SOURCE_LABEL[option]}
           </Chip>
@@ -296,7 +384,7 @@ export function MailboxScreen() {
             })}
           </div>
 
-          <div className="flex min-h-0 flex-col gap-4 overflow-y-auto px-6 py-[22px]">
+          <div className="flex min-h-0 flex-col gap-4 overflow-hidden px-6 py-[22px]">
             {!selected ? (
               <div className="flex flex-1 flex-col items-center justify-center gap-2 text-slate-dim">
                 <AlertIcon size={26} />
@@ -304,8 +392,8 @@ export function MailboxScreen() {
               </div>
             ) : (
               <>
-                <h3 className="o-section-title">{selected.subject || "(bez tematu)"}</h3>
-                <div className="flex items-center gap-2.5 border-b border-line pb-3.5">
+                <h3 className="o-section-title shrink-0">{selected.subject || "(bez tematu)"}</h3>
+                <div className="flex shrink-0 items-center gap-2.5 border-b border-line pb-3.5">
                   <InitialAvatar name={senderName(selected.sender)} />
                   <div className="min-w-0">
                     <div className="truncate text-[12.5px] text-white">
@@ -319,14 +407,18 @@ export function MailboxScreen() {
                     {formatDateTime(selected.received_at)}
                   </span>
                 </div>
-                <p className="whitespace-pre-wrap text-[13px] leading-[1.72] text-slate">
-                  {selected.body_preview || "(ORDLY zapisuje tylko podgląd treści)"}
-                </p>
+                {selected.source === "allegro_lokalnie" && (
+                  <p className="shrink-0 text-[11.5px] leading-[1.5] text-amber">
+                    Allegro Lokalnie nie ma API - ORDLY tylko o tym mówi. Zamówieniem
+                    zarządzasz na stronie serwisu.
+                  </p>
+                )}
+                <MailBody key={selected.message_id} message={selected} />
                 <a
                   href={gmailSearchUrl(selected.message_id)}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="inline-flex items-center gap-2 self-start rounded-[9px] border border-line bg-panel-2 px-3 py-2.5 text-[12px] text-slate transition-colors hover:border-line-strong hover:text-white"
+                  className="inline-flex shrink-0 items-center gap-2 self-start rounded-[9px] border border-line bg-panel-2 px-3 py-2.5 text-[12px] text-slate transition-colors hover:border-line-strong hover:text-white"
                 >
                   <ExternalIcon size={14} className="text-teal-bright" />
                   Otwórz pełną wiadomość w Gmail

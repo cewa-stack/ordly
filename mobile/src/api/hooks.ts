@@ -18,6 +18,7 @@ import type {
   Health,
   Issue,
   IssueMessage,
+  MailBody,
   MailMessage,
   MailSource,
   Order,
@@ -273,6 +274,23 @@ export function useMailMessages(source?: MailSource, unreadOnly = false) {
       const qs = params.toString();
       return api.get<MailMessage[]>(`/api/v1/mail/messages${qs ? `?${qs}` : ""}`);
     },
+  });
+}
+
+/**
+ * Pelna tresc jednego maila - zapytanie idzie do backendu dopiero przy
+ * otwarciu wiadomosci, bo tam konczy sie polaczeniem z IMAP. Stad
+ * `staleTime` na 5 minut: powrot do tej samej wiadomosci nie ma po co
+ * meczyc skrzynki drugi raz.
+ */
+export function useMailBody(messageId: string | undefined) {
+  return useQuery({
+    queryKey: ["mail-body", messageId],
+    queryFn: () =>
+      api.get<MailBody>(`/api/v1/mail/messages/${encodeURIComponent(messageId!)}/body`),
+    enabled: Boolean(messageId),
+    retry: false,
+    staleTime: 5 * 60_000,
   });
 }
 

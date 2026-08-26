@@ -12,6 +12,10 @@ import type { MailMessage } from "@/api/types";
 
 const SOURCE_LABEL: Record<string, string> = {
   allegro: "Allegro",
+  // Krótko, bo etykieta stoi w wąskiej pastylce obok tematu. Rozwinięcie
+  // ("Allegro Lokalnie - zarządzasz na stronie serwisu") jest na ekranie
+  // wiadomości, gdzie jest na nie miejsce.
+  allegro_lokalnie: "AL",
   olx: "OLX",
   other: "Inne",
 };

@@ -5,10 +5,23 @@ from __future__ import annotations
 from aiogram import Bot, html
 from loguru import logger
 
+from app.domain.entities.allegro_lokalnie_event import AllegroLokalnieEvent
+from app.domain.entities.dispute_notice import DisputeNotice
 from app.domain.entities.order import Order
 from app.domain.entities.order_return import OrderReturn
 from app.domain.interfaces.notifier import Notifier
 from app.shared.dto.reminder_dto import ShippingReminderData
+
+#: Nagłówki zdarzeń z Allegro Lokalnie - emoji + pogrubiona nazwa, tak
+#: jak reszta powiadomień bota. Telegram renderuje HTML, więc pogrubienie
+#: zostaje (w przeciwieństwie do Web Push, gdzie katalog daje czysty tekst).
+_ALLEGRO_LOKALNIE_HEADLINES = {
+    "new_order": "🛒 <b>Nowe zamówienie — Allegro Lokalnie</b>",
+    "order_status": "🔄 <b>Zmiana zamówienia — Allegro Lokalnie</b>",
+    "new_message": "💬 <b>Nowa wiadomość — Allegro Lokalnie</b>",
+    "interest": "👀 <b>Pytanie o ogłoszenie — Allegro Lokalnie</b>",
+    "unknown": "📩 <b>Powiadomienie z Allegro Lokalnie</b>",
+}
 
 
 class TelegramNotifier(Notifier):
@@ -133,6 +146,75 @@ class TelegramNotifier(Notifier):
             for order in orders
         )
         text = f"📦 <b>Aktualne zamówienia</b> ({len(orders)})\n\n{lines}"
+        await self.send_text(text)
+
+    async def notify_allegro_lokalnie(self, event: AllegroLokalnieEvent) -> None:
+        """
+        Zdarzenie z Allegro Lokalnie odczytane z powiadomienia e-mail.
+
+        Temat i fragment treści pochodzą z maila od obcego nadawcy, więc
+        idą przez `html.quote` - inaczej znak `<` w tytule ogłoszenia
+        wywróciłby parsowanie HTML po stronie Telegrama i wiadomość by
+        nie doszła.
+        """
+        headline = _ALLEGRO_LOKALNIE_HEADLINES.get(
+            event.event_type, _ALLEGRO_LOKALNIE_HEADLINES["unknown"]
+        )
+        ile = f"{event.quantity}× " if event.quantity else ""
+        wiersze = [headline, f"🛍️ {ile}{html.quote(event.opis)}"]
+        if event.amount is not None:
+            wiersze.append(f"💰 <b>{event.amount:.2f} zł</b>")
+        if event.buyer:
+            wiersze.append(f"👤 {html.quote(event.buyer)}")
+        text = "\n".join(wiersze) + (
+            "\n\n<i>Allegro Lokalnie nie ma API - tym zamówieniem zarządzasz "
+            "na stronie serwisu. ORDLY tylko o nim mówi.</i>"
+        )
+        await self.send_text(text)
+
+    async def notify_new_dispute(self, notice: DisputeNotice) -> None:
+        """
+        Kupujący rozpoczął dyskusję.
+
+        Login, powód i nazwa oferty pochodzą z maila od Allegro, więc idą
+        przez `html.quote` - bot wysyła z `parse_mode=HTML` i surowy `<`
+        w nazwie oferty wywróciłby parsowanie.
+        """
+        wiersze = [f"💬 <b>Nowa dyskusja</b> — {html.quote(notice.buyer_login)}"]
+        if notice.reason:
+            wiersze.append(f"❗ {html.quote(notice.reason)}")
+        if notice.offer_name:
+            wiersze.append(f"🛍️ {html.quote(notice.offer_name)}")
+        if notice.order_external_id:
+            wiersze.append(f"<code>#{html.quote(notice.order_external_id)}</code>")
+        if notice.respond_by is not None:
+            wiersze.append(
+                f"⏳ Odpowiedz do <b>{notice.respond_by.strftime('%d.%m.%Y %H:%M')}</b>, "
+                "inaczej Allegro włączy się do rozmowy."
+            )
+        await self.send_text("\n".join(wiersze))
+
+    async def notify_unmatched_products(
+        self, reference: str, product_names: list[str]
+    ) -> None:
+        """
+        Sprzedaż bez powiązania z magazynem - format BEZ ZMIAN względem
+        tego, co bot wysyłał dotąd.
+
+        Telegram renderuje HTML, więc pogrubienie i `<code>` z komendą do
+        skopiowania zostają - to one czynią tę wiadomość użyteczną na
+        desktopie. Zmiana dotyczyła wyłącznie kanału Web Push, gdzie ten
+        sam tekst wychodził jako surowe znaczniki.
+        """
+        products = "\n".join(f"• {html.quote(name)}" for name in product_names)
+        text = (
+            "⚠️ <b>Sprzedaż poza magazynem</b>\n"
+            f"Zamówienie {html.quote(reference)} zawiera pozycje bez powiązania "
+            "z magazynem, więc stany się nie zmieniły:\n"
+            f"{products}\n\n"
+            "Przypisz składniki w Magazyn → Powiązania ofert "
+            "(albo <code>/stock link [oferta] [SKU] [ilość]</code>)."
+        )
         await self.send_text(text)
 
     async def send_text(self, text: str) -> None:

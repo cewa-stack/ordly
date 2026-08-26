@@ -18,6 +18,7 @@ const DAY_LABELS = ["pon", "wt", "śr", "czw", "pt", "sob", "ndz"];
 
 const CHANNEL_COLOR: Record<string, string> = {
   allegro: "var(--coral)",
+  allegro_lokalnie: "rgba(255,133,99,.55)",
   amazon: "var(--amber)",
   olx: "var(--violet)",
   ebay: "var(--teal-bright)",

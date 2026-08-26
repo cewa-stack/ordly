@@ -4,7 +4,7 @@ import { requireSession } from "../lib/tokenStore";
 import { toResult } from "../lib/result";
 
 interface ListFilters {
-  source?: "allegro" | "olx" | "other";
+  source?: "allegro" | "allegro_lokalnie" | "olx" | "other";
   unreadOnly?: boolean;
 }
 
@@ -37,6 +37,17 @@ export function registerMailboxIpc(): void {
       return apiRequest(session.baseUrl, session.token, "/api/v1/mail/sync", {
         method: "POST",
       });
+    })
+  );
+
+  ipcMain.handle("ordly:mailbox:body", async (_event, messageId: string) =>
+    toResult(async () => {
+      const session = requireSession();
+      return apiRequest(
+        session.baseUrl,
+        session.token,
+        `/api/v1/mail/messages/${encodeURIComponent(messageId)}/body`
+      );
     })
   );
 

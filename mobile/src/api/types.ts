@@ -174,7 +174,7 @@ export interface IssueMessage {
   created_at: string;
 }
 
-export type MailSource = "allegro" | "olx" | "other";
+export type MailSource = "allegro" | "allegro_lokalnie" | "olx" | "other";
 
 export interface MailMessage {
   message_id: string;
@@ -184,4 +184,17 @@ export interface MailMessage {
   source: MailSource;
   body_preview: string;
   is_read: boolean;
+}
+
+/**
+ * Pełna treść maila, dociągana ze skrzynki dopiero przy otwarciu
+ * wiadomości - w bazie na Pi leżą wyłącznie metadane i krótki podgląd.
+ *
+ * `html_body` renderuje się w izolowanej ramce (PWA), `plain_body` jest
+ * wariantem zapasowym. Backend gwarantuje, że `plain_body` nie jest
+ * puste, jeśli mail ma jakąkolwiek treść (patrz `mail_body_out`).
+ */
+export interface MailBody {
+  html_body: string | null;
+  plain_body: string | null;
 }

@@ -30,14 +30,29 @@ class IssuesService:
             raise MarketplaceUnavailableError(str(exc)) from exc
 
     async def get_thread(self, issue_id: str) -> list[IssueMessage]:
-        """Zwraca wątek wiadomości pojedynczej dyskusji/reklamacji."""
+        """
+        Zwraca wątek wiadomości dyskusji/reklamacji w kolejności
+        chronologicznej - najstarsza pierwsza, najnowsza ostatnia.
+
+        Allegro zwraca `/sale/issues/{id}/chat` od najnowszej wiadomości
+        (typowe dla paginowanych API), czyli odwrotnie niż czyta się
+        rozmowę w komunikatorze. Sortowanie siedzi TUTAJ, a nie w każdym
+        kliencie z osobna: desktop i mobile dostają jedną, gotową
+        kolejność, więc kolejny ekran nie odziedziczy tego błędu przez
+        zapomniane `sort()`.
+
+        Wiadomości z identycznym `created_at` zachowują kolejność
+        z marketplace - stabilne `sorted()` nie ma czym ich rozstrzygnąć,
+        a zgadywanie byłoby gorsze niż zostawienie decyzji Allegro.
+        """
         try:
-            return await self._plugin.get_issue_messages(issue_id)
+            messages = await self._plugin.get_issue_messages(issue_id)
         except AllegroApiError as exc:
             logger.warning(
                 "Marketplace niedostępne przy pobieraniu wątku {}: {}", issue_id, exc
             )
             raise MarketplaceUnavailableError(str(exc)) from exc
+        return sorted(messages, key=lambda message: message.created_at)
 
     async def reply(self, issue_id: str, text: str) -> None:
         """Wysyła odpowiedź sprzedawcy w danej dyskusji/reklamacji."""

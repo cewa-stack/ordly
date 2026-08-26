@@ -150,9 +150,22 @@ export interface MailMessage {
   sender: string;
   subject: string;
   received_at: string;
-  source: "allegro" | "olx" | "other";
+  source: "allegro" | "allegro_lokalnie" | "olx" | "other";
   body_preview: string;
   is_read: boolean;
+}
+
+/**
+ * Pelna tresc maila, dociagana ze skrzynki dopiero przy otwarciu
+ * wiadomosci - w bazie na Pi leza wylacznie metadane i krotki podglad.
+ *
+ * `html_body` idzie do izolowanego `<iframe>`, `plain_body` jest
+ * wariantem zapasowym. Backend gwarantuje, ze `plain_body` nie jest
+ * puste, jesli mail ma jakakolwiek tresc (patrz `mail_body_out`).
+ */
+export interface MailBody {
+  html_body: string | null;
+  plain_body: string | null;
 }
 
 /**

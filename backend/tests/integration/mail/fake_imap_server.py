@@ -32,6 +32,10 @@ _MONTHS = {
 
 _FROM_RE = re.compile(r'FROM "([^"]*)"', re.IGNORECASE)
 _SINCE_RE = re.compile(r"SINCE (\S+)", re.IGNORECASE)
+# RFC 3501 dopuszcza nazwę nagłówka i jako atom, i w cudzysłowie - serwer
+# testowy przyjmuje oba warianty, żeby test nie utrwalał przypadkowego
+# wyboru składni po stronie watchera.
+_HEADER_RE = re.compile(r'HEADER "?([A-Za-z-]+)"? "([^"]*)"', re.IGNORECASE)
 _IMAP_DATE_RE = re.compile(r"^(\d{1,2})-([A-Za-z]{3})-(\d{4})$")
 
 
@@ -123,11 +127,15 @@ class FakeImapServer:
 
     def _search(self, command: str) -> list[int]:
         """
-        Filtruje wiadomości jak prawdziwy serwer: FROM to dopasowanie
-        PODCIĄGU nagłówka (nie równość adresu), SINCE porównuje daty.
+        Filtruje wiadomości jak prawdziwy serwer: FROM i HEADER to
+        dopasowanie PODCIĄGU nagłówka (nie równość), SINCE porównuje daty.
         """
         from_match = _FROM_RE.search(command)
         needle = from_match.group(1).lower() if from_match else ""
+
+        header_match = _HEADER_RE.search(command)
+        header_name = header_match.group(1).lower() if header_match else ""
+        header_needle = header_match.group(2).lower() if header_match else ""
 
         since_match = _SINCE_RE.search(command)
         since = parse_imap_date(since_match.group(1)) if since_match else None
@@ -140,6 +148,10 @@ class FakeImapServer:
             sender = str(message.get("From", "")).lower()
             if needle and needle not in sender:
                 continue
+            if header_name:
+                value = str(message.get(header_name, "")).lower()
+                if header_needle not in value:
+                    continue
             if since is not None:
                 received = email.utils.parsedate_to_datetime(str(message.get("Date")))
                 if received.date() < since:

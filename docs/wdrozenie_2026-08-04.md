@@ -1,5 +1,12 @@
 # ORDLY — wdrożenie zmian z 4 sierpnia 2026
 
+> **NIEAKTUALNE W JEDNYM MIEJSCU.** Krok A6 podaje
+> `MAIL_WATCH_SENDERS=allegro.pl,olx.pl` — ta wartość **nie łapie żadnych
+> maili z Allegro** (IMAP dopasowuje podciąg, a `allegro.pl` nie występuje
+> ani w `allegromail.pl`, ani w `allegrolokalnie.pl`). Poprawna wartość to
+> `allegro,olx` — patrz [wdrozenie_2026-08-26.md](wdrozenie_2026-08-26.md),
+> krok A6. Reszta tej instrukcji jest nadal aktualna.
+
 Ta instrukcja przeprowadza przez trzy rzeczy naraz:
 
 1. **naprawę Dyskusji** (wątki nie ładowały się po kliknięciu),
