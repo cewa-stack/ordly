@@ -11,6 +11,7 @@ import { colors } from "@/theme/colors";
 import { radii, spacing, typography } from "@/theme/typography";
 import { useIssueMessages, useIssues } from "@/api/hooks";
 import { ErrorState } from "@/components/ErrorState";
+import { RichText } from "@/components/RichText";
 import { Skeleton } from "@/components/Skeleton";
 import { Pill } from "@/components/Pill";
 import { issueStatusLabel, issueStatusTone } from "@/utils/format";
@@ -45,6 +46,7 @@ export function IssueDetailScreen() {
   const issues = useIssues();
   const messages = useIssueMessages(issueId);
   const issue = issues.data?.find((i: Issue) => i.external_id === issueId);
+  const threadRef = React.useRef<ScrollView>(null);
 
   if (messages.isPending) {
     return (
@@ -87,13 +89,21 @@ export function IssueDetailScreen() {
         </View>
       ) : null}
 
-      <ScrollView contentContainerStyle={styles.thread}>
+      {/* Konwencja komunikatora: najstarsza wiadomość u góry, najnowsza
+          na dole - a otwarcie wątku ma pokazywać właśnie tę najnowszą,
+          bez ręcznego przewijania przez całą historię. Backend oddaje
+          wątek już posortowany rosnąco (IssuesService.get_thread). */}
+      <ScrollView
+        ref={threadRef}
+        contentContainerStyle={styles.thread}
+        onContentSizeChange={() => threadRef.current?.scrollToEnd({ animated: false })}
+      >
         {(messages.data ?? []).map((message: IssueMessage) => {
           const isSeller = message.author_role === "SELLER";
           return (
             <View key={message.id} style={[styles.bubbleRow, isSeller && styles.bubbleRowSeller]}>
               <View style={[styles.bubble, isSeller ? styles.bubbleSeller : styles.bubbleBuyer]}>
-                <Text style={styles.bubbleText}>{message.text}</Text>
+                <RichText content={message.text} style={styles.bubbleText} />
                 <Text style={styles.bubbleMeta}>
                   {isSeller ? "Ty" : message.author_login} · {formatDateTime(message.created_at)}
                 </Text>

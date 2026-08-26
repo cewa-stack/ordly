@@ -205,6 +205,20 @@ input[type="number"]::-webkit-inner-spin-button {
     font-weight: 600;
     color: var(--white, #fff);
   }
+  /**
+   * Linki wystepuja tylko w tresci wiadomosci z dyskusji (sanityzator
+   * opisu oferty wycina `<a>`) - np. odnosnik do "Allegro Ochrona
+   * Kupujacych" w komunikacie systemowym. Maja wygladac na klikalne,
+   * a nie zlewac sie z reszta zdania.
+   */
+  .o-html-preview a {
+    color: var(--teal-bright);
+    text-decoration: underline;
+    text-underline-offset: 2px;
+  }
+  .o-html-preview a:hover {
+    color: var(--white);
+  }
 }
 
 @keyframes shimmer {

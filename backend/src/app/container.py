@@ -43,6 +43,7 @@ from app.repositories.sqlite_telegram_message_repository import (
     SqliteTelegramMessageRepository,
 )
 from app.repositories.sqlite_token_store import SqliteTokenStore
+from app.services.allegro_lokalnie_orders_service import AllegroLokalnieOrdersService
 from app.services.backup_service import BackupService
 from app.services.component_resolver import ComponentResolver
 from app.services.dashboard_service import DashboardService
@@ -160,7 +161,23 @@ class Container:
 
     def mailbox_service(self, session: AsyncSession) -> MailboxService:
         """Buduje MailboxService dla /api/v1/mail/messages (Skrzynka) i joba IMAP."""
-        return MailboxService(SqliteMailRepository(session), self._settings.mail_watch)
+        return MailboxService(
+            SqliteMailRepository(session),
+            self._settings.mail_watch,
+            event_bus=self.event_bus,
+        )
+
+    def allegro_lokalnie_orders_service(
+        self, session: AsyncSession
+    ) -> AllegroLokalnieOrdersService:
+        """
+        Buduje serwis zamówień z Allegro Lokalnie.
+
+        Korzysta z TEGO SAMEGO repozytorium zamówień co synchronizacja
+        Allegro.pl - sprzedaż z Lokalnie ma być normalnym zamówieniem,
+        a nie osobnym bytem obok.
+        """
+        return AllegroLokalnieOrdersService(SqliteOrderRepository(session))
 
     def ordlak_service(self, session: AsyncSession) -> OrdlakService:
         """Buduje OrdlakService dla /api/v1/ordlak/* (generator ofert AI)."""

@@ -8,6 +8,8 @@ from typing import Any
 
 from loguru import logger
 
+from app.domain.entities.allegro_lokalnie_event import AllegroLokalnieEvent
+from app.domain.entities.dispute_notice import DisputeNotice
 from app.domain.entities.order import Order
 from app.domain.entities.order_return import OrderReturn
 from app.domain.interfaces.notifier import Notifier
@@ -80,6 +82,22 @@ class CompositeNotifier(Notifier):
     async def send_text(self, text: str) -> None:
         """Rozgłasza dowolny tekst do wszystkich kanałów."""
         await self._run_all([n.send_text(text) for n in self._notifiers])
+
+    async def notify_allegro_lokalnie(self, event: AllegroLokalnieEvent) -> None:
+        """Rozgłasza zdarzenie z Allegro Lokalnie do wszystkich kanałów."""
+        await self._run_all([n.notify_allegro_lokalnie(event) for n in self._notifiers])
+
+    async def notify_new_dispute(self, notice: DisputeNotice) -> None:
+        """Rozgłasza informację o nowej dyskusji do wszystkich kanałów."""
+        await self._run_all([n.notify_new_dispute(notice) for n in self._notifiers])
+
+    async def notify_unmatched_products(
+        self, reference: str, product_names: list[str]
+    ) -> None:
+        """Rozgłasza ostrzeżenie o sprzedaży bez powiązania z magazynem."""
+        await self._run_all(
+            [n.notify_unmatched_products(reference, product_names) for n in self._notifiers]
+        )
 
     async def notify_sync_failed(self, channel: str, retry_in_minutes: int) -> None:
         """Rozgłasza alert o niedostępnym kanale sprzedaży."""

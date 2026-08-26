@@ -68,6 +68,11 @@ export const stockStatusColor: Record<StockStatus, string> = {
  */
 export const marketplaceColor: Record<string, { background: string; text: string }> = {
   allegro: { background: "#FFE7DE", text: "#C4523A" },
+  // Allegro Lokalnie: TEN SAM odcień co Allegro.pl (bo to ta sama
+  // rodzina serwisów), ale słabszy - kanał bez API, w którym ORDLY
+  // tylko pokazuje, a zarządza się na stronie. Amber jest zajęty przez
+  // Amazon, a dwa kanały w jednym kolorze przestałyby być etykietami.
+  allegro_lokalnie: { background: "#FFF1EC", text: "#D9765C" },
   amazon: { background: "#FBF0D8", text: "#9A6F22" },
   olx: { background: "#E9E7FE", text: "#5A4FD1" },
   ebay: { background: "#D9F0EC", text: "#166F72" },

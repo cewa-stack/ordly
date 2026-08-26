@@ -31,7 +31,11 @@ export type PushTarget =
  */
 export function resolvePushTarget(url: string): PushTarget | null {
   const path = url.split("?")[0].replace(/\/+$/, "");
-  const segments = path.split("/").filter(Boolean);
+  // Identyfikatory w ścieżce są zakodowane po stronie backendu
+  // (`push_payload.py`), bo Message-ID maila zawiera `<`, `>` i `@`.
+  // Bez odkodowania ekran szczegółów szukałby wiadomości o adresie
+  // `%3Cabc%40...%3E` i nie znalazłby jej nigdy.
+  const segments = path.split("/").filter(Boolean).map(safeDecode);
 
   if (segments.length === 0) return null;
 
@@ -67,6 +71,15 @@ export function resolvePushTarget(url: string): PushTarget | null {
   }
 
   return null;
+}
+
+/** Uszkodzone kodowanie procentowe nie może wywrócić nawigacji z powiadomienia. */
+function safeDecode(segment: string): string {
+  try {
+    return decodeURIComponent(segment);
+  } catch {
+    return segment;
+  }
 }
 
 type NavigateHandler = (target: PushTarget) => void;

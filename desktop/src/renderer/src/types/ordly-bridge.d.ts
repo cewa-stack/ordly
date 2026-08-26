@@ -5,6 +5,7 @@ import type {
   HealthStatus,
   Issue,
   IssueMessage,
+  MailBody,
   MailboxStatus,
   MailMessage,
   MailSyncResult,
@@ -94,11 +95,12 @@ export interface OrdlyBridge {
   };
   mailbox: {
     list: (filters: {
-      source?: "allegro" | "olx" | "other";
+      source?: "allegro" | "allegro_lokalnie" | "olx" | "other";
       unreadOnly?: boolean;
     }) => Promise<BridgeResult<MailMessage[]>>;
     status: () => Promise<BridgeResult<MailboxStatus>>;
     sync: () => Promise<BridgeResult<MailSyncResult>>;
+    body: (messageId: string) => Promise<BridgeResult<MailBody>>;
     markRead: (messageId: string) => Promise<BridgeResult<null>>;
   };
   ordlak: {

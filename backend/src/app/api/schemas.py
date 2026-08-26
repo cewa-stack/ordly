@@ -22,6 +22,7 @@ from app.domain.entities.order import Order
 from app.domain.entities.order_return import ReturnRecord
 from app.domain.entities.ordlak_generation import OrdlakGeneration, PriceBreakdown
 from app.domain.entities.shipment import Shipment
+from app.infrastructure.mail.mime import MailBodies, html_to_plain_text
 from app.repositories.sqlite_event_repository import EventRecord
 from app.services.dashboard_service import DashboardSummary
 from app.services.mailbox_service import MailboxStatus
@@ -307,6 +308,36 @@ def mail_message_out(message: MailMessage) -> MailMessageOut:
         body_preview=message.body_preview,
         is_read=message.is_read,
     )
+
+
+class MailBodyOut(BaseModel):
+    """
+    Pełna treść maila z `GET /api/v1/mail/messages/{message_id}/body`.
+
+    Dwa osobne pola, nie jeden sklejony string: aplikacja świadomie
+    wybiera, co pokazać - `html_body` idzie do izolowanego `<iframe>`,
+    a `plain_body` jest wariantem zapasowym dla widoków, które HTML-a
+    nie renderują.
+    """
+
+    html_body: str | None
+    plain_body: str | None
+
+
+def mail_body_out(bodies: MailBodies) -> MailBodyOut:
+    """
+    Mapuje treść maila na schemat odpowiedzi API.
+
+    `plain_body` NIGDY nie jest puste, jeśli mail ma jakąkolwiek treść:
+    gdy brakuje części `text/plain` (a Allegro często wysyła sam HTML),
+    powstaje z HTML-a. Dzięki temu żaden klient nie musi mieć własnego
+    "co pokazać, gdy nie ma tekstu" - a to właśnie brak tego wariantu
+    kończył się linkiem "otwórz w Gmailu" jako jedyną drogą do treści.
+    """
+    plain = bodies.text if bodies.text and bodies.text.strip() else None
+    if plain is None and bodies.html:
+        plain = html_to_plain_text(bodies.html)
+    return MailBodyOut(html_body=bodies.html, plain_body=plain)
 
 
 class MailboxStatusOut(BaseModel):

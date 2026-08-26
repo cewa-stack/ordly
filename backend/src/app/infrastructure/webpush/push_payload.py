@@ -20,10 +20,12 @@ chęci:
 from __future__ import annotations
 
 import json
+import re
 from dataclasses import dataclass, field
-from datetime import time
+from datetime import datetime, time
 from decimal import Decimal
 from typing import Literal
+from urllib.parse import quote
 
 # Wątki grupowania z sekcji 04 - nazwa wątku zastępuje nazwę aplikacji
 # w nagłówku powiadomienia na iOS.
@@ -130,6 +132,63 @@ def _shorten(text: str, limit: int = 80) -> str:
     return f"{text[: limit - 1].rstrip()}…"
 
 
+_HTML_TAG = re.compile(r"<[^>]+>")
+
+
+def strip_html(text: str) -> str:
+    """
+    Usuwa znaczniki HTML z treści przeznaczonej pod Web Push.
+
+    Ten kanał nie renderuje HTML - w przeciwieństwie do Telegrama, gdzie
+    bot ustawia `parse_mode=HTML`. Tekst sformatowany pod Telegram, który
+    trafi tu wspólną ścieżką `send_text`, pokazałby na ekranie blokady
+    dosłowne `<b>` i `<code>` (dokładnie to był zgłoszony błąd).
+
+    To SIATKA BEZPIECZEŃSTWA, nie sposób budowania treści: każde
+    zdarzenie warte powiadomienia ma mieć własny builder w katalogu
+    niżej. Ta funkcja tylko gwarantuje, że przyszłe `send_text(...)`
+    z HTML-em nie wypłynie na telefon w surowej postaci.
+    """
+    return _HTML_TAG.sub("", text)
+
+
+#: Nazwy kanałów w treści powiadomienia. `.capitalize()` dawało „Olx”
+#: i nie miało co zrobić z `allegro_lokalnie`. Skrótów nie używamy -
+#: „AL Lokalnie” wymagałoby domyślania się, co znaczy „AL”.
+_CHANNEL_LABELS = {
+    "allegro": "Allegro",
+    "allegro_lokalnie": "AllegroLokalnie",
+    "olx": "OLX",
+    "amazon": "Amazon",
+    "ebay": "eBay",
+}
+
+
+def _channel_label(code: str) -> str:
+    """Czytelna nazwa kanału sprzedaży - z mapy, a nie z `.capitalize()`."""
+    return _CHANNEL_LABELS.get(code.lower(), code.capitalize())
+
+
+def _items(items: list[tuple[int, str]], limit: int = 52) -> str:
+    """
+    `50× Butelki PET 30 ml +2 poz.` - pierwsza pozycja z liczbą, reszta zwinięta.
+
+    Powiadomienie ma powiedzieć ILE i CZEGO, a nie wyliczyć całe
+    zamówienie - pełny spis czyta się w aplikacji, do której prowadzi
+    kliknięcie. Skrót „poz.” zamiast „pozycje”, bo liczebnik wymagałby
+    odmiany („1 pozycja”, „2 pozycje”, „5 pozycji”), a to wyskakuje na
+    ekranie blokady kilka razy dziennie. Znak `×` (U+00D7) zamiast litery
+    „x” - to mnożenie, nie litera.
+    """
+    if not items:
+        return "brak danych"
+    quantity, name = items[0]
+    text = f"{quantity}× {_shorten(name, limit)}"
+    if len(items) > 1:
+        text += f" +{len(items) - 1} poz."
+    return text
+
+
 # --------------------------------------------------------------------------
 # Katalog - sekcja 03. Czego tu nie ma, tego się nie wysyła.
 # --------------------------------------------------------------------------
@@ -138,18 +197,27 @@ def _shorten(text: str, limit: int = 80) -> str:
 def new_order(
     *,
     marketplace: str,
-    buyer_login: str,
     amount: Decimal,
     currency: str,
-    products_summary: str,
+    products: list[tuple[int, str]],
     external_id: str,
     badge: int | None = None,
     silent: bool = False,
 ) -> PushPayload:
-    """Nowe zamówienie - natychmiast. „Nowe zamówienie · Allegro"."""
+    """
+    Nowe zamówienie - natychmiast. Ile, czego, za ile.
+
+    Kanał siedzi w TREŚCI, nie w tytule: „Nowe zamówienie · Allegro”
+    ucinało się na ekranie blokady już przy zwykłym Allegro, a przy
+    AllegroLokalnie nie było czego czytać. Tytuł zmieści się teraz zawsze.
+
+    Login kupującego zniknął stąd świadomie - z ekranu blokady i tak
+    nic się z nim nie zrobi, a jest widoczny w aplikacji, do której
+    prowadzi kliknięcie.
+    """
     return PushPayload(
-        title=f"Nowe zamówienie · {marketplace.capitalize()}",
-        body=f"{buyer_login} — {_money(amount, currency)}. {_shorten(products_summary)}",
+        title="Nowe zamówienie",
+        body=f"{_channel_label(marketplace)} · {_items(products)} — {_money(amount, currency)}",
         thread="orders",
         url=f"/orders/{external_id}",
         silent=silent,
@@ -173,13 +241,13 @@ def many_new_orders(
     Rozbicie na kanały jest istotne: „4 nowe zamówienia" bez informacji
     skąd przyszły nie mówi nic o tym, gdzie szukać problemu.
     """
-    breakdown = ", ".join(
-        f"{channel.capitalize()} ({n})" if n > 1 else channel.capitalize()
+    breakdown = " · ".join(
+        f"{_channel_label(channel)} {n}"
         for channel, n in sorted(per_channel.items(), key=lambda item: -item[1])
     )
     return PushPayload(
         title=f"{count} {_orders_word(count)}",
-        body=f"{breakdown} — łącznie {_money(total_amount, currency)}.",
+        body=f"{breakdown} — {_money(total_amount, currency)}",
         thread="orders",
         url="/orders",
         silent=silent,
@@ -198,7 +266,7 @@ def low_stock(
     """Niski stan - natychmiast. Produkt, ile zostało, przy jakim progu."""
     return PushPayload(
         title="Niski stan",
-        body=f"{name} — zostały {stock} szt. przy progu {min_stock}.",
+        body=f"{name} — {stock} szt. (próg {min_stock})",
         thread="stock",
         url=f"/stock/{sku}",
         silent=silent,
@@ -206,26 +274,35 @@ def low_stock(
     )
 
 
-def unanswered_question(
+def new_dispute(
     *,
     buyer_login: str,
-    subject: str,
-    hours_left: int | None,
+    reason: str | None,
+    respond_by: datetime | None,
     issue_id: str,
     badge: int | None = None,
     silent: bool = False,
 ) -> PushPayload:
     """
-    Pytanie kupującego bez odpowiedzi - natychmiast.
+    Kupujący rozpoczął dyskusję - natychmiast. Kto, o co i do kiedy
+    trzeba odpowiedzieć.
 
-    `hours_left` to czas do limitu odpowiedzi narzuconego przez kanał.
-    Gdy go nie znamy, treść po prostu go pomija - lepiej niż zmyślona
-    liczba godzin.
+    Termin pokazujemy jako KONKRETNĄ GODZINĘ, nie odliczanie („zostało
+    6 godz."). Powiadomienie bywa czytane długo po dostarczeniu -
+    odliczanie zdążyłoby się wtedy zestarzeć i skłamać, godzina nie.
+    Gdy maila nie da się odczytać terminu, treść go po prostu pomija.
+
+    Zastąpiło pozycję `unanswered_question`, która siedziała w katalogu
+    bez żadnego producenta - nic w aplikacji jej nie wysyłało.
     """
-    deadline = f" Zostało {hours_left} godz." if hours_left is not None else ""
+    czesci = [buyer_login]
+    if reason:
+        czesci.append(f": {_shorten(reason, 40)}")
+    if respond_by is not None:
+        czesci.append(f" — odpowiedz do {respond_by.strftime('%d.%m, %H:%M')}")
     return PushPayload(
-        title="Pytanie bez odpowiedzi",
-        body=f"{buyer_login} pyta: {_shorten(subject, 60)}.{deadline}",
+        title="Nowa dyskusja",
+        body="".join(czesci),
         thread="issues",
         url=f"/issues/{issue_id}",
         silent=silent,
@@ -242,10 +319,15 @@ def new_return(
     badge: int | None = None,
     silent: bool = False,
 ) -> PushPayload:
-    """Nowy zwrot do decyzji - natychmiast. Numer, produkt, powód."""
+    """
+    Nowy zwrot do decyzji - natychmiast. Co wraca i dlaczego.
+
+    Numer zwrotu zniknął z treści: to UUID, którego i tak nie da się
+    przepisać z ekranu blokady, a kliknięcie prowadzi wprost do rekordu.
+    """
     return PushPayload(
-        title="Nowy zwrot do decyzji",
-        body=f"#{external_id[:8].upper()} {_shorten(products_summary, 50)} — {reason}.",
+        title="Nowy zwrot",
+        body=f"{_shorten(products_summary, 60)} — {reason}",
         thread="returns",
         url=f"/returns/{external_id}",
         silent=silent,
@@ -257,24 +339,23 @@ def new_return(
 def sync_failed(
     *,
     channel: str,
-    healthy_channels: int,
     retry_in_minutes: int,
     silent: bool = False,
 ) -> PushPayload:
     """
     Błąd synchronizacji - dopiero po DRUGIEJ nieudanej próbie.
 
-    Treść trzyma się tonu z sekcji 7.3: co się stało, co mimo to
-    zadziałało, kiedy kolejna próba. Bez przeprosin.
+    Treść trzyma się tonu z sekcji 7.3: co się stało i kiedy kolejna
+    próba. Bez przeprosin.
+
+    Zdanie o pozostałych kanałach zniknęło razem z parametrem
+    `healthy_channels`: ORDLY dopuszcza jeden aktywny plugin naraz
+    (patrz `Container.build_plugin`), więc brzmiało zawsze tak samo
+    („Żaden inny kanał nie był aktywny”) i nic nie wnosiło.
     """
-    survived = (
-        f"Pozostałe {healthy_channels} kanały zaktualizowane. "
-        if healthy_channels > 0
-        else "Żaden inny kanał nie był aktywny. "
-    )
     return PushPayload(
-        title=f"{channel.capitalize()} nie odpowiedziało",
-        body=f"{survived}Ordi spróbuje ponownie za {retry_in_minutes} minut.",
+        title=f"{_channel_label(channel)} nie odpowiada",
+        body=f"Ponowna próba za {retry_in_minutes} minut",
         thread="sync",
         url="/settings",
         silent=silent,
@@ -294,12 +375,100 @@ def wholesaler_confirmed(
     i nie rusza plakietki.
     """
     return PushPayload(
-        title=f"{wholesaler_name} potwierdziła wysyłkę",
-        body=_shorten(items_summary, 90),
+        title=f"{wholesaler_name} potwierdziła",
+        body=_shorten(items_summary, 70),
         thread="mail",
         url="/mailbox",
         silent=True,
         actions=[_ACTION_SHOW],
+    )
+
+
+#: Tytuły zdarzeń z Allegro Lokalnie. Klucze pochodzą z
+#: `domain/entities/allegro_lokalnie_event.py`. Nazwa kanału NIE jest tu
+#: doklejana - „Nowe zamówienie · Allegro Lokalnie” ucinało się na
+#: ekranie blokady w połowie słowa. Kanał idzie do treści, tak samo jak
+#: w `new_order`.
+_ALLEGRO_LOKALNIE_TITLES = {
+    "new_order": "Nowe zamówienie",
+    "order_status": "Zmiana zamówienia",
+    "new_message": "Nowa wiadomość",
+    "interest": "Pytanie o ogłoszenie",
+    "unknown": "AllegroLokalnie",
+}
+
+
+def allegro_lokalnie_event(
+    *,
+    event_type: str,
+    listing_title: str,
+    quantity: int | None,
+    amount: Decimal | None,
+    message_id: str,
+    silent: bool = False,
+) -> PushPayload:
+    """
+    Zdarzenie z Allegro Lokalnie - jedyne źródło wiedzy o tamtej sprzedaży.
+
+    Treść trzyma ten sam układ co `new_order` (kanał w treści, potem ile,
+    czego i za ile), bo dla użytkownika to jest po prostu sprzedaż -
+    tylko z serwisu, którym z ORDLY nie da się sterować.
+
+    Powiadomienie nie prowadzi do rekordu zamówienia (Allegro Lokalnie
+    nie ma API, więc takiego rekordu w ORDLY nie ma), tylko do maila,
+    z którego zdarzenie zostało odczytane - tam jest pełna treść
+    i klikalny link do ogłoszenia.
+
+    `event_type` spoza katalogu (nierozpoznany szablon maila) dostaje
+    neutralny tytuł zamiast zniknąć - lepiej powiadomić "coś przyszło,
+    sprawdź" niż przemilczeć sprzedaż.
+    """
+    title = _ALLEGRO_LOKALNIE_TITLES.get(event_type, _ALLEGRO_LOKALNIE_TITLES["unknown"])
+    kanal = _channel_label("allegro_lokalnie")
+    pozycja = _items([(quantity, listing_title)]) if quantity else _shorten(listing_title, 62)
+    body = f"{kanal} · {pozycja}" if title != kanal else pozycja
+    if amount is not None:
+        body = f"{body} — {_money(amount)}"
+    return PushPayload(
+        title=title,
+        body=body,
+        thread="mail",
+        url=f"/mailbox/{quote(message_id, safe='')}",
+        silent=silent,
+        collapse_key=f"al:{message_id}",
+    )
+
+
+def unmatched_products(
+    *,
+    reference: str,
+    product_names: list[str],
+    silent: bool = False,
+) -> PushPayload:
+    """
+    Sprzedaż bez powiązania z magazynem - stan się nie zmienił.
+
+    Zdarzenie miało dotąd tylko wariant telegramowy i szło na telefon
+    wspólną ścieżką `send_text`, przez co na ekranie blokady lądowały
+    dosłowne `<b>` i `<code>` (zgłoszony błąd). Teraz ma własną pozycję
+    w katalogu: tytuł mówi, CO się stało, treść - której pozycji to
+    dotyczy, a kliknięcie prowadzi do zamówienia, nie do ustawień.
+
+    Numer zamówienia nie wchodzi do treści - pełny UUID zająłby całą
+    linię, a i tak nie da się go przepisać z ekranu blokady.
+    """
+    if not product_names:
+        opis = "brak danych"
+    else:
+        extra = f" +{len(product_names) - 1} poz." if len(product_names) > 1 else ""
+        opis = f"{_shorten(product_names[0], 52)}{extra}"
+    return PushPayload(
+        title="Sprzedaż poza magazynem",
+        body=f"{opis} — stan bez zmian",
+        thread="stock",
+        url=f"/orders/{reference}",
+        silent=silent,
+        collapse_key=f"unmatched:{reference}",
     )
 
 
@@ -310,10 +479,15 @@ def pending_packing(
     badge: int | None = None,
     silent: bool = False,
 ) -> PushPayload:
-    """Zaległe pakowanie - raz dziennie o 9:00. Od kiedy czeka najstarsze."""
+    """
+    Zaległe pakowanie - raz dziennie o 9:00. Od kiedy czeka najstarsze.
+
+    Tytuł bez słowa „zamówienia”: „3 zamówienia do spakowania” ucinało
+    się na ekranie blokady, a liczba i tak mówi wszystko.
+    """
     return PushPayload(
-        title=f"{count} {_orders_word(count, genitive=True)} do spakowania",
-        body=f"Najstarsze czeka od {oldest_since}.",
+        title=f"{count} do spakowania",
+        body=f"Najstarsze czeka od {oldest_since}",
         thread="orders",
         url="/orders",
         silent=silent,

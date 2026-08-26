@@ -17,6 +17,8 @@ from loguru import logger
 from pywebpush import WebPushException, webpush
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.domain.entities.allegro_lokalnie_event import AllegroLokalnieEvent
+from app.domain.entities.dispute_notice import DisputeNotice
 from app.domain.entities.order import Order
 from app.domain.entities.order_return import OrderReturn
 from app.domain.entities.push_subscription import PushSubscription
@@ -79,10 +81,9 @@ class WebPushNotifier(Notifier):
             await self._send(
                 push_payload.new_order(
                     marketplace=order.marketplace,
-                    buyer_login=order.buyer.login,
                     amount=order.total_amount,
                     currency=order.currency,
-                    products_summary=order.products_summary,
+                    products=[(p.quantity, p.name) for p in order.products],
                     external_id=order.external_id,
                 )
             )
@@ -165,22 +166,48 @@ class WebPushNotifier(Notifier):
         """
         return
 
-    async def notify_sync_failed(self, channel: str, retry_in_minutes: int) -> None:
+    async def notify_allegro_lokalnie(self, event: AllegroLokalnieEvent) -> None:
         """
-        Kanał nie odpowiada - katalog, pozycja „Błąd synchronizacji".
+        Zdarzenie z Allegro Lokalnie - katalog, pozycja „Allegro Lokalnie".
 
-        Liczba zdrowych kanałów jest na razie stała i wynosi 0, bo
-        `MARKETPLACE_PROVIDER` dopuszcza tylko jeden aktywny plugin
-        naraz (patrz komentarz w `Container.build_plugin`). Gdy dojdzie
-        obsługa wielu kanałów równolegle, ta liczba ma przyjść z serwisu
-        synchronizacji, a nie zostać zgadnięta tutaj.
+        Treść budujemy z katalogu, a NIE przez `send_text`: tamta ścieżka
+        jest wspólna z Telegramem, gdzie formatowanie jest HTML-em, a
+        Web Push HTML-a nie renderuje i pokazałby dosłowne znaczniki.
         """
         await self._send(
-            push_payload.sync_failed(
-                channel=channel,
-                healthy_channels=0,
-                retry_in_minutes=retry_in_minutes,
+            push_payload.allegro_lokalnie_event(
+                event_type=event.event_type,
+                listing_title=event.opis,
+                quantity=event.quantity,
+                amount=event.amount,
+                message_id=event.message_id,
             )
+        )
+
+    async def notify_new_dispute(self, notice: DisputeNotice) -> None:
+        """Nowa dyskusja - katalog, pozycja „Nowa dyskusja"."""
+        await self._send(
+            push_payload.new_dispute(
+                buyer_login=notice.buyer_login,
+                reason=notice.reason,
+                respond_by=notice.respond_by,
+                issue_id=notice.issue_id,
+                badge=1,
+            )
+        )
+
+    async def notify_unmatched_products(
+        self, reference: str, product_names: list[str]
+    ) -> None:
+        """Sprzedaż poza magazynem - katalog, pozycja „Sprzedaż poza magazynem"."""
+        await self._send(
+            push_payload.unmatched_products(reference=reference, product_names=product_names)
+        )
+
+    async def notify_sync_failed(self, channel: str, retry_in_minutes: int) -> None:
+        """Kanał nie odpowiada - katalog, pozycja „Błąd synchronizacji"."""
+        await self._send(
+            push_payload.sync_failed(channel=channel, retry_in_minutes=retry_in_minutes)
         )
 
     async def send_text(self, text: str) -> None:
@@ -190,11 +217,18 @@ class WebPushNotifier(Notifier):
         Trafia do wątku `sync`, bo to jedyne miejsce w katalogu na
         komunikaty techniczne. Bez akcji „Wycisz" - alert, który da się
         wyciszyć jednym kliknięciem, przestaje być alertem.
+
+        `strip_html` to SIATKA BEZPIECZEŃSTWA: ta ścieżka jest wspólna
+        z Telegramem, gdzie treść bywa formatowana znacznikami HTML.
+        Web Push HTML-a nie renderuje, więc bez tego oczyszczenia na
+        ekranie blokady lądowały dosłowne `<b>` i `<code>` - to był
+        zgłoszony błąd. Zdarzenia warte powiadomienia mają własne pozycje
+        w katalogu; to zabezpiecza wszystko, co przyjdzie tędy w przyszłości.
         """
         await self._send(
             PushPayload(
                 title="ORDLY",
-                body=text,
+                body=push_payload.strip_html(text),
                 thread="sync",
                 url="/settings",
                 actions=[{"action": "open", "title": "Pokaż"}],

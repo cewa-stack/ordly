@@ -9,10 +9,12 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.dependencies import get_container, get_session
 from app.api.schemas import (
+    MailBodyOut,
     MailboxStatusOut,
     MailMessageOut,
     MailSyncResultOut,
     WholesalerMailIn,
+    mail_body_out,
     mail_message_out,
     mailbox_status_out,
 )
@@ -91,11 +93,36 @@ async def sync_mailbox(
         if not status.configured:
             return MailSyncResultOut(new_count=0, configured=False)
         try:
-            new_count = await mailbox_service.sync_now()
+            saved = await mailbox_service.sync_now()
         except ImapConnectionError as exc:
             raise HTTPException(status_code=502, detail=str(exc)) from exc
 
-    return MailSyncResultOut(new_count=new_count, configured=True)
+    # Zdarzenia dopiero po zamknięciu sesji - subskrybenci (powiadomienia)
+    # piszą we własnych sesjach i muszą widzieć zatwierdzone dane.
+    await mailbox_service.publish_mail_events(saved)
+    return MailSyncResultOut(new_count=len(saved), configured=True)
+
+
+@router.get("/mail/messages/{message_id}/body", response_model=MailBodyOut)
+async def get_mail_message_body(
+    container: Annotated[Container, Depends(get_container)],
+    session: Annotated[AsyncSession, Depends(get_session)],
+    message_id: str,
+) -> MailBodyOut:
+    """
+    Zwraca pełną treść maila - wersję HTML i tekstową osobno.
+
+    Treść jest dociągana ze skrzynki IMAP przy każdym wywołaniu, bo
+    ORDLY trzyma w bazie wyłącznie metadane i krótki podgląd (patrz
+    `MailboxService`). Błąd połączenia z IMAP wraca jako 502 z powodem
+    do pokazania użytkownikowi - tak samo jak przy `POST /mail/sync`.
+    """
+    mailbox_service = container.mailbox_service(session)
+    try:
+        bodies = await mailbox_service.get_message_body(message_id)
+    except ImapConnectionError as exc:
+        raise HTTPException(status_code=502, detail=str(exc)) from exc
+    return mail_body_out(bodies)
 
 
 @router.post("/mail/messages/{message_id}/mark-read", status_code=204, response_model=None)

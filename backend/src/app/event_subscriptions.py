@@ -12,6 +12,8 @@ from loguru import logger
 
 from app.container import Container
 from app.core.event_bus.events import (
+    AllegroLokalnieEventDetected,
+    DisputeNoticeDetected,
     LowStockDetected,
     NotificationSent,
     OrderCancelled,
@@ -56,19 +58,20 @@ def register_event_subscriptions(container: Container) -> None:
         Bez tego brak receptury oferty objawia się wyłącznie tym, że stan
         magazynowy stoi w miejscu - a to wygląda jak awaria, nie jak brak
         konfiguracji. Alarm wskazuje konkretną ofertę do powiązania.
+
+        Treść buduje KANAŁ, nie to miejsce. Wcześniej powstawał tu jeden
+        string sformatowany pod Telegram (`<b>`, `<code>`) i szedł do
+        wszystkich kanałów naraz - Web Push nie renderuje HTML, więc na
+        ekranie blokady lądowały dosłowne znaczniki. Teraz każdy kanał
+        formatuje po swojemu: Telegram nadal HTML-em, push pozycją
+        z katalogu `push_payload`.
         """
         if outcome is None or not outcome.unmatched_products:
             return
 
-        products = "\n".join(f"• {name}" for name in outcome.unmatched_products)
         try:
-            await container.notifier().send_text(
-                "⚠️ <b>Sprzedaż poza magazynem</b>\n"
-                f"Zamówienie {outcome.reference} zawiera pozycje bez powiązania "
-                "z magazynem, więc stany się nie zmieniły:\n"
-                f"{products}\n\n"
-                "Przypisz składniki w Magazyn → Powiązania ofert "
-                "(albo <code>/stock link [oferta] [SKU] [ilość]</code>)."
+            await container.notifier().notify_unmatched_products(
+                outcome.reference, list(outcome.unmatched_products)
             )
         except Exception:
             logger.exception(
@@ -302,6 +305,109 @@ def register_event_subscriptions(container: Container) -> None:
             event_repository = SqliteEventRepository(session)
             await event_repository.record(event_type="SyncStarted", level="INFO")
 
+    async def handle_allegro_lokalnie_event(event: AllegroLokalnieEventDetected) -> None:
+        """
+        Obsługuje zdarzenie z Allegro Lokalnie i zapisuje je w audycie.
+
+        To jedyny sygnał, jaki ORDLY dostaje z tego serwisu - Allegro
+        Lokalnie nie ma API, więc bez tego maila sprzedaż tam byłaby dla
+        aplikacji niewidzialna.
+
+        Sprzedaż z kompletem danych staje się PEŁNOPRAWNYM zamówieniem:
+        publikujemy `OrderCreated`, czyli ten sam tor co przy Allegro.pl
+        (odjęcie stanów magazynowych, statystyki, lista do spakowania,
+        powiadomienie „Nowe zamówienie"). Wtedy `notify_allegro_lokalnie`
+        NIE leci - inaczej użytkownik dostałby dwa powiadomienia o jednej
+        sprzedaży.
+
+        Wszystko inne - wiadomość od kupującego, pytanie o dostawę,
+        doręczenie paczki, nierozpoznany szablon - zostaje powiadomieniem
+        ze skrzynki, bo nie ma z tego czego odjąć ani czego policzyć.
+        """
+        detected = event.event
+        created_order = None
+        try:
+            async with container.session_scope() as session:
+                created_order = await container.allegro_lokalnie_orders_service(
+                    session
+                ).create_from_event(detected)
+        except Exception:
+            logger.exception(
+                "Nie udało się zapisać zamówienia z Allegro Lokalnie {}",
+                detected.message_id,
+            )
+
+        if created_order is not None:
+            # Zdarzenie publikujemy PO zamknięciu sesji zapisu -
+            # subskrybenci (magazyn, audyt) piszą we własnych sesjach
+            # i muszą widzieć zatwierdzone zamówienie.
+            await container.event_bus.publish(
+                OrderCreated(occurred_at=utc_now(), order=created_order)
+            )
+        else:
+            try:
+                await container.notifier().notify_allegro_lokalnie(detected)
+            except Exception:
+                logger.exception(
+                    "Nie udało się wysłać powiadomienia o zdarzeniu Allegro Lokalnie {}",
+                    detected.message_id,
+                )
+
+        async with container.session_scope() as session:
+            event_repository = SqliteEventRepository(session)
+            await event_repository.record(
+                event_type="AllegroLokalnieEventDetected",
+                # Nierozpoznany szablon maila to sygnał do aktualizacji
+                # wzorców - ma być widoczny w logach aplikacji, nie tylko
+                # w treści powiadomienia.
+                level="WARNING" if detected.event_type == "unknown" else "INFO",
+                payload={
+                    "message_id": detected.message_id,
+                    "event_type": detected.event_type,
+                    "subject": detected.subject,
+                    "amount": str(detected.amount) if detected.amount is not None else None,
+                    # Numer zamówienia, jeśli zdarzenie stało się sprzedażą -
+                    # inaczej z audytu nie da się odtworzyć, czy mail tylko
+                    # powiadomił, czy ruszył magazyn.
+                    "order_external_id": (
+                        created_order.external_id if created_order is not None else None
+                    ),
+                },
+            )
+
+    async def handle_dispute_notice(event: DisputeNoticeDetected) -> None:
+        """
+        Powiadamia o rozpoczętej dyskusji i zapisuje ją w audycie.
+
+        Do tej pory ORDLY nie mówił o dyskusjach nic - wątki pobierał
+        dopiero wtedy, gdy sam otworzyłeś ekran Dyskusji. Termin
+        odpowiedzi („inaczej włączymy się do rozmowy") jest wyłącznie
+        w mailu, więc to jedyne miejsce, z którego można go wziąć.
+        """
+        notice = event.notice
+        try:
+            await container.notifier().notify_new_dispute(notice)
+        except Exception:
+            logger.exception(
+                "Nie udało się wysłać powiadomienia o dyskusji {}", notice.issue_id
+            )
+
+        async with container.session_scope() as session:
+            event_repository = SqliteEventRepository(session)
+            await event_repository.record(
+                event_type="DisputeNoticeDetected",
+                level="WARNING",
+                payload={
+                    "issue_id": notice.issue_id,
+                    "buyer_login": notice.buyer_login,
+                    "order_external_id": notice.order_external_id,
+                    "reason": notice.reason,
+                    "respond_by": (
+                        notice.respond_by.isoformat() if notice.respond_by else None
+                    ),
+                },
+            )
+
     async def handle_sync_finished(event: SyncFinished) -> None:
         """Zapisuje w audycie podsumowanie zakończonej synchronizacji."""
         async with container.session_scope() as session:
@@ -323,5 +429,7 @@ def register_event_subscriptions(container: Container) -> None:
     container.event_bus.subscribe(NotificationSent, handle_notification_sent)
     container.event_bus.subscribe(SyncStarted, handle_sync_started)
     container.event_bus.subscribe(SyncFinished, handle_sync_finished)
+    container.event_bus.subscribe(AllegroLokalnieEventDetected, handle_allegro_lokalnie_event)
+    container.event_bus.subscribe(DisputeNoticeDetected, handle_dispute_notice)
 
     logger.info("Zarejestrowano subskrybentów Event Busa")

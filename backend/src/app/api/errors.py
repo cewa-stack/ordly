@@ -17,6 +17,8 @@ from app.domain.exceptions.domain_exceptions import (
     DuplicateReturnError,
     InsufficientStockError,
     InventoryItemNotFoundError,
+    MailboxNotConfiguredError,
+    MailMessageNotFoundError,
     MailNotConfiguredError,
     MailSendError,
     MarketplaceUnavailableError,
@@ -24,7 +26,7 @@ from app.domain.exceptions.domain_exceptions import (
     ShipmentNotAvailableError,
 )
 
-_NOT_FOUND = (OrderNotFoundError, InventoryItemNotFoundError)
+_NOT_FOUND = (OrderNotFoundError, InventoryItemNotFoundError, MailMessageNotFoundError)
 _CONFLICT = (DuplicateOrderError, DuplicateReturnError, DuplicateInventoryItemError)
 _UNPROCESSABLE = (InsufficientStockError,)
 _UNAVAILABLE = (
@@ -32,6 +34,7 @@ _UNAVAILABLE = (
     ShipmentNotAvailableError,
     MailNotConfiguredError,
     MailSendError,
+    MailboxNotConfiguredError,
 )
 
 

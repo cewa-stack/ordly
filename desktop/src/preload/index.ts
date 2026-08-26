@@ -74,10 +74,16 @@ const ordly = {
     importCsv: () => ipcRenderer.invoke("ordly:olx:importCsv"),
   },
   mailbox: {
-    list: (filters: { source?: "allegro" | "olx" | "other"; unreadOnly?: boolean } = {}) =>
+    list: (
+      filters: {
+        source?: "allegro" | "allegro_lokalnie" | "olx" | "other";
+        unreadOnly?: boolean;
+      } = {}
+    ) =>
       ipcRenderer.invoke("ordly:mailbox:list", filters),
     status: () => ipcRenderer.invoke("ordly:mailbox:status"),
     sync: () => ipcRenderer.invoke("ordly:mailbox:sync"),
+    body: (messageId: string) => ipcRenderer.invoke("ordly:mailbox:body", messageId),
     markRead: (messageId: string) => ipcRenderer.invoke("ordly:mailbox:markRead", messageId),
   },
   ordlak: {

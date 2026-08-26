@@ -1,0 +1,708 @@
+Delivered-To: sklep.dopefoam@gmail.com
+Received: by 2002:a05:6022:5223:b0:10a:8560:69ef with SMTP id w35csp3130319law;
+        Mon, 10 Aug 2026 10:45:40 -0700 (PDT)
+X-Received: by 2002:a05:600c:1c25:b0:493:c634:952 with SMTP id 5b1f17b1804b1-49972767bb2mr47693785e9.7.1786383940541;
+        Mon, 10 Aug 2026 10:45:40 -0700 (PDT)
+ARC-Seal: i=1; a=rsa-sha256; t=1786383940; cv=none;
+        d=google.com; s=arc-20260327;
+        b=eJCwCshxmDv+4GervYjs9W9aFRWwPhC3uY0t3UF5VCJ/OT9N+8dycD+m3NGG7wCEU1
+         T3aBpwaK0r0w4q0Y5S61rxmprgXYp5VWAcs2GC2MrSm2+P7/E8Zd6lrFyw1LNyTTCAS3
+         16HGdGsmfxz3a/SXsY6+2T+CudOceqArHyJVLvbljV8rAq+cPgiUE/TLkim1D9vDtiIt
+         CL/cSW0VxDD8TNdtSXbnLdkqXLdGu8fbjT9iRKyU3GLwTnXBo/jEM/pzQ7oDz0TJqxeY
+         CD7D6lGGeXNUDC3h2lXrxB6L25jWFQpPp5tlF2xGw06il/ST+ov1RQMYqAJ7I1Cm1tcH
+         lpOw==
+ARC-Message-Signature: i=1; a=rsa-sha256; c=relaxed/relaxed; d=google.com; s=arc-20260327;
+        h=feedback-id:content-transfer-encoding:mime-version:subject
+         :message-id:to:date:from:dkim-signature;
+        bh=i9uOhchCHiWBPJ9V9lMs4e8234tI2maBPCll8fcY5KU=;
+        fh=ncS/P45YE5WFLOohRMKkY92QoHbbPEq+2rnFy84TJFQ=;
+        b=jpN/2YjTQqo7uqTR/XBgafNfclrA/peecdqLomrsd/V3j+uT9NJmlwBjIwvDM7xVgm
+         aaMKdLCZHsdQEEnB9U7DdFtsdYAls+NIeA0XqNo/ArrRCuWwJwsKrxxtieadPFugvsjV
+         xzk52dvf8x6WrWeLMShtnPF6uYB1666BalrcXZKwlWJ+kQ48Taige3YFTWI7luL1MMpO
+         eO/48h2o1iEG0Mcqgr7FwEf8Y0oiW9Kl5A3mTa3vVd2qFsnR5Kh5aMfurdFnkWiOjvLU
+         nIjh2lvhf8hFjgEr8dCrvdxeRhmxeeJnct66vpszfV5fRNQHptQy6s/7rRVm+44EnZ3a
+         eceQ==;
+        dara=google.com
+ARC-Authentication-Results: i=1; mx.google.com;
+       dkim=pass header.i=@allegrolokalnie.pl header.s=smtp header.b="NqRg8ll/";
+       spf=pass (google.com: domain of powiadomienia@allegrolokalnie.pl designates 194.0.251.103 as permitted sender) smtp.mailfrom=powiadomienia@allegrolokalnie.pl;
+       dmarc=pass (p=QUARANTINE sp=QUARANTINE dis=NONE) header.from=allegrolokalnie.pl
+Return-Path: <powiadomienia@allegrolokalnie.pl>
+Received: from smtpfarm15.allegro.pl (smtpfarm15.allegro.pl. [194.0.251.103])
+        by mx.google.com with ESMTPS id ffacd0b85a97d-48002252bdbsi18504035f8f.334.2026.08.10.10.45.40
+        for <sklep.dopefoam@gmail.com>
+        (version=TLS1_2 cipher=ECDHE-ECDSA-CHACHA20-POLY1305 bits=256/256);
+        Mon, 10 Aug 2026 10:45:40 -0700 (PDT)
+Received-SPF: pass (google.com: domain of powiadomienia@allegrolokalnie.pl designates 194.0.251.103 as permitted sender) client-ip=194.0.251.103;
+Authentication-Results: mx.google.com;
+       dkim=pass header.i=@allegrolokalnie.pl header.s=smtp header.b="NqRg8ll/";
+       spf=pass (google.com: domain of powiadomienia@allegrolokalnie.pl designates 194.0.251.103 as permitted sender) smtp.mailfrom=powiadomienia@allegrolokalnie.pl;
+       dmarc=pass (p=QUARANTINE sp=QUARANTINE dis=NONE) header.from=allegrolokalnie.pl
+DKIM-Signature: v=1; a=rsa-sha256; c=simple/simple;
+  d=allegrolokalnie.pl; i=@allegrolokalnie.pl; q=dns/txt;
+  s=smtp; t=1786383940; x=1817919940;
+  h=date:to:message-id:subject:mime-version:
+   content-transfer-encoding:from;
+  bh=zwsv6kUznTQpPobu6u7dGkFRKNNghWqo+EhDuvTEdBA=;
+  b=NqRg8ll/O7Yb9Jbfx09+kLiggbK7LCozdafRPHHkZuDXfoZjV6mZMl0H
+   7qAMlyVQdgoseGtNPznfw/rSHeffN3rFnjISplVdT39OdVKWl/er3Kjnb
+   c3LexlRIlSJWiKje36AIC1Yg06qFQEIEzdjMOhvGHpEsMvC4Ppj6bi6kA
+   k=;
+X-CSE-ConnectionGUID: K4vd1xANSh224FPrqQgg6w==
+X-CSE-MsgGUID: LTOjd1/wRJK5/mN/gLJZ+A==
+From: =?utf-8?q?Allegro_Lokalnie?= <powiadomienia@allegrolokalnie.pl>
+Date: Mon, 10 Aug 2026 19:45:40 +0200 (CEST)
+To: sklep.dopefoam@gmail.com
+Message-ID: <notificationstwo.20260810174540.f7fd3c0c-2b28-4668-ba2d-79c2817e05a5@allegro.pl>
+Subject: =?UTF-8?Q?Dostarczyli=C5=9Bmy_Twoj=C4=85_pacz?=
+ =?UTF-8?Q?k=C4=99_z_25szt._Butelka_Goril?=
+ =?UTF-8?Q?la_60ml_Liquid_Aromat_Baza_olejki_DIY_kosmetyki_PET?=
+MIME-Version: 1.0
+Content-Type: text/html;charset=UTF-8
+Content-Transfer-Encoding: quoted-printable
+Feedback-ID: TRANSACTIONAL:blueprint-8e311a3f-09f2-4815-b514-61cce831cfe3:allegro
+
+<!DOCTYPE html
+  PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xht=
+ml1/DTD/xhtml1-transitional.dtd">
+<html xmlns=3D"http://www.w3.org/1999/xhtml" lang=3D"pl">
+
+<head>
+  <meta http-equiv=3D"Content-Type" content=3D"text/html; charset=3DUTF-8" =
+/>
+  <meta http-equiv=3D"X-UA-Compatible" content=3D"IE=3Dedge" />
+  <meta content=3D"telephone=3Dno" name=3D"format-detection" />
+  <title>Allegro Lokalnie</title>
+  <meta name=3D"viewport" content=3D"width=3Ddevice-width, initial-scale=3D=
+1.0" />
+  <link rel=3D"stylesheet" href=3D"https://assets.allegrostatic.com/mail-as=
+sets/fonts.css" />
+  <style>
+    .alLink:hover {
+      color: #2d709a !important;
+    }
+  </style>
+</head>
+
+<body bgcolor=3D"#f4f8fc" style=3D"background-color: #f4f8fc;
+    -webkit-text-size-adjust: 100%;
+    -ms-text-size-adjust: 100%;
+    font-size: 14px;
+    font-weight: normal;
+    font-family: 'Open Sans', Helvetica, Arial, sans-serif;
+    color: #222222;
+    margin: 0;
+    padding: 0;
+    width: 100%;">
+
+  <!--[if mso]>
+<table role=3D"presentation" cellspacing=3D"0" cellpadding=3D"0" border=3D"=
+0" width=3D"100%" style=3D"width:100%; background-color: #e7ebee;">
+    <tr><td width=3D"100%" style=3D"width:100%; background-color: #e7ebee;"=
+>
+        <table role=3D"presentation" width=3D"600" align=3D"center" cellspa=
+cing=3D"0" cellpadding=3D"0" border=3D"0">
+            <tr><td width=3D"600" bgcolor=3D"#e7ebee" style=3D"width:600px;=
+background-color: #e7ebee;"><![endif]-->
+
+  <center>
+    <table role=3D"presentation" cellpadding=3D"0" cellspacing=3D"0" width=
+=3D"100%" bgcolor=3D"#f4f8fc">
+      <tr>
+        <td>
+          <table role=3D"presentation" align=3D"center" width=3D"100%" cell=
+padding=3D"0" cellspacing=3D"0" style=3D"max-width: 600px; border-collapse:=
+ collapse;
+            font-size: 12px;
+            font-family: 'Open Sans', Helvetica, Arial, sans-serif;">
+            <tr>
+              <td>
+                <table role=3D"presentation" align=3D"center" cellpadding=
+=3D"0" cellspacing=3D"0" width=3D"100%">
+    <tr>
+        <td style=3D"padding: 8px 16px; color: #767676; font-family: 'Open =
+Sans', Helvetica, Arial, sans-serif;">
+        </td>
+    </tr>
+</table>
+<table role=3D"presentation" cellpadding=3D"0" cellspacing=3D"0" width=3D"1=
+00%" style=3D"border-collapse: collapse; margin: 0; background-color: #ffff=
+ff;" border=3D"0">
+    <tr>
+        <td style=3D"padding-bottom: 10px; padding-top: 10px; padding-left:=
+ 15px;">
+            <a=20
+                href=3D"https://t.allegrolokalnie.pl/?utm_source=3Dnotifica=
+tion&amp;utm_medium=3DsellerParcelTerminalStatus&amp;utm_campaign=3D8e311a3=
+f-09f2-4815-b514-61cce831cfe3&amp;tr_n=3DStrona%20g%C5%82%C3%B3wna&amp;tr_i=
+d=3Df7fd3c0c-2b28-4668-ba2d-79c2817e05a5&amp;tr_d=3Dallegrolokalnie.pl&amp;=
+tr_s=3DVMlQ5I9n"
+                style=3D"text-decoration: none;"=20
+                target=3D"_blank"
+            >
+                <img src=3D"https://storage.googleapis.com/lokalnie-prod-as=
+sets/static/mail-assets/lokalnie-new-logo.png" width=3D"165" height=3D"22"
+                    alt=3D"Allegro Lokalnie" style=3D"border: none; color: =
+#000; font-weight: bold; font-size: 22px" />
+            </a>
+        </td>
+    </tr>
+
+    <tr>
+        <td style=3D"padding-left: 15px; padding-bottom: 10px;">
+            <p style=3D"
+                font-family: 'Open Sans', Helvetica, Arial, sans-serif;
+                font-size: 21px;
+                font-weight: normal;
+                font-style: normal;
+                line-height: normal;
+                letter-spacing: normal;
+                margin: 0;
+                padding: 0;">
+                Cze=C5=9B=C4=87 =C5=81ukasz,            </p>
+        </td>
+    </tr>
+
+                        <tr>
+                <td style=3D"
+                    font-family: 'Open Sans', Helvetica, Arial, sans-serif;=
+=20
+                    padding-bottom: 16px;=20
+                    padding-left: 15px;=20
+                    padding-right: 15px;
+                    font-size: 0;
+                  ">
+                                            <span style=3D"font-size: 14px"=
+>Twoja paczka z 25szt. Butelka Gorilla 60ml Liquid Aromat Baza olejki DIY k=
+osmetyki PET szcz=C4=99=C5=9Bliwie dotar=C5=82a do ArchiTheOne =F0=9F=8E=89=
+ </span>
+                                                                <a=20
+                            href=3D"https://t.allegrolokalnie.pl/wiadomosci=
+/ad8870c8-07d0-481c-bd52-b9a8c44acefd?utm_source=3Dnotification&amp;utm_med=
+ium=3DsellerParcelTerminalStatus&amp;utm_campaign=3D8e311a3f-09f2-4815-b514=
+-61cce831cfe3&amp;tr_n=3DCzat&amp;tr_id=3Df7fd3c0c-2b28-4668-ba2d-79c2817e0=
+5a5&amp;tr_d=3Dallegrolokalnie.pl&amp;tr_s=3D1cSt5Oyu"
+                            target=3D"_blank"
+                            style=3D"
+                                display: inline;
+                                font-family: 'Open Sans', Helvetica, Arial,=
+ sans-serif;
+                                font-size: 14px;
+                                text-align: center;
+                                text-decoration: none;
+                                letter-spacing: 0.4px;
+                                -webkit-text-size-adjust: none;
+                                color: #2BB9A3;
+                        ">Porozmawiaj z kupuj=C4=85cym</a>
+                                                                <span style=
+=3D"font-size: 14px">, aby dowiedzie=C4=87 si=C4=99, czy jest zadowolony z =
+zakupu.</span>
+                                    </td>
+            </tr>
+                    <tr>
+                <td style=3D"
+                    font-family: 'Open Sans', Helvetica, Arial, sans-serif;=
+=20
+                    padding-bottom: 16px;=20
+                    padding-left: 15px;=20
+                    padding-right: 15px;
+                    font-size: 0;
+                  ">
+                                            <span style=3D"font-size: 14px"=
+>Jeste=C5=9B Smart!, wi=C4=99c sprzedajesz bez koszt=C3=B3w dostawy. Wystaw=
+ kolejne og=C5=82oszenie i zamie=C5=84 niepotrzebne rzeczy na ekstra kas=C4=
+=99 =F0=9F=92=B0</span>
+                                                                           =
+ </td>
+            </tr>
+           =20
+        <tr>
+        <td style=3D"padding-bottom: 16px; padding-left: 13px; text-align: =
+center;">
+            <!--[if mso]>
+  <v:roundrect xmlns:v=3D"urn:schemas-microsoft-com:vml" xmlns:w=3D"urn:sch=
+emas-microsoft-com:office:word" href=3D"https://t.allegrolokalnie.pl/oferty=
+/wystaw?utm_source=3Dnotification&amp;utm_medium=3DsellerParcelTerminalStat=
+us&amp;utm_campaign=3D8e311a3f-09f2-4815-b514-61cce831cfe3&amp;tr_n=3DWysta=
+w&amp;tr_id=3Df7fd3c0c-2b28-4668-ba2d-79c2817e05a5&amp;tr_d=3Dallegrolokaln=
+ie.pl&amp;tr_s=3D7rMzWPO8" style=3D"height:40px;v-text-anchor:middle;width:=
+280px;" arcsize=3D"63%" stroke=3D"f" fillcolor=3D"#edecf7">
+    <w:anchorlock/>
+    <center>
+  <![endif]-->
+      <a href=3D"https://t.allegrolokalnie.pl/oferty/wystaw?utm_source=3Dno=
+tification&amp;utm_medium=3DsellerParcelTerminalStatus&amp;utm_campaign=3D8=
+e311a3f-09f2-4815-b514-61cce831cfe3&amp;tr_n=3DWystaw&amp;tr_id=3Df7fd3c0c-=
+2b28-4668-ba2d-79c2817e05a5&amp;tr_d=3Dallegrolokalnie.pl&amp;tr_s=3D7rMzWP=
+O8"
+        class=3D"ml-button--primary"
+        style=3D"background-color:#6256B1;
+          border-radius: 25px;
+          padding: 8px;
+          color: #ffffff;
+          display: inline-block;
+          font-family: 'Open Sans', Helvetica, Arial, sans-serif;
+          font-size: 14px;
+          font-weight: 600;
+          line-height: 24px;
+          text-align: center;
+          text-decoration: none;
+          letter-spacing: 0.4px;
+          width: 280px;
+          text-transform: uppercase;
+          -webkit-text-size-adjust: none;">
+                  WYSTAW              </a>
+  <!--[if mso]>
+    </center>
+  </v:roundrect>
+  <![endif]-->        </td>
+    </tr>
+    </table>
+<table role=3D"presentation" align=3D"center" cellpadding=3D"0" cellspacing=
+=3D"0" width=3D"100%">
+    <tr>
+        <td style=3D"padding: 8px 16px; color: #767676; font-family: 'Open =
+Sans', Helvetica, Arial, sans-serif;">
+        </td>
+    </tr>
+</table>
+<table role=3D"presentation" align=3D"center" cellpadding=3D"0" cellspacing=
+=3D"0" width=3D"100%">
+    <tr>
+        <td bgcolor=3D"#ffffff" style=3D"background: #fff;
+          padding: 13px;
+          font-size: 14px;
+          font-family: 'Open Sans', Helvetica, Arial, sans-serif;">
+
+          <table role=3D"presentation" cellpadding=3D"0" cellspacing=3D"0" =
+width=3D"100%"
+            style=3D"border-collapse: collapse; margin: 0;" border=3D"0">
+                        <tr>
+                <td style=3D"
+                font-weight: 600;
+                font-size: 17px;
+                padding-bottom: 5px;">Sprzedany przedmiot</td>
+            </tr>
+                                      <tr>
+                <td >
+                  <table role=3D"presentation" cellpadding=3D"0" cellspacin=
+g=3D"0" width=3D"100%" style=3D"border-collapse: collapse; margin: 0;" bord=
+er=3D"0">
+                    <tr>
+                      <td valign=3D"top" width=3D"96" style=3D"padding-bott=
+om: 10px; padding-top: 10px;">
+                        <img src=3D"https://a.allegroimg.com/s180x180b/1127=
+96/8cc1b55642438f12d943e1d6b84c" width=3D"96" height=3D"96" alt=3D"25szt. B=
+utelka Gorilla 60ml Liquid Aromat Baza olejki DIY kosmetyki PET" style=3D"d=
+isplay: block; border-radius: 8px;"/>
+                      </td>
+                      <td style=3D"padding-left: 12px; padding-bottom: 10px=
+; padding-top: 10px;">
+                                                  <p style=3D"
+                          margin-top: 0;
+                          text-transform: uppercase;
+                          font-size: 13px;
+                          font-weight: 600;
+                          margin-bottom: 9px;
+                          color: #FF5A00">kup teraz</p>
+                                                <p style=3D"
+                        margin-top: 0;
+                        font-weight: 600;
+                        font-size: 16px;">25szt. Butelka Gorilla 60ml Liqui=
+d Aromat Baza olejki DIY kosmetyki PET</p>
+                        <p style=3D"
+                        margin-top: 0;
+                        margin-bottom: 0;
+                        font-size: 16px;">
+                                                49,99 z=C5=82              =
+                                    <img src=3D"https://storage.googleapis.=
+com/lokalnie-prod-assets/static/mail-assets/smart-icon.png"
+                            style=3D"width: 60px; height: 16px; margin-left=
+: 8px; transform: translateY(4px);" />
+                                                                        </p=
+>
+                        <p style=3D"
+                        margin-top: 0;
+                        margin-bottom: 0;
+                        font-size: 12px;
+                        color: #767676">1 sztuka</p>
+                      </td>
+                    </tr>
+                  </table>
+                </td>
+              </tr>
+                      </table>
+        </td>
+      </tr>
+</table>
+<table role=3D"presentation" align=3D"center" cellpadding=3D"0" cellspacing=
+=3D"0" width=3D"100%">
+    <tr>
+        <td style=3D"padding: 8px 16px; color: #767676; font-family: 'Open =
+Sans', Helvetica, Arial, sans-serif;">
+        </td>
+    </tr>
+</table>
+<table role=3D"presentation" align=3D"center" cellpadding=3D"0" cellspacing=
+=3D"0" width=3D"100%">
+  <tr>
+    <td bgcolor=3D"#ffffff" style=3D"background: #fff;
+      font-size: 14px;
+      padding: 13px;
+      font-family: 'Open Sans', Helvetica, Arial, sans-serif;">
+
+      <table role=3D"presentation" cellpadding=3D"0" cellspacing=3D"0" widt=
+h=3D"100%"
+        style=3D"border-collapse: collapse; margin: 0;" border=3D"0">
+        <tr>
+          <td style=3D"padding-top:8px;">
+            <img src=3D"https://storage.googleapis.com/lokalnie-prod-assets=
+/static/mail-assets/padlock.png"
+              style=3D"margin-right: 8px;">
+          </td>
+          <td>
+            <div style=3D"
+        font-family: 'Open Sans', Helvetica, Arial, sans-serif;
+        font-weight: normal;
+        font-stretch: normal;
+        font-style: normal;
+        letter-spacing: normal;
+        padding-top: 5px;
+        font-size: 14px;
+        line-height: 16px;
+        color: #222222;">
+              <span>Wiadomo=C5=9B=C4=87 wys=C5=82ana przez Allegro do =C5=
+=81ukasz Szymankiewicz (CEWULA).</span>
+            </div>
+          </td>
+        </tr>
+      </table>
+    </td>
+  </tr>
+</table>
+<table role=3D"presentation" align=3D"center" cellpadding=3D"0" cellspacing=
+=3D"0" width=3D"100%">
+    <tr>
+        <td style=3D"padding: 8px 16px; color: #767676; font-family: 'Open =
+Sans', Helvetica, Arial, sans-serif;">
+        </td>
+    </tr>
+</table>
+<table role=3D"presentation" align=3D"center" cellpadding=3D"0" cellspacing=
+=3D"0" width=3D"100%" style=3D"max-width: 600px">
+  <tr>
+    <td bgcolor=3D"#ffffff" style=3D"background: #ECEFF1;
+      border-top-width: 3px;
+      border-top-color: #7770bd;
+      border-top-style: solid;
+      padding-left: 16px;
+      padding-right: 16px;
+      padding-bottom: 16px;
+      padding-top: 16px;
+      font-size: 14px;
+      font-family: 'Open Sans', Helvetica, Arial, sans-serif;
+      ">
+
+      <table role=3D"presentation" align=3D"center" cellpadding=3D"0" cells=
+pacing=3D"0" width=3D"100%"
+        style=3D"border-collapse: collapse; margin: 0;">
+        <tr>
+          <td>
+            <table role=3D"presentation" align=3D"center" cellpadding=3D"0"=
+ cellspacing=3D"0" width=3D"100%"
+              style=3D"border-collapse: collapse; margin: 0;">
+              <tr>
+                <td style=3D"font-family: 'Open Sans', Helvetica, Arial, sa=
+ns-serif;">
+                  <table role=3D"presentation" cellpadding=3D"0" cellspacin=
+g=3D"0" width=3D"100%"
+                    style=3D"border-collapse: collapse; margin: 0;" border=
+=3D"0">
+                    <tr>
+                      <td>
+                        <img alt=3D"Mobile icon" width=3D"24" height=3D"24"=
+ style=3D"padding-right: 8px; vertical-align: middle;"
+                          src=3D"https://storage.googleapis.com/lokalnie-pr=
+od-assets/static/mail-assets/mobile_icon.png" />
+                      </td>
+                      <td style=3D"font-family: 'Open Sans', Helvetica, Ari=
+al, sans-serif;">
+                        <p style=3D"
+                          font-size: 14px;
+                          font-weight: 600;
+                          font-style: normal;
+                          line-height: normal;
+                          letter-spacing: normal;
+                          color: #767676;
+                          margin: 0;">Czy masz ju=C5=BC aplikacj=C4=99 <spa=
+n style=3D"color: #111111;">Allegro
+                            Lokalnie</span>?
+                        </p>
+                        <p style=3D"margin-top: 8px; margin-bottom: 0; colo=
+r: #767676; font-weight: 400;">
+                          Pobierz j=C4=85. <span style=3D"font-weight: 600;=
+">Wystawiaj szybciej, kupuj wygodniej</span>!
+                          <a href=3D"https://t.allegrolokalnie.pl/aplikacja=
+-mobilna?utm_source=3Dnotification&amp;utm_medium=3DsellerParcelTerminalSta=
+tus&amp;utm_campaign=3D8e311a3f-09f2-4815-b514-61cce831cfe3&amp;tr_n=3DApli=
+kacja%20mobilna%20-%20Landing%20Page&amp;tr_id=3Df7fd3c0c-2b28-4668-ba2d-79=
+c2817e05a5&amp;tr_d=3Dzobacz.allegrolokalnie.pl&amp;tr_s=3D2FsQgQhB"
+                            style=3D"
+=09=09=09=09=09=09=09=09=09=09=09=09=09=09-webkit-text-size-adjust:100%;
+=09=09=09=09=09=09=09=09=09=09=09=09=09=09-ms-text-size-adjust:100%;
+=09=09=09=09=09=09=09=09=09=09=09=09=09=09text-decoration: none;
+=09=09=09=09=09=09=09=09=09=09=09=09=09=09color: #2BB9A3;" target=3D"_blank=
+" class=3D"alLink">Dowiedz si=C4=99 wi=C4=99cej</a>.
+                        </p>
+                      </td>
+                    </tr>
+                  </table>
+                  <table role=3D"presentation" cellpadding=3D"0" cellspacin=
+g=3D"0" width=3D"100%"
+                    style=3D"border-collapse: collapse; margin: 0; margin-t=
+op: 16px;" border=3D"0">
+                    <tr>
+                      <td>
+                        <table role=3D"presentation" cellpadding=3D"0" cell=
+spacing=3D"0"
+                          style=3D"border-collapse: collapse; margin: 0;">
+                          <tr>
+                            <td style=3D"padding-right: 16px;">
+                              <a href=3D"https://t.allegro.pl/rd/f7fd3c0c-2=
+b28-4668-ba2d-79c2817e05a5?name=3DAndroid%20App&amp;url=3Dhttps://play.goog=
+le.com/store/apps/details?utm_source%3Dnotification%26utm_medium%3DsellerPa=
+rcelTerminalStatus%26utm_campaign%3D8e311a3f-09f2-4815-b514-61cce831cfe3%26=
+id%3Dpl.allegro.sale%26hl%3Den%26gl%3DUS&amp;s=3DCsuUkYBM"
+                                style=3D"text-decoration: none;" target=3D"=
+_blank">
+                                <img alt=3D"Pobierz z Google Store" width=
+=3D"135" height=3D"43"
+                                  src=3D"https://assets.allegrostatic.com/m=
+ail-assets/playstore.png" />
+                              </a>
+                            </td>
+                            <td>
+                              <a href=3D"https://t.allegro.pl/rd/f7fd3c0c-2=
+b28-4668-ba2d-79c2817e05a5?name=3DiOS%20App&amp;url=3Dhttps://apps.apple.co=
+m/pl/app/allegro-lokalnie/id910511602?utm_source%3Dnotification%26utm_mediu=
+m%3DsellerParcelTerminalStatus%26utm_campaign%3D8e311a3f-09f2-4815-b514-61c=
+ce831cfe3&amp;s=3DCBKa9ygM"
+                                style=3D"text-decoration: none;" target=3D"=
+_blank">
+                                <img alt=3D"Pobierz z App Store" width=3D"1=
+35" height=3D"43"
+                                  src=3D"https://assets.allegrostatic.com/m=
+ail-assets/appstore.png" />
+                              </a>
+                            </td>
+                          </tr>
+                        </table>
+                      </td>
+                    </tr>
+                  </table>
+                </td>
+              </tr>
+            </table>
+          </td>
+        </tr>
+        <tr>
+          <td style=3D"font-size: 0; line-height: 0; padding-top: 16px; pad=
+ding-bottom: 16px;">
+            <div style=3D"border-bottom: 1px solid #dddddd;">&nbsp;</div>
+          </td>
+        </tr>
+        <tr>
+          <td style=3D"font-family: 'Open Sans', Helvetica, Arial, sans-ser=
+if; color: #767676;">
+            <table role=3D"presentation" cellpadding=3D"0" cellspacing=3D"0=
+" style=3D"border-collapse: collapse; margin: 0;">
+              <tr>
+                <td>
+                  Masz pytania? <a
+                    href=3D"https://t.allegro.pl/pomoc?utm_source=3Dnotific=
+ation&amp;utm_medium=3DsellerParcelTerminalStatus&amp;utm_campaign=3D8e311a=
+3f-09f2-4815-b514-61cce831cfe3&amp;tr_n=3DSkorzystaj%20z%20Pomocy%20Allegro=
+&amp;tr_id=3Df7fd3c0c-2b28-4668-ba2d-79c2817e05a5&amp;tr_d=3Dallegro.pl&amp=
+;tr_s=3DXs4FVmiC" style=3D"
+=09=09=09=09=09=09=09=09=09=09=09=09=09=09-webkit-text-size-adjust:100%;
+=09=09=09=09=09=09=09=09=09=09=09=09=09=09-ms-text-size-adjust:100%;
+=09=09=09=09=09=09=09=09=09=09=09=09=09=09text-decoration: none;
+=09=09=09=09=09=09=09=09=09=09=09=09=09=09color: #2BB9A3;" target=3D"_blank=
+" class=3D"alLink">Skorzystaj z Pomocy Allegro</a>.
+                </td>
+              </tr>
+            </table>
+          </td>
+        </tr>
+        <tr>
+          <td style=3D"font-size: 0; line-height: 0; padding-top: 16px; pad=
+ding-bottom: 16px;">
+            <div style=3D"border-bottom: 1px solid #dddddd;">&nbsp;</div>
+          </td>
+        </tr>
+        <tr>
+          <td style=3D"font-family: 'Open Sans', Helvetica, Arial, sans-ser=
+if; color: #767676; padding-bottom: 16px;">
+            Polub nas na social media i b=C4=85d=C5=BA na bie=C5=BC=C4=85co=
+ z najlepszymi ofertami
+          </td>
+        </tr>
+        <tr>
+          <td style=3D"padding-bottom: 16px;">
+            <table role=3D"presentation" cellpadding=3D"0" cellspacing=3D"0=
+" style=3D"border-collapse: collapse; margin: 0;">
+              <tr>
+                <td style=3D"padding-right: 8px;">
+                  <a href=3D"https://t.allegro.pl/rd/f7fd3c0c-2b28-4668-ba2=
+d-79c2817e05a5?name=3DFacebook&amp;url=3Dhttps://www.facebook.com/allegro?u=
+tm_source%3Dnotification%26utm_medium%3DsellerParcelTerminalStatus%26utm_ca=
+mpaign%3D8e311a3f-09f2-4815-b514-61cce831cfe3&amp;s=3DFnEEiIVR"
+                    style=3D"text-decoration: none;" target=3D"_blank">
+                    <img alt=3D"Facebook" width=3D"32" height=3D"32"
+                      src=3D"https://storage.googleapis.com/lokalnie-prod-a=
+ssets/static/mail-assets/social/facebook.png" />
+                  </a>
+                </td>
+                <td style=3D"padding-right: 8px;">
+                  <a href=3D"https://t.allegro.pl/rd/f7fd3c0c-2b28-4668-ba2=
+d-79c2817e05a5?name=3DLinkedin&amp;url=3Dhttps://www.linkedin.com/company/a=
+llegro-pl/?utm_source%3Dnotification%26utm_medium%3DsellerParcelTerminalSta=
+tus%26utm_campaign%3D8e311a3f-09f2-4815-b514-61cce831cfe3&amp;s=3D1betHpVD"
+                    style=3D"text-decoration: none;" target=3D"_blank">
+                    <img alt=3D"Linkedin" width=3D"32" height=3D"32"
+                      src=3D"https://storage.googleapis.com/lokalnie-prod-a=
+ssets/static/mail-assets/social/linkedin.png" />
+                  </a>
+                </td>
+                <td style=3D"padding-right: 8px;">
+                  <a href=3D"https://t.allegro.pl/rd/f7fd3c0c-2b28-4668-ba2=
+d-79c2817e05a5?name=3DInstagram&amp;url=3Dhttps://www.instagram.com/allegro=
+pl/?utm_source%3Dnotification%26utm_medium%3DsellerParcelTerminalStatus%26u=
+tm_campaign%3D8e311a3f-09f2-4815-b514-61cce831cfe3&amp;s=3DPL9R6Zn2"
+                    style=3D"text-decoration: none;" target=3D"_blank">
+                    <img alt=3D"Instagram" width=3D"32" height=3D"32"
+                      src=3D"https://storage.googleapis.com/lokalnie-prod-a=
+ssets/static/mail-assets/social/instagram.png" />
+                  </a>
+                </td>
+                <td style=3D"padding-right: 8px;">
+                  <a href=3D"https://t.allegro.pl/rd/f7fd3c0c-2b28-4668-ba2=
+d-79c2817e05a5?name=3DPinterest&amp;url=3Dhttps://pl.pinterest.com/allegrop=
+l/?utm_source%3Dnotification%26utm_medium%3DsellerParcelTerminalStatus%26ut=
+m_campaign%3D8e311a3f-09f2-4815-b514-61cce831cfe3&amp;s=3Drw/qXJbt"
+                    style=3D"text-decoration: none;" target=3D"_blank">
+                    <img alt=3D"Pinterest" width=3D"32" height=3D"32"
+                      src=3D"https://storage.googleapis.com/lokalnie-prod-a=
+ssets/static/mail-assets/social/pinterest.png" />
+                  </a>
+                </td>
+                <td style=3D"padding-right: 8px;">
+                  <a href=3D"https://t.allegro.pl/rd/f7fd3c0c-2b28-4668-ba2=
+d-79c2817e05a5?name=3DYoutube&amp;url=3Dhttps://www.youtube.com/channel/UCK=
+I3iYa4A86oD2R01Njr4oA?utm_source%3Dnotification%26utm_medium%3DsellerParcel=
+TerminalStatus%26utm_campaign%3D8e311a3f-09f2-4815-b514-61cce831cfe3&amp;s=
+=3DgIFs9qkx"
+                    style=3D"text-decoration: none;" target=3D"_blank">
+                    <img alt=3D"Youtube" width=3D"32" height=3D"32"
+                      src=3D"https://storage.googleapis.com/lokalnie-prod-a=
+ssets/static/mail-assets/social/youtube.png" />
+                  </a>
+                </td>
+              </tr>
+            </table>
+          </td>
+        </tr>
+        <tr>
+          <td style=3D"font-family: 'Open Sans', Helvetica, Arial, sans-ser=
+if; color: #767676; padding-bottom: 16px;">
+            Ka=C5=BCdy e-mail od Allegro zawiera Twoje imi=C4=99, nazwisko =
+i login (je=C5=9Bli masz je na swoim koncie). Je=C5=9Bli
+            podejrzewasz, =C5=BCe e-mail jest fa=C5=82szywy,
+            <a href=3D"https://t.allegro.pl/pomoc/kontakt?utm_source=3Dnoti=
+fication&amp;utm_medium=3DsellerParcelTerminalStatus&amp;utm_campaign=3D8e3=
+11a3f-09f2-4815-b514-61cce831cfe3&amp;tr_n=3DStrona%20kontaktowa&amp;tr_id=
+=3Df7fd3c0c-2b28-4668-ba2d-79c2817e05a5&amp;tr_d=3Dallegro.pl&amp;tr_s=3DhK=
+uqWmZH" style=3D"
+              -webkit-text-size-adjust:100%;
+              -ms-text-size-adjust:100%;
+              text-decoration: none;
+              color: #2BB9A3;" target=3D"_blank" class=3D"alLink">skontaktu=
+j si=C4=99 z nami</a>.
+            Wi=C4=99cej informacji znajdziesz w
+            <a href=3D"https://t.allegro.pl/bezpieczenstwo/pelne-bezpieczen=
+stwo?utm_source=3Dnotification&amp;utm_medium=3DsellerParcelTerminalStatus&=
+amp;utm_campaign=3D8e311a3f-09f2-4815-b514-61cce831cfe3&amp;tr_n=3Dcentrum%=
+20bezpiecze%C5%84stwa%20Allegro&amp;tr_id=3Df7fd3c0c-2b28-4668-ba2d-79c2817=
+e05a5&amp;tr_d=3Ddlakupujacych.allegro.pl&amp;tr_s=3DISDNHujR"
+              style=3D"
+              -webkit-text-size-adjust:100%;
+              -ms-text-size-adjust:100%;
+              text-decoration: none;
+              color: #2BB9A3;" target=3D"_blank" class=3D"alLink">centrum b=
+ezpiecze=C5=84stwa Allegro</a>.
+          </td>
+        </tr>
+        <tr>
+          <td style=3D"font-family: 'Open Sans', Helvetica, Arial, sans-ser=
+if; color: #767676; padding-bottom: 16px;">
+            Wiadomo=C5=9B=C4=87 zosta=C5=82a wys=C5=82ana automatycznie, dl=
+atego na ni=C4=85 nie odpowiadaj. Je=C5=9Bli chcesz z nami porozmawia=C4=87=
+,
+            skorzystaj ze
+            <a href=3D"https://t.allegro.pl/pomoc/kontakt?utm_source=3Dnoti=
+fication&amp;utm_medium=3DsellerParcelTerminalStatus&amp;utm_campaign=3D8e3=
+11a3f-09f2-4815-b514-61cce831cfe3&amp;tr_n=3DStrona%20kontaktowa&amp;tr_id=
+=3Df7fd3c0c-2b28-4668-ba2d-79c2817e05a5&amp;tr_d=3Dallegro.pl&amp;tr_s=3DhK=
+uqWmZH" style=3D"
+              -webkit-text-size-adjust:100%;
+              -ms-text-size-adjust:100%;
+              text-decoration: none;
+              color: #2BB9A3;" target=3D"_blank" class=3D"alLink">strony ko=
+ntaktowej</a>.
+          </td>
+        </tr>
+        <tr>
+          <td style=3D"font-family: 'Open Sans', Helvetica, Arial, sans-ser=
+if; color: #767676; padding-bottom: 16px;">
+            Je=C5=BCeli nie chcesz otrzymywa=C4=87 tego typu wiadomo=C5=9Bc=
+i, <a href=3D"https://t.allegro.pl/moje-allegro/moje-konto/powiadomienia?ut=
+m_source=3Dnotification&amp;utm_medium=3DsellerParcelTerminalStatus&amp;utm=
+_campaign=3D8e311a3f-09f2-4815-b514-61cce831cfe3&amp;tr_n=3DDostosowanie%20=
+ustawie%C5%84%20zg%C3%B3d%20na%20powiadomienia&amp;tr_id=3Df7fd3c0c-2b28-46=
+68-ba2d-79c2817e05a5&amp;tr_d=3Dallegro.pl&amp;tr_s=3DMrsFZ%2BnR" style=3D"
+            -webkit-text-size-adjust:100%;
+            -ms-text-size-adjust:100%;
+            text-decoration: none;
+            color: #2BB9A3;" target=3D"_blank" class=3D"alLink">dostosuj us=
+tawienia zg=C3=B3d na powiadomienia.</a>
+          </td>
+        </tr>
+        <tr>
+          <td style=3D"font-family: 'Open Sans', Helvetica, Arial, sans-ser=
+if; color: #767676;">
+            Allegro sp. z o.o. z siedzib=C4=85 w Poznaniu, przy ul. Wierzbi=
+=C4=99cice 1B, 61-569 Pozna=C5=84, wpisana do rejestru
+            przedsi=C4=99biorc=C3=B3w prowadzonego przez S=C4=85d Rejonowy =
+Pozna=C5=84 - Nowe Miasto i Wilda w Poznaniu, VIII Wydzia=C5=82
+            Gospodarczy Krajowego Rejestru S=C4=85dowego pod numerem KRS: 0=
+000635012, kapita=C5=82 zak=C5=82adowy: 40 000 000 z=C5=82otych,
+            posiadaj=C4=85ca numer identyfikacji podatkowej NIP 525-26-74-7=
+98, REGON 365331553
+          </td>
+        </tr>
+      </table>
+    </td>
+  </tr>
+</table>
+              </td>
+            </tr>
+          </table>
+        </td>
+      </tr>
+    </table>
+  </center>
+  <!--[if mso]></td></tr></table></td></tr></table><![endif]-->
+  <img src=3D"https://t.allegro.pl/tr/f7fd3c0c-2b28-4668-ba2d-79c2817e05a5.=
+gif" width=3D"0" height=3D"0" alt=3D"" style=3D"display: block;"></body>
+
+</html>

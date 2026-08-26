@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from app.domain.entities.allegro_lokalnie_event import AllegroLokalnieEvent
+from app.domain.entities.dispute_notice import DisputeNotice
 from app.domain.entities.order import Order
 from app.domain.entities.order_return import OrderReturn
 from app.domain.interfaces.notifier import Notifier
@@ -19,6 +21,8 @@ class FakeNotifier(Notifier):
         self.sent_low_stock: list[tuple[str, str, int, int]] = []
         self.sent_reminders: list[ShippingReminderData] = []
         self.sent_active_orders: list[list[Order]] = []
+        self.sent_allegro_lokalnie: list[AllegroLokalnieEvent] = []
+        self.sent_disputes: list[DisputeNotice] = []
 
     async def notify_new_order(self, order: Order) -> None:
         self.sent_orders.append(order)
@@ -37,6 +41,12 @@ class FakeNotifier(Notifier):
 
     async def notify_active_orders(self, orders: list[Order]) -> None:
         self.sent_active_orders.append(list(orders))
+
+    async def notify_allegro_lokalnie(self, event: AllegroLokalnieEvent) -> None:
+        self.sent_allegro_lokalnie.append(event)
+
+    async def notify_new_dispute(self, notice: DisputeNotice) -> None:
+        self.sent_disputes.append(notice)
 
     async def send_text(self, text: str) -> None:
         self.sent_texts.append(text)

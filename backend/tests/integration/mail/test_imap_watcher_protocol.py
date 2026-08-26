@@ -12,6 +12,7 @@ from datetime import datetime
 from email.message import EmailMessage
 
 import aioimaplib
+import pytest
 import pytest_asyncio
 
 from app.infrastructure.mail.imap_watcher import ImapWatcher
@@ -33,6 +34,31 @@ def _build_message(
     message["Subject"] = subject
     message["Date"] = date_header
     message.set_content(body)
+    return message.as_bytes()
+
+
+def _build_html_message(
+    message_id: str = "<html1@allegromail.pl>",
+    sender: str = "Allegro <powiadomienia@allegro.pl>",
+) -> bytes:
+    """
+    Mail JEDNOCZĘŚCIOWY `text/html` - dokładnie taki, jaki Allegro wysyła
+    przy powiadomieniach o dyskusji, i dokładnie ten kształt, który
+    wychodził w aplikacji jako surowe źródło.
+    """
+    message = EmailMessage()
+    message["Message-ID"] = message_id
+    message["From"] = sender
+    message["Subject"] = "Dyskusja - nowa wiadomość od naszego doradcy"
+    message["Date"] = "Sat, 08 Aug 2026 09:30:00 +0000"
+    message.set_content(
+        '<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">\n'
+        '<html lang="pl"><head><style>body{font-family:Arial}</style></head>'
+        "<body><p>Dzie&#324; dobry,</p>"
+        "<p>masz now&#261; wiadomo&#347;&#263; od naszego doradcy.</p>"
+        "</body></html>",
+        subtype="html",
+    )
     return message.as_bytes()
 
 
@@ -160,7 +186,95 @@ class TestFetchNewFromSenders:
         assert z_domena == []
         assert len(z_tokenem) == 1
 
+    async def test_token_allegro_lapie_takze_allegro_lokalnie(self, server: FakeImapServer):
+        """
+        KLUCZOWE DLA KONFIGURACJI NA PI. IMAP dopasowuje FROM po
+        podciągu, więc token "allegro" łapie i `allegromail.pl`,
+        i `allegrolokalnie.pl` - ale wpisana w `.env` DOMENA "allegro.pl"
+        nie łapie żadnego z nich. Przy złej wartości `MAIL_WATCH_SENDERS`
+        powiadomienia z Allegro Lokalnie w ogóle nie trafiają do ORDLY.
+        """
+        server.add_message(
+            _build_message(
+                message_id="<al1@allegrolokalnie.pl>",
+                sender="Allegro Lokalnie <powiadomienia@allegrolokalnie.pl>",
+                subject="Nowe zamówienie",
+            )
+        )
+
+        z_tokenem = await _watcher(server).fetch_new_from_senders(["allegro"], _SINCE)
+        z_domena = await _watcher(server).fetch_new_from_senders(["allegro.pl"], _SINCE)
+
+        assert [m.message_id for m in z_tokenem] == ["<al1@allegrolokalnie.pl>"]
+        assert z_tokenem[0].source == "allegro_lokalnie"
+        assert z_domena == []
+
     async def test_pusta_skrzynka_zwraca_pusta_liste(self, server: FakeImapServer):
         messages = await _watcher(server).fetch_new_from_senders(["allegro"], _SINCE)
 
         assert messages == []
+
+    async def test_podglad_maila_html_nie_zawiera_znacznikow(self, server: FakeImapServer):
+        """
+        Regresja buga "surowy kod HTML w skrzynce": mail jednoczęściowy
+        `text/html` nie ma części `text/plain`, więc podgląd budowany z
+        surowego payloadu zaczynał się od `<!DOCTYPE HTML ...`.
+        """
+        server.add_message(_build_html_message())
+
+        messages = await _watcher(server).fetch_new_from_senders(["allegro"], _SINCE)
+
+        assert len(messages) == 1
+        preview = messages[0].body_preview
+        assert "<" not in preview
+        assert "DOCTYPE" not in preview
+        assert "Dzień dobry" in preview
+
+
+class TestFetchBodiesByMessageId:
+    """Dociąganie pełnej treści pojedynczego maila na żądanie użytkownika."""
+
+    async def test_znajduje_maila_po_message_id_i_oddaje_obie_wersje(
+        self, server: FakeImapServer
+    ):
+        server.add_message(_build_message(message_id="<inny@allegromail.pl>"))
+        server.add_message(_build_html_message())
+
+        bodies = await _watcher(server).fetch_bodies_by_message_id("<html1@allegromail.pl>")
+
+        assert bodies is not None
+        assert bodies.html is not None
+        assert bodies.html.startswith("<!DOCTYPE HTML")
+        assert bodies.text is None
+
+    async def test_nie_oznacza_maila_jako_przeczytanego(self, server: FakeImapServer):
+        """Otwarcie wiadomości w ORDLY nie może zmienić jej stanu w Gmailu."""
+        server.add_message(_build_html_message())
+
+        await _watcher(server).fetch_bodies_by_message_id("<html1@allegromail.pl>")
+
+        fetches = [cmd for cmd in server.commands if " FETCH " in f" {cmd} "]
+        assert fetches, "watcher w ogóle nie pobrał wiadomości"
+        for command in fetches:
+            assert "BODY.PEEK[]" in command
+            assert "RFC822" not in command
+
+    async def test_brak_maila_na_serwerze_zwraca_none(self, server: FakeImapServer):
+        """Mail skasowany w Gmailu to brak treści, a nie błąd połączenia."""
+        server.add_message(_build_message())
+
+        bodies = await _watcher(server).fetch_bodies_by_message_id("<niema@allegromail.pl>")
+
+        assert bodies is None
+
+    async def test_message_id_z_cudzyslowem_jest_odrzucone(self, server: FakeImapServer):
+        """
+        Cudzysłów w wartości pozwoliłby doczepić do komendy IMAP własne
+        argumenty - odpowiednik SQL injection dla protokołu pocztowego.
+        """
+        server.add_message(_build_message())
+
+        with pytest.raises(ValueError):
+            await _watcher(server).fetch_bodies_by_message_id('<a" OR FROM "bank')
+
+        assert not any("HEADER" in command for command in server.commands)
