@@ -105,6 +105,8 @@ class TestPushNigdyNieDostajeHtml:
                 amount=None,
                 message_id="<m@x>",
             ),
+            push_payload.olx_event(event_type="unknown", opis="A", message_id="<m@olx.pl>"),
+            push_payload.olx_event(event_type="new_order", opis="A", message_id="<m@olx.pl>"),
         ]
 
         for payload in payloads:

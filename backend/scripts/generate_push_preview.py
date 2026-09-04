@@ -193,6 +193,60 @@ def _karty() -> list[Karta]:
                 "w tytule ucinała się na „Allegro Lok…”."
             ),
         ),
+        Karta(
+            builder="allegro_lokalnie_event (zwrot)",
+            kiedy="Gdy mail z Allegro Lokalnie dotyczy zwrotu albo reklamacji.",
+            payload=push_payload.allegro_lokalnie_event(
+                event_type="return",
+                listing_title=(
+                    "25szt. Butelka Gorilla 60ml Liquid Aromat Baza olejki DIY kosmetyki PET"
+                ),
+                quantity=1,
+                amount=Decimal("71.98"),
+                message_id="<notificationsthree.20260901101500@allegro.pl>",
+            ),
+            uwaga=(
+                "Ten sam builder co wyżej, inny typ zdarzenia. Zwrot był dotąd "
+                "wrzucony do „Zmiana zamówienia” razem z „paczka dostarczona” i "
+                "„anulowano” - a jako jedyny z tej trójki wymaga reakcji, więc ma "
+                "teraz własny tytuł."
+            ),
+            czas="10:15",
+        ),
+        Karta(
+            builder="olx_event (sprzedaż)",
+            kiedy="Gdy ktoś kupi Twoje ogłoszenie z Przesyłką OLX.",
+            payload=push_payload.olx_event(
+                event_type="new_order",
+                # Dane z REALNEGO maila: tests/fixtures/olx/
+                # "Kupujacy juz zaplacil, potwierdz sprzedaz do 15_29 16-12-2025"
+                opis="5x Butelka Gorilla 60ml Każda Ilość | Na Liquid Aromat Klej Tusz | DIY",
+                message_id="<0102019b181eba89-5cdc713d@eu-west-1.amazonses.com>",
+            ),
+            uwaga=(
+                "Bez kwoty i bez słowa „zamówienie”, bo zamówienie w ORDLY z tego NIE "
+                "powstaje: mail z OLX nie podaje ceny ani sumy zapłaconej. Stąd „stan "
+                "bez zmian” w treści - magazyn poprawiasz ręcznie i to jedyne miejsce, "
+                "gdzie ta informacja trafia na ekran blokady."
+            ),
+            czas="15:29",
+        ),
+        Karta(
+            builder="olx_event (wiadomość)",
+            kiedy="Gdy kupujący napisze w sprawie ogłoszenia.",
+            payload=push_payload.olx_event(
+                event_type="new_message",
+                opis="Butelki PET 10 ml do liquidów – zestaw 10 szt. + dozownik + zakrętka",
+                message_id="<010201a048a929c9-47b08d7c@eu-west-1.amazonses.com>",
+            ),
+            uwaga=(
+                "Nazwa kanału ZOSTAJE w tytule, odwrotnie niż przy Allegro Lokalnie: "
+                "„OLX” to trzy znaki, więc nic się nie ucina. Treścią jest tytuł "
+                "ogłoszenia, bo temat maila jest dla wszystkich wiadomości z OLX "
+                "identyczny („Wiadomości dotyczące ogłoszeń”) i sam z siebie nie mówi nic."
+            ),
+            czas="13:57",
+        ),
     ]
 
 

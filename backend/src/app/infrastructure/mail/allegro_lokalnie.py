@@ -40,6 +40,7 @@ from app.domain.entities.allegro_lokalnie_event import (
     EVENT_NEW_MESSAGE,
     EVENT_NEW_ORDER,
     EVENT_ORDER_STATUS,
+    EVENT_RETURN,
     EVENT_UNKNOWN,
     AllegroLokalnieEvent,
 )
@@ -64,12 +65,31 @@ _SUBJECT_RULES: tuple[tuple[str, tuple[str, ...]], ...] = (
         ),
     ),
     (
+        # Zwrot STOI PRZED `EVENT_ORDER_STATUS`, bo to też zmiana
+        # zamówienia - gdyby był niżej, wpadłby w ogólniejszą grupę.
+        # UWAGA: żadna z próbek w `tests/fixtures/allegro_lokalnie/` nie
+        # jest zwrotem (mamy sprzedaż, wiadomość, pytanie o dostawę i
+        # doręczenie paczki), więc dokładne brzmienie tematu maila
+        # o zwrocie jest NIEPOTWIERDZONE. Wzorzec "zwrot" był tu już
+        # wcześniej - w grupie `EVENT_ORDER_STATUS` - i to jego jedyną
+        # zmianą jest teraz trafniejsza etykieta: temat ze słowem
+        # „zwrot" nigdy nie oznacza doręczonej paczki. Jeśli Allegro
+        # Lokalnie nazywa te maile inaczej, zdarzenie wpadnie w
+        # `order_status` albo `unknown` - czyli tak jak dotąd, bez
+        # regresu. Po pierwszej realnej próbce dopisz ją do fixtures
+        # i uzupełnij wzorce.
+        EVENT_RETURN,
+        (
+            "zwrot",
+            "reklamacj",
+        ),
+    ),
+    (
         EVENT_ORDER_STATUS,
         (
             "dostarczylismy twoja paczke",  # "Dostarczyliśmy Twoją paczkę z…"
             "paczka dotarla",
             "anulowa",
-            "zwrot",
             "status zamowienia",
         ),
     ),

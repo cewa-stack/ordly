@@ -30,6 +30,7 @@ from app.domain.entities.allegro_lokalnie_event import (
     EVENT_NEW_MESSAGE,
     EVENT_NEW_ORDER,
     EVENT_ORDER_STATUS,
+    EVENT_RETURN,
     EVENT_UNKNOWN,
     AllegroLokalnieEvent,
 )
@@ -158,6 +159,36 @@ class TestKlasyfikacja:
 
         assert "kup teraz" in message.body_preview.lower()
         assert event.event_type == EVENT_NEW_MESSAGE
+
+    def test_zwrot_jest_osobnym_zdarzeniem_a_nie_zmiana_statusu(self):
+        """
+        Zwrot wymaga reakcji, doręczenie paczki nie - a dotąd oba wpadały
+        w `order_status` i dostawały ten sam tytuł powiadomienia
+        („Zmiana zamówienia"), przez co na ekranie blokady brzmiały
+        identycznie.
+
+        UWAGA: nie mamy fixture ze zwrotem z Allegro Lokalnie - poniższy
+        temat jest ZŁOŻONY RĘCZNIE i sprawdza wyłącznie REGUŁĘ
+        (`zwrot` -> `EVENT_RETURN`), a nie to, że Allegro Lokalnie
+        naprawdę tak tytułuje te maile. Gdy przyjdzie prawdziwa próbka,
+        dołóż ją do `tests/fixtures/allegro_lokalnie/` i dopisz test
+        parametryzowany jak dla pozostałych typów.
+        """
+        message, _ = wczytaj(SPRZEDANO_25)
+        zwrot = MailMessage(
+            message_id=message.message_id,
+            sender=message.sender,
+            subject="Zwrot 25szt. Butelka Gorilla 60ml Liquid Aromat Baza olejki DIY",
+            received_at=message.received_at,
+            source=message.source,
+            body_preview=message.body_preview,
+        )
+
+        assert parse_event(zwrot).event_type == EVENT_RETURN
+
+    def test_doreczenie_paczki_dalej_jest_zmiana_statusu(self):
+        """Wydzielenie zwrotu nie ma przeklasyfikować pozostałych maili."""
+        assert zdarzenie(DORECZONO).event_type == EVENT_ORDER_STATUS
 
     def test_tylko_sprzedaz_liczy_sie_jako_zamowienie(self):
         sprzedaz = [zdarzenie(n).is_order for n in (SPRZEDANO_100, DORECZONO)]

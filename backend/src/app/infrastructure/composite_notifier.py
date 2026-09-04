@@ -10,6 +10,7 @@ from loguru import logger
 
 from app.domain.entities.allegro_lokalnie_event import AllegroLokalnieEvent
 from app.domain.entities.dispute_notice import DisputeNotice
+from app.domain.entities.olx_event import OlxEvent
 from app.domain.entities.order import Order
 from app.domain.entities.order_return import OrderReturn
 from app.domain.interfaces.notifier import Notifier
@@ -86,6 +87,10 @@ class CompositeNotifier(Notifier):
     async def notify_allegro_lokalnie(self, event: AllegroLokalnieEvent) -> None:
         """Rozgłasza zdarzenie z Allegro Lokalnie do wszystkich kanałów."""
         await self._run_all([n.notify_allegro_lokalnie(event) for n in self._notifiers])
+
+    async def notify_olx_event(self, event: OlxEvent) -> None:
+        """Rozgłasza zdarzenie z OLX do wszystkich kanałów."""
+        await self._run_all([n.notify_olx_event(event) for n in self._notifiers])
 
     async def notify_new_dispute(self, notice: DisputeNotice) -> None:
         """Rozgłasza informację o nowej dyskusji do wszystkich kanałów."""

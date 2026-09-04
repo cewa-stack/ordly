@@ -18,7 +18,12 @@ import aioimaplib
 
 from app.domain.entities.mail_message import MailMessage
 from app.infrastructure.mail.classify import classify_sender
-from app.infrastructure.mail.mime import MailBodies, extract_bodies, html_to_plain_text
+from app.infrastructure.mail.mime import (
+    MailBodies,
+    extract_bodies,
+    html_to_plain_text,
+    looks_like_markup,
+)
 from app.utils.time import utc_now
 
 _BODY_PREVIEW_LENGTH = 500
@@ -261,10 +266,20 @@ def _extract_body_preview(msg: Message) -> str:
     widać było `<!DOCTYPE HTML ...` zamiast wiadomości. Teraz HTML jest
     najpierw sprowadzany do tekstu, a maile bez części `text/plain` nie
     dają już pustego podglądu.
+
+    Część `text/plain` też nie jest tu przyjmowana na słowo: maile
+    sprzedażowe z OLX mają w niej dosłowne `<a href="…">Potwierdź
+    sprzedaż</a>`, bo szablon wkleja do wariantu tekstowego ten sam kod,
+    co do HTML-owego. Gdy w „tekście" stoją znaczniki, przepuszczamy go
+    przez ten sam konwerter - inaczej wróciłby ten sam objaw, tylko
+    innymi drzwiami.
     """
     bodies = extract_bodies(msg)
     if bodies.text and bodies.text.strip():
-        return bodies.text.strip()[:_BODY_PREVIEW_LENGTH]
+        text = bodies.text.strip()
+        if looks_like_markup(text):
+            text = html_to_plain_text(text)
+        return text[:_BODY_PREVIEW_LENGTH]
     if bodies.html:
         return html_to_plain_text(bodies.html)[:_BODY_PREVIEW_LENGTH]
     return ""

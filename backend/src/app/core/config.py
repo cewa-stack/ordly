@@ -332,11 +332,28 @@ class MailWatchSettings(BaseSettings):
     # (allegro.pl, allegromail.pl, powiadomienia@allegromail.pl) i są spójne z
     # `classify_sender`, które klasyfikuje źródło dokładnie tak samo.
     watch_senders_raw: str = Field(default="allegro,olx", alias="MAIL_WATCH_SENDERS")
+    # Fragmenty adresów nadawców, których NIE chcemy w skrzynce, mimo że
+    # przechodzą przez `watch_senders`. IMAP SEARCH FROM dopasowuje
+    # podciąg, więc `powiadomienia@marketing.olx.pl` łapie się na "olx",
+    # a `hello@newsletter.allegro.pl` na "allegro" - dokładnie tak samo
+    # jak prawdziwe powiadomienia o sprzedaży. Zwężenie `watch_senders`
+    # do pełnych domen nie wchodzi w grę (patrz komentarz wyżej: to
+    # odcięłoby realnego nadawcę `noreply@allegromail.pl`), więc marketing
+    # odsiewamy osobną listą, sprawdzaną PO stronie klienta. Rozszerza się
+    # ją bez ryzyka dla odbioru prawdziwej poczty.
+    exclude_senders_raw: str = Field(
+        default="marketing.olx.pl,newsletter.allegro.pl", alias="MAIL_EXCLUDE_SENDERS"
+    )
 
     @property
     def watch_senders(self) -> list[str]:
         """Lista fragmentów adresów nadawców do obserwowania, bez pustych wpisów."""
         return [s.strip() for s in self.watch_senders_raw.split(",") if s.strip()]
+
+    @property
+    def exclude_senders(self) -> list[str]:
+        """Fragmenty adresów nadawców do pominięcia (marketing), pisane małymi literami."""
+        return [s.strip().lower() for s in self.exclude_senders_raw.split(",") if s.strip()]
 
     @property
     def enabled(self) -> bool:

@@ -317,6 +317,32 @@ class TestAllegroLokalnie:
         assert "AL Lokalnie" not in payload.body
         assert len(payload.title) <= 24
 
+    def test_zwrot_ma_wlasny_tytul_odrozny_od_zmiany_zamowienia(self):
+        """
+        Zwrot wymaga reakcji, „paczka dostarczona" i „anulowano" nie -
+        a wszystkie trzy dostawały dotąd tytuł „Zmiana zamówienia".
+        Na ekranie blokady widać wyłącznie tytuł, więc rozróżnienie
+        musi być właśnie tam.
+        """
+        zwrot = push_payload.allegro_lokalnie_event(
+            event_type="return",
+            listing_title="Butelka Gorilla 60ml",
+            quantity=1,
+            amount=None,
+            message_id="<al-zwrot@allegrolokalnie.pl>",
+        )
+        status = push_payload.allegro_lokalnie_event(
+            event_type="order_status",
+            listing_title="Butelka Gorilla 60ml",
+            quantity=1,
+            amount=None,
+            message_id="<al-status@allegrolokalnie.pl>",
+        )
+
+        assert zwrot.title == "Zwrot / reklamacja"
+        assert zwrot.title != status.title
+        assert len(zwrot.title) <= 24
+
     def test_bez_kwoty_tresc_jej_nie_zmysla(self):
         payload = push_payload.allegro_lokalnie_event(
             event_type="new_message",
@@ -510,7 +536,85 @@ class TestTytulyMieszczaSieNaEkranieBlokady:
                 amount=None,
                 message_id="<m@x>",
             ),
+            push_payload.olx_event(event_type="new_order", opis="A", message_id="<m@olx.pl>"),
+            push_payload.olx_event(event_type="return", opis="A", message_id="<m@olx.pl>"),
+            push_payload.olx_event(
+                event_type="new_message", opis="A", message_id="<m@olx.pl>"
+            ),
         ]
 
         zbyt_dlugie = [p.title for p in payloads if len(p.title) > self.LIMIT]
         assert zbyt_dlugie == []
+
+
+class TestOlx:
+    """
+    Kanał, o którym ORDLY dowiaduje się wyłącznie z poczty.
+
+    Sprzedaż z OLX NIE staje się zamówieniem - mail nie podaje kwoty
+    (patrz `domain/entities/olx_event.py`), więc zostaje powiadomieniem.
+    Treść musi to powiedzieć wprost, bo magazyn trzeba poprawić ręcznie.
+    """
+
+    @staticmethod
+    def _payload(event_type: str, opis: str = "Butelki PET 10 ml do liquidów"):
+        return push_payload.olx_event(
+            event_type=event_type, opis=opis, message_id="<olx-1@olx.pl>"
+        )
+
+    def test_nazwa_kanalu_zostaje_w_tytule(self):
+        """
+        Odwrotnie niż przy Allegro Lokalnie: „OLX" to trzy znaki, więc nic
+        się nie ucina, a bez nich „Nowa wiadomość" z OLX byłaby na ekranie
+        blokady nie do odróżnienia od tej z Lokalnie.
+        """
+        payload = self._payload("new_message")
+
+        assert payload.title == "Nowa wiadomość · OLX"
+        assert len(payload.title) <= 24
+
+    def test_sprzedaz_mowi_wprost_ze_stan_sie_nie_zmienil(self):
+        """
+        Jedyne miejsce, w którym ta informacja dociera na ekran blokady.
+        Bez niej sprzedaż z OLX wyglądałaby jak zwykłe zamówienie, po
+        którym magazyn schodzi sam - a tu nie schodzi.
+        """
+        payload = self._payload("new_order")
+
+        assert payload.title == "Sprzedano · OLX"
+        assert payload.body.endswith("stan bez zmian")
+        assert "Butelki PET" in payload.body
+
+    def test_sprzedaz_nie_udaje_nowego_zamowienia(self):
+        """„Nowe zamówienie" znaczy w ORDLY, że rekord powstał. Tu nie powstaje."""
+        assert "zamówienie" not in self._payload("new_order").title.lower()
+
+    def test_zwrot_i_wiadomosc_maja_rozne_tytuly(self):
+        zwrot = self._payload("return")
+        wiadomosc = self._payload("new_message")
+
+        assert zwrot.title == "Zwrot / reklamacja · OLX"
+        assert zwrot.title != wiadomosc.title
+
+    def test_nierozpoznany_szablon_dostaje_neutralny_tytul(self):
+        """Lepiej powiadomić „coś przyszło" niż przemilczeć sprzedaż."""
+        payload = self._payload("unknown", opis="Coś nowego z OLX")
+
+        assert payload.title == "OLX"
+        assert "Coś nowego z OLX" in payload.body
+
+    def test_nazwa_kanalu_nie_powtarza_sie_w_tresci(self):
+        assert self._payload("new_message").body.count("OLX") == 0
+
+    def test_tresc_nie_zmysla_kwoty(self):
+        """Maila z OLX nie da się zapytać o cenę - w treści jej po prostu nie ma."""
+        for typ in ("new_order", "new_message", "return", "unknown"):
+            assert "zł" not in self._payload(typ).body
+
+    def test_klikniecie_prowadzi_do_maila(self):
+        payload = push_payload.olx_event(
+            event_type="unknown", opis="A", message_id="<olx-6@olx.pl>"
+        )
+
+        assert payload.url.startswith("/mailbox/")
+        assert payload.collapse_key == "olx:<olx-6@olx.pl>"

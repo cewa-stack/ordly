@@ -249,13 +249,29 @@ Trwa 1–2 minuty. Efekt trafia do `mobile\dist\`.
 
 ### C2. Spakuj i wyślij na Pi
 
+Uruchom to z katalogu `mobile`. `tar` jest wbudowany w Windows 11 i działa
+tak samo w PowerShellu, jak w Git Bashu — **nie używaj tu `Compress-Archive`
+ze zmienną `$env:USERPROFILE`**: w bashu ta zmienna nie istnieje, archiwum
+trafia w bezsensowną ścieżkę, `scp` nie ma czego wysłać, a krok C3 i tak
+zdąży wyczyścić katalog na Pi. Efektem jest pusty `webapp_dist`
+i biały ekran na telefonie.
+
 ```bash
-powershell -Command "Compress-Archive -Path dist\* -DestinationPath $env:USERPROFILE\Desktop\mobile-dist.zip -Force"
+tar -czf mobile-dist.tgz -C dist .
 ```
 
 ```bash
-scp $env:USERPROFILE\Desktop\mobile-dist.zip cewastack2@cewastack2:~/
+scp mobile-dist.tgz cewastack2@cewastack2:~/
 ```
+
+Zanim pójdziesz dalej, upewnij się, że plik faktycznie doleciał:
+
+```bash
+ssh cewastack2@cewastack2 "ls -lh ~/mobile-dist.tgz"
+```
+
+Ma pokazać kilka megabajtów. Jeśli pokaże `No such file` — **zatrzymaj się
+tutaj**, nie wykonuj C3, bo skasujesz działającą aplikację.
 
 ### C3. Podmień paczkę na Pi
 
@@ -270,16 +286,37 @@ Odpowiedź to `WEB_APP_DIST_PATH=/home/cewastack2/ordly/webapp_dist`. Podmień
 zawartość TEGO katalogu:
 
 ```bash
-ssh cewastack2@cewastack2 "rm -rf ~/ordly/webapp_dist/* && unzip -o ~/mobile-dist.zip -d ~/ordly/webapp_dist && chmod -R u+rX ~/ordly/webapp_dist && rm ~/mobile-dist.zip && sudo systemctl restart ordly"
+ssh cewastack2@cewastack2 "rm -rf ~/ordly/webapp_dist/* && tar -xzf ~/mobile-dist.tgz -C ~/ordly/webapp_dist && chmod -R a+rX ~/ordly/webapp_dist && rm ~/mobile-dist.tgz && sudo systemctl restart ordly"
 ```
 
 ### C4. Sprawdź, że Pi serwuje świeżą wersję
 
+Nie wystarczy sprawdzić `index.html` — biały ekran bierze się stąd, że
+strona się ładuje, a **bundle JS pod nią nie**. Sprawdź oba:
+
 ```bash
-ssh cewastack2@cewastack2 "curl -s http://localhost:8000/ | grep -o 'AppEntry-[a-z0-9]*\.js'"
+ssh cewastack2@cewastack2 "cd ~/ordly/webapp_dist && ls && curl -s -o /dev/null -w 'index.html: %{http_code}\n' http://localhost:8000/ && curl -s -o /dev/null -w 'bundle: %{http_code}\n' http://localhost:8000/_expo/static/js/web/\$(grep -o 'AppEntry-[a-z0-9]*\.js' index.html)"
 ```
 
-Hash ma się zgadzać z tym w świeżo zbudowanym `mobile\dist\index.html`.
+Ma wypisać listę plików (`_expo`, `assets`, `index.html`, `sw.js`, …)
+oraz **`index.html: 200`** i **`bundle: 200`**.
+
+- Pusta lista plików → C2/C3 nie doszło do skutku, powtórz od C2.
+- `bundle: 404` → w `webapp_dist` jest niepełna paczka, powtórz od C2.
+- **`bundle: 401`** → brak praw odczytu, nie problem z tokenem. Starlette
+  zamienia `PermissionError` na 401 (dosłownie, w swoim `staticfiles.py`),
+  więc telefon dostaje `index.html`, ale nie dostaje kodu aplikacji i widzi
+  biały ekran. Naprawa:
+
+```bash
+ssh cewastack2@cewastack2 "chmod -R a+rX ~/ordly/webapp_dist"
+```
+
+> **Dlaczego `a+rX`, a nie `u+rX`:** `u+rX` daje odczyt tylko właścicielowi
+> katalogu. Wystarczy, że usługa ORDLY chodzi jako inny użytkownik albo
+> rozpakowanie ustawi katalogowi tryb bez `x`, i cały podkatalog `_expo/`
+> staje się dla niej niewidoczny. Wielkie `X` (nie `x`) nadaje prawo wejścia
+> tylko katalogom, nie robi z plików JS programów wykonywalnych.
 
 ### C5. Odśwież aplikację na telefonie
 
