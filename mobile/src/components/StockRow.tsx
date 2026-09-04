@@ -1,8 +1,13 @@
 /**
  * Karta produktu magazynowego — §7 specyfikacji: nazwa SemiBold, SKU mono,
- * po prawej stan Bold 20 + pasek zapasu w trzech kolorach
+ * po prawej stan Bold + pasek zapasu w trzech kolorach
  * (success > próg · warning niski · danger zero/krytyczny).
  * Odpowiedź na "czy mam towar" bez czytania.
+ *
+ * Pasek pojawia się TYLKO wtedy, gdy jest do czego porównać stan
+ * (`max_stock` albo `min_stock`) - patrz `stockRatio`. Gdy produkt nie ma
+ * żadnego progu, informację o stanie niesie sam licznik sztuk, dlatego
+ * jest tu większy niż globalna `typography.statValue`.
  */
 import * as React from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
@@ -17,11 +22,42 @@ interface StockRowProps {
   onPress?: () => void;
 }
 
+/**
+ * Proporcja wypełnienia paska zapasu albo `null`, gdy nie ma jej z czego policzyć.
+ *
+ * Kolejność mianowników jest od najdokładniejszego do najsłabszego:
+ * `max_stock` to stan docelowy ustawiony przez użytkownika, więc
+ * `stock / max_stock` jest jedyną proporcją, która naprawdę coś znaczy.
+ * Bez niego zostaje przybliżenie „pełno = dwa razy próg alertu”.
+ *
+ * `null` (brak obu progów) NIE jest tym samym co zero i nie jest tym
+ * samym co pełno. Poprzednia wersja zwracała w tym miejscu `1`, przez co
+ * produkt z 5 sztukami i produkt z 5000 sztuk miały identyczny, pełny
+ * pasek - a próg alertu jest polem OPCJONALNYM, więc dotyczyło to
+ * większości magazynu. Pasek przestawał nieść jakąkolwiek informację
+ * o stanie, co przy przewijaniu listy wyglądało jak jego nieczytelność.
+ */
+function stockRatio(item: StockItem): number | null {
+  if (item.max_stock !== null && item.max_stock > 0) {
+    return item.stock / item.max_stock;
+  }
+  if (item.min_stock > 0) {
+    return item.stock / (item.min_stock * 2);
+  }
+  return item.stock === 0 ? 0 : null;
+}
+
 export function StockRow({ item, onPress }: StockRowProps) {
-  const ratio = item.min_stock > 0 ? item.stock / (item.min_stock * 2) : item.stock > 0 ? 1 : 0;
-  const width = `${Math.max(4, Math.min(100, Math.round(ratio * 100)))}%` as const;
+  const ratio = stockRatio(item);
   const barColor = stockStatusColor[item.status];
   const isLow = item.status !== "ok";
+  // Bez punktu odniesienia pasek nie ma czego pokazać, więc go nie ma -
+  // rysowanie go „na jakąś szerokość” tylko udawałoby informację.
+  // Wtedy sam licznik sztuk mówi o stanie wszystko, co da się powiedzieć.
+  const width =
+    ratio === null
+      ? null
+      : (`${Math.max(4, Math.min(100, Math.round(ratio * 100)))}%` as const);
 
   return (
     <Pressable
@@ -36,12 +72,16 @@ export function StockRow({ item, onPress }: StockRowProps) {
           <Text style={styles.sku}>{item.sku}</Text>
         </View>
         <View style={styles.stockBlock}>
-          <Text style={styles.qty}>
+          {/* Licznik przejmuje kolor statusu, bo to on - a nie pasek
+              szeroki na 60 px - rzuca się w oczy przy przewijaniu listy. */}
+          <Text style={[styles.qty, isLow && { color: barColor }]}>
             {item.stock} <Text style={styles.qtyUnit}>szt.</Text>
           </Text>
-          <View style={styles.bar}>
-            <View style={[styles.barFill, { width, backgroundColor: barColor }]} />
-          </View>
+          {width !== null ? (
+            <View style={styles.bar}>
+              <View style={[styles.barFill, { width, backgroundColor: barColor }]} />
+            </View>
+          ) : null}
         </View>
       </View>
       {isLow ? (
@@ -94,7 +134,13 @@ const styles = StyleSheet.create({
     gap: 6,
   },
   qty: {
+    // Lokalny wariant `typography.statValue` (18/700): na karcie
+    // magazynowej liczba sztuk jest głównym nośnikiem stanu, bo pasek
+    // bywa nieobecny (patrz `stockRatio`). Globalnej `statValue` nie
+    // ruszamy - używa jej m.in. pasek KPI na innych ekranach.
     ...typography.statValue,
+    fontSize: 21,
+    lineHeight: 27,
     color: colors.text,
   },
   qtyUnit: {

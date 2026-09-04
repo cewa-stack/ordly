@@ -14,6 +14,7 @@ from app.core.event_bus.bus import EventBus
 from app.core.event_bus.events import (
     AllegroLokalnieEventDetected,
     DisputeNoticeDetected,
+    OlxEventDetected,
 )
 from app.domain.entities.mail_message import MailMessage
 from app.domain.exceptions.domain_exceptions import (
@@ -23,9 +24,14 @@ from app.domain.exceptions.domain_exceptions import (
 from app.domain.interfaces.mail_repository import MailRepository
 from app.infrastructure.mail.allegro_lokalnie import parse_event
 from app.infrastructure.mail.allegro_notifications import parse_dispute_notice
-from app.infrastructure.mail.classify import SOURCE_ALLEGRO, SOURCE_ALLEGRO_LOKALNIE
+from app.infrastructure.mail.classify import (
+    SOURCE_ALLEGRO,
+    SOURCE_ALLEGRO_LOKALNIE,
+    SOURCE_OLX,
+)
 from app.infrastructure.mail.imap_watcher import ImapConnectionError, ImapWatcher
 from app.infrastructure.mail.mime import MailBodies
+from app.infrastructure.mail.olx import parse_event as parse_olx_event
 from app.utils.time import utc_now
 
 _FIRST_SYNC_LOOKBACK_DAYS = 7
@@ -163,6 +169,9 @@ class MailboxService:
         zamówień (`SyncOrdersService.publish_sync_events`). Subskrybenci
         piszą we własnych sesjach i muszą widzieć zatwierdzone dane.
 
+        Maile marketingowe odpadają jeszcze PRZED zapisem - patrz
+        `_without_marketing()`.
+
         Raises:
             ImapConnectionError: Gdy połączenie/logowanie IMAP zawiedzie.
         """
@@ -177,7 +186,9 @@ class MailboxService:
         )
 
         watcher = self._watcher_factory()
-        messages = await watcher.fetch_new_from_senders(self._settings.watch_senders, since)
+        messages = self._without_marketing(
+            await watcher.fetch_new_from_senders(self._settings.watch_senders, since)
+        )
 
         saved: list[MailMessage] = []
         for message in messages:
@@ -186,6 +197,36 @@ class MailboxService:
             await self._mail_repository.save(message)
             saved.append(message)
         return saved
+
+    def _without_marketing(self, messages: list[MailMessage]) -> list[MailMessage]:
+        """
+        Odsiewa newslettery i promocje, zanim cokolwiek trafi do bazy.
+
+        Zapytanie IMAP jest z założenia szerokie (`FROM "olx"`,
+        `FROM "allegro"` - dopasowanie PODCIĄGU), bo tylko tak łapie
+        wszystkie warianty realnych nadawców powiadomień. Cena tej
+        szerokości jest taka, że `powiadomienia@marketing.olx.pl`
+        („Wow - 70% rabatu…") i `hello@newsletter.allegro.pl` („Odbierz
+        kupon…") przechodzą tym samym filtrem co sprzedaż.
+
+        Filtrujemy PRZED `save()`, a nie przy wyświetlaniu: mail
+        marketingowy ma nigdy nie znaleźć się w `mail_messages`, żeby ani
+        nie zaśmiecał skrzynki w aplikacji, ani - gdyby ktoś kiedyś
+        rozszerzył `publish_mail_events` - nie wszedł przypadkiem do
+        klasyfikacji zdarzeń.
+        """
+        excluded = self._settings.exclude_senders
+        if not excluded:
+            return messages
+
+        kept: list[MailMessage] = []
+        for message in messages:
+            sender = message.sender.lower()
+            if any(fragment in sender for fragment in excluded):
+                logger.debug("Pomijam mail marketingowy od {}", message.sender)
+                continue
+            kept.append(message)
+        return kept
 
     async def publish_mail_events(self, messages: list[MailMessage]) -> None:
         """
@@ -201,7 +242,14 @@ class MailboxService:
           `allegro_notifications`). Zamówienia i zwroty przychodzą
           z synchronizacji API i drugi tor dałby duplikaty powiadomień.
 
-        Poczta OLX i pozostała nie generuje dziś żadnych zdarzeń.
+        - **OLX** - jak Lokalnie: brak samoobsługowego API dla
+          sprzedawców, więc mail jest jedynym sygnałem. Parser nie ma
+          jeszcze wzorców tematu (brak prawdziwych próbek), więc każdy
+          taki mail daje dziś zdarzenie typu `unknown` - powiadomienie
+          "coś przyszło z OLX, sprawdź", a nie zamówienie. Patrz
+          `infrastructure/mail/olx.py`.
+
+        Pozostała poczta (hurtownie, `other`) nie generuje zdarzeń.
 
         Deduplikacja jest naturalna: `sync_now()` zwraca tylko maile
         faktycznie zapisane w tym cyklu, a `Message-ID` jest kluczem
@@ -216,6 +264,13 @@ class MailboxService:
                     AllegroLokalnieEventDetected(
                         occurred_at=utc_now(),
                         event=parse_event(message, await self._bodies(message)),
+                    )
+                )
+            elif message.source == SOURCE_OLX:
+                await self._event_bus.publish(
+                    OlxEventDetected(
+                        occurred_at=utc_now(),
+                        event=parse_olx_event(message, await self._bodies(message)),
                     )
                 )
             elif message.source == SOURCE_ALLEGRO:

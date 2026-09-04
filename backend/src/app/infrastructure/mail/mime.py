@@ -26,6 +26,11 @@ _LINE_BREAK = re.compile(r"<br\s*/?>", re.IGNORECASE)
 _PARAGRAPH_END = re.compile(r"</(p|h[1-6]|blockquote)\s*>", re.IGNORECASE)
 _BLOCK_END = re.compile(r"</(div|tr|li|ul|ol|table|section|article)\s*>", re.IGNORECASE)
 _ANY_TAG = re.compile(r"<[^>]+>")
+
+#: Czy w tekście stoi PRAWDZIWY znacznik HTML, a nie samo "<" (np. w
+#: "cena < 50 zł"). Wymagamy litery zaraz po nawiasie i domknięcia, więc
+#: zwykły tekst z nierównością przechodzi nietknięty.
+_LOOKS_LIKE_MARKUP = re.compile(r"<\s*/?[a-zA-Z][^>]*>")
 _SPACES_NO_NEWLINE = re.compile(r"[^\S\n]+")
 _MANY_BLANK_LINES = re.compile(r"\n{3,}")
 
@@ -98,6 +103,20 @@ def html_to_plain_text(html: str) -> str:
         _SPACES_NO_NEWLINE.sub(" ", line).strip() for line in unescape(stripped).split("\n")
     ]
     return _MANY_BLANK_LINES.sub("\n\n", "\n".join(lines)).strip()
+
+
+def looks_like_markup(text: str) -> bool:
+    """
+    Czy „czysty tekst" w rzeczywistości niesie znaczniki HTML.
+
+    Nie jest to teoretyczne: część `text/plain` maili sprzedażowych z OLX
+    zawiera dosłowne `<a href="https://delivery.olx.pl/...">Potwierdź
+    sprzedaż</a>` - szablon wkleja do wariantu tekstowego ten sam kod, co
+    do HTML-owego. Bez tego sprawdzenia podgląd na liście wiadomości
+    pokazywałby surowe znaczniki, czyli dokładnie ten sam objaw, który
+    naprawiliśmy wcześniej dla maili jednoczęściowych `text/html`.
+    """
+    return bool(_LOOKS_LIKE_MARKUP.search(text))
 
 
 def _is_attachment(part: Message) -> bool:

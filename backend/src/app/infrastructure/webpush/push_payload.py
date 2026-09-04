@@ -392,6 +392,10 @@ def wholesaler_confirmed(
 _ALLEGRO_LOKALNIE_TITLES = {
     "new_order": "Nowe zamówienie",
     "order_status": "Zmiana zamówienia",
+    # Zwrot ma własny tytuł, bo jako jedyna „zmiana zamówienia" wymaga
+    # Twojej reakcji - doręczenie paczki i anulowanie nie wymagają
+    # żadnej, a dotąd wszystkie trzy brzmiały identycznie.
+    "return": "Zwrot / reklamacja",
     "new_message": "Nowa wiadomość",
     "interest": "Pytanie o ogłoszenie",
     "unknown": "AllegroLokalnie",
@@ -436,6 +440,68 @@ def allegro_lokalnie_event(
         url=f"/mailbox/{quote(message_id, safe='')}",
         silent=silent,
         collapse_key=f"al:{message_id}",
+    )
+
+
+#: Tytuły zdarzeń z OLX. Klucze pochodzą z `domain/entities/olx_event.py`.
+#: W odróżnieniu od `_ALLEGRO_LOKALNIE_TITLES` nazwa kanału ZOSTAJE
+#: w tytule: „OLX" to trzy znaki, więc nic się nie ucina, a bez niej
+#: „Nowa wiadomość" z OLX byłaby na ekranie blokady nie do odróżnienia
+#: od „Nowej wiadomości" z Allegro Lokalnie.
+#:
+#: „Sprzedano", a nie „Nowe zamówienie" - bo zamówienie w ORDLY z tego
+#: NIE powstaje. Mail z OLX nie podaje kwoty, więc sprzedaż zostaje
+#: powiadomieniem i nie rusza magazynu (patrz `olx_event` niżej).
+_OLX_TITLES = {
+    "new_order": "Sprzedano · OLX",
+    "new_message": "Nowa wiadomość · OLX",
+    "return": "Zwrot / reklamacja · OLX",
+    "unknown": "OLX",
+}
+
+
+def olx_event(
+    *,
+    event_type: str,
+    opis: str,
+    message_id: str,
+    silent: bool = False,
+) -> PushPayload:
+    """
+    Zdarzenie z OLX - kanał, o którym ORDLY dowiaduje się wyłącznie z poczty.
+
+    Treść to tytuł ogłoszenia, bo to jedyna konkretna rzecz w tym mailu:
+    temat wiadomości od kupującego jest ZAWSZE ten sam („Wiadomości
+    dotyczące ogłoszeń"), a przy sprzedaży mówi głównie o terminie
+    potwierdzenia. Bez tytułu powiadomienia z OLX byłyby nierozróżnialne.
+
+    Przy sprzedaży treść kończy się „stan bez zmian" - tym samym
+    sformułowaniem, co `unmatched_products`, i z tego samego powodu:
+    magazyn się NIE zmienił i trzeba go poprawić ręcznie. To jedyne
+    miejsce, w którym ta informacja dociera na ekran blokady, więc nie
+    może jej tam zabraknąć.
+
+    Kwoty nie ma w ogóle, bo nie ma jej w mailu - patrz
+    `domain/entities/olx_event.py`.
+
+    `event_type` spoza katalogu (nierozpoznany szablon maila) dostaje
+    neutralny tytuł zamiast zniknąć - lepiej powiadomić "coś przyszło,
+    sprawdź" niż przemilczeć sprzedaż.
+    """
+    title = _OLX_TITLES.get(event_type, _OLX_TITLES["unknown"])
+    kanal = _channel_label("olx")
+    if event_type == "new_order":
+        body = f"{_shorten(opis, 46)} — stan bez zmian"
+    else:
+        pozycja = _shorten(opis, 62)
+        body = pozycja if kanal in title else f"{kanal} · {pozycja}"
+    return PushPayload(
+        title=title,
+        body=body,
+        thread="mail",
+        url=f"/mailbox/{quote(message_id, safe='')}",
+        silent=silent,
+        collapse_key=f"olx:{message_id}",
     )
 
 

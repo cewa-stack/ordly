@@ -16,6 +16,7 @@ from app.core.event_bus.events import (
     DisputeNoticeDetected,
     LowStockDetected,
     NotificationSent,
+    OlxEventDetected,
     OrderCancelled,
     OrderCreated,
     OrderPackingStarted,
@@ -375,6 +376,52 @@ def register_event_subscriptions(container: Container) -> None:
                 },
             )
 
+    async def handle_olx_event(event: OlxEventDetected) -> None:
+        """
+        Powiadamia o zdarzeniu z OLX i zapisuje je w audycie.
+
+        To jedyny sygnał, jaki ORDLY dostaje z OLX - serwis nie ma
+        samoobsługowego API dla sprzedawców, więc bez tego maila
+        wszystko, co się tam dzieje, byłoby dla aplikacji niewidzialne.
+        Do niedawna właśnie tak było: poczta OLX nie generowała żadnych
+        zdarzeń.
+
+        W ODRÓŻNIENIU OD ALLEGRO LOKALNIE sprzedaż z OLX NIE staje się
+        zamówieniem i nie rusza magazynu ani statystyk. Powód jest
+        w danych, nie w kodzie: mail sprzedażowy z OLX nie podaje żadnej
+        kwoty (patrz `domain/entities/olx_event.py`), a zamówienie
+        wpisane z kwotą 0 zł zafałszowałoby przychód i nie dałoby się go
+        potem poprawić z aplikacji. Powiadomienie mówi więc dokładnie
+        tyle, ile mail: co i kiedy się sprzedało - stan odejmujesz sam.
+        """
+        detected = event.event
+        try:
+            await container.notifier().notify_olx_event(detected)
+        except Exception:
+            logger.exception(
+                "Nie udało się wysłać powiadomienia o zdarzeniu OLX {}",
+                detected.message_id,
+            )
+
+        async with container.session_scope() as session:
+            event_repository = SqliteEventRepository(session)
+            await event_repository.record(
+                event_type="OlxEventDetected",
+                # Nierozpoznany szablon maila to sygnał do uzupełnienia
+                # wzorców - ma być widoczny w logach aplikacji, nie tylko
+                # w treści powiadomienia.
+                level="WARNING" if detected.event_type == "unknown" else "INFO",
+                payload={
+                    "message_id": detected.message_id,
+                    "event_type": detected.event_type,
+                    "subject": detected.subject,
+                    "listing_title": detected.listing_title,
+                    # UUID transakcji - po nim odnajdziesz sprzedaż
+                    # w panelu OLX, gdy trzeba sprawdzić kwotę.
+                    "order_id": detected.order_id,
+                },
+            )
+
     async def handle_dispute_notice(event: DisputeNoticeDetected) -> None:
         """
         Powiadamia o rozpoczętej dyskusji i zapisuje ją w audycie.
@@ -430,6 +477,7 @@ def register_event_subscriptions(container: Container) -> None:
     container.event_bus.subscribe(SyncStarted, handle_sync_started)
     container.event_bus.subscribe(SyncFinished, handle_sync_finished)
     container.event_bus.subscribe(AllegroLokalnieEventDetected, handle_allegro_lokalnie_event)
+    container.event_bus.subscribe(OlxEventDetected, handle_olx_event)
     container.event_bus.subscribe(DisputeNoticeDetected, handle_dispute_notice)
 
     logger.info("Zarejestrowano subskrybentów Event Busa")

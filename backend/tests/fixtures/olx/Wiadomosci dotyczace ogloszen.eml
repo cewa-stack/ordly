@@ -1,0 +1,411 @@
+Delivered-To: sklep.dopefoam@gmail.com
+Received: by 2002:a05:6022:441e:b0:10a:8560:69ef with SMTP id cv30csp538948lab;
+        Sat, 29 Aug 2026 00:13:42 -0700 (PDT)
+X-Received: by 2002:a5d:5e8b:0:b0:482:e66d:aad2 with SMTP id ffacd0b85a97d-482eababe33mr23891943f8f.13.1787987622609;
+        Sat, 29 Aug 2026 00:13:42 -0700 (PDT)
+ARC-Seal: i=1; a=rsa-sha256; t=1787987622; cv=none;
+        d=google.com; s=arc-20260327;
+        b=NkSqFryhLqjJ4ETDgArfzeLOeK1M4vogcogEey5Vr0O0ZyimJsms4YUL3y/59CEM4j
+         D85Cho9oOQFoqmLkrablsNLnkD6+Y7IZL4TTxmMthqzmQUx8voNrASA9s2dElOfdaJC7
+         dX5MBUh+BLlIgIR0rJsh4GunkUA2Fn9Hd8dcVzkcreB2PaWFobHluXoogEoC6/D06qI6
+         KG5tLKkLCODAp7Z3iHZUiS+M+EMfdXRbUR1noamuFinvDqDetBvSxdi0R75Ad5yPLXXL
+         B1ycZCuSgbZqD7DzyOlsP5w7uAOjQ2+n2gmovc+CWPYa3Y3Bm9Qw2gBqEIZkZ2OiAFrI
+         Z6eA==
+ARC-Message-Signature: i=1; a=rsa-sha256; c=relaxed/relaxed; d=google.com; s=arc-20260327;
+        h=feedback-id:bimi-selector:list-unsubscribe:list-unsubscribe-post
+         :mime-version:subject:message-id:to:reply-to:from:date
+         :dkim-signature:dkim-signature;
+        bh=Ipbgj8Ombsn7baZlJzec684RZd9fBNA+ili+/YNQM1M=;
+        fh=ncS/P45YE5WFLOohRMKkY92QoHbbPEq+2rnFy84TJFQ=;
+        b=esH5OWMubPdpd99YI/7AlqI+rPxxt31+Nm5cqjuLBpe1vdncMpkjiP9yx4ymHEmMUE
+         BxU8lM65U69/nGu4UZdzYIkvMkqf9ui/OYc9UBJELa/utFVgb5H3QWdZY9WYXcWXmrvx
+         BoEJiVPoF5LZkIBMrxDIiO9i1SuHoNeubRtLLOFH9LdVHUC4QqbzWbujq3xv1liH/nee
+         c52Cv6oq5cb5NGDysEFhqi1KK6HDuWRtSgNGf2XWc/nYFSSN6VdFb8Q1Qy4uYPwTekXE
+         3Epqy7Z/IuXnGIqw+pWxc4TRgg6JeDrZBYkMuq9yIw4lOwEfZLK7ADi56ZojPeIKQPJp
+         jU3w==;
+        dara=google.com
+ARC-Authentication-Results: i=1; mx.google.com;
+       dkim=pass header.i=@olx.pl header.s=gpslqrzlt3xo2s3kgbohtne25ajgtjpz header.b=YlzQBQ8e;
+       dkim=pass header.i=@amazonses.com header.s=shh3fegwg5fppqsuzphvschd53n6ihuv header.b=fdBSItgT;
+       spf=pass (google.com: domain of 010201a04c5df96a-9032580b-3612-4390-9a2d-26c6e1fdc5e1-000000@comms-ses-eu-from.olx.pl designates 54.240.6.10 as permitted sender) smtp.mailfrom=010201a04c5df96a-9032580b-3612-4390-9a2d-26c6e1fdc5e1-000000@comms-ses-eu-from.olx.pl;
+       dmarc=pass (p=REJECT sp=REJECT dis=NONE) header.from=olx.pl
+Return-Path: <010201a04c5df96a-9032580b-3612-4390-9a2d-26c6e1fdc5e1-000000@comms-ses-eu-from.olx.pl>
+Received: from a6-10.smtp-out.eu-west-1.amazonses.com (a6-10.smtp-out.eu-west-1.amazonses.com. [54.240.6.10])
+        by mx.google.com with ESMTPS id ffacd0b85a97d-482fbb53154si7077629f8f.475.2026.08.29.00.13.42
+        for <sklep.dopefoam@gmail.com>
+        (version=TLS1_3 cipher=TLS_AES_128_GCM_SHA256 bits=128/128);
+        Sat, 29 Aug 2026 00:13:42 -0700 (PDT)
+Received-SPF: pass (google.com: domain of 010201a04c5df96a-9032580b-3612-4390-9a2d-26c6e1fdc5e1-000000@comms-ses-eu-from.olx.pl designates 54.240.6.10 as permitted sender) client-ip=54.240.6.10;
+Authentication-Results: mx.google.com;
+       dkim=pass header.i=@olx.pl header.s=gpslqrzlt3xo2s3kgbohtne25ajgtjpz header.b=YlzQBQ8e;
+       dkim=pass header.i=@amazonses.com header.s=shh3fegwg5fppqsuzphvschd53n6ihuv header.b=fdBSItgT;
+       spf=pass (google.com: domain of 010201a04c5df96a-9032580b-3612-4390-9a2d-26c6e1fdc5e1-000000@comms-ses-eu-from.olx.pl designates 54.240.6.10 as permitted sender) smtp.mailfrom=010201a04c5df96a-9032580b-3612-4390-9a2d-26c6e1fdc5e1-000000@comms-ses-eu-from.olx.pl;
+       dmarc=pass (p=REJECT sp=REJECT dis=NONE) header.from=olx.pl
+DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/simple;
+	s=gpslqrzlt3xo2s3kgbohtne25ajgtjpz; d=olx.pl; t=1787987622;
+	h=Date:From:Reply-To:To:Message-ID:Subject:MIME-Version:Content-Type:List-Unsubscribe-Post:List-Unsubscribe;
+	bh=Ss49TngkB7/K1MOIgYFffgYH5IvK5UUp/LM/Fu54KMc=;
+	b=YlzQBQ8eK5eIfAxK3mpnLXokEGmwdkM0d8Eu6O9jaap21g/GCPNRHkOIClToH2lL
+	rZ4azwJiVupvwjNx1U58fZkn/qIcI1YhDZ+OaxkMvpaMMGkK1PmjGViMaYmPrRVH+yb
+	lwvL9vSMQPXgBh1C8ofADY/HsMlTzgzS/OMhBXsA=
+DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/simple;
+	s=shh3fegwg5fppqsuzphvschd53n6ihuv; d=amazonses.com; t=1787987622;
+	h=Date:From:Reply-To:To:Message-ID:Subject:MIME-Version:Content-Type:List-Unsubscribe-Post:List-Unsubscribe:Feedback-ID;
+	bh=Ss49TngkB7/K1MOIgYFffgYH5IvK5UUp/LM/Fu54KMc=;
+	b=fdBSItgTYeGaqddW9xeNdqd29DFZVAfY86YA0g6sjcsADrFDJuQsHq1A+jJxJp+M
+	AHERvl6T1V6KfQqY75Vjxy9Y0TEM3QvxxxNvup16HXwu5tQgbJGeB2D6S5ITINFKRf1
+	7IJE719i7XKF31XVtpNWKN+u+XvqCiUEZA6gHvUc=
+Date: Sat, 29 Aug 2026 07:13:42 +0000
+From: OLX <noreply@olx.pl>
+Reply-To: noreply@olx.pl
+To: sklep.dopefoam@gmail.com
+Message-ID: <010201a04c5df96a-9032580b-3612-4390-9a2d-26c6e1fdc5e1-000000@eu-west-1.amazonses.com>
+Subject: =?UTF-8?Q?Wiadomo=C5=9Bci_dotycz=C4=85ce_og=C5=82osze=C5=84?=
+MIME-Version: 1.0
+Content-Type: multipart/alternative; 
+	boundary="----=_Part_55668_858625773.1787987622224"
+X-OLX-Correlation-ID: 86433c18-7f9e-4b6d-9c51-27d98e06dff2
+List-Unsubscribe-Post: List-Unsubscribe=One-Click
+List-Unsubscribe: <https://unsubscribe.olx.org/api/v1/unsubscribe/eyJraWQiOiJwcmQtb2x4LWV1LWNvbW1zLTIwMjQwMTEyIiwidHlwIjoiSldUIiwiYWxnIjoiSFMyNTYifQ.eyJzdWIiOiJza2xlcC5kb3BlZm9hbUBnbWFpbC5jb20iLCJhdWQiOiJvbHgtZXUtY29tbXMiLCJzaXRlQ29kZSI6Im9seHBsIiwiY2FtcGFpZ25JZCI6ImNoYXRfbmV3X21lc3NhZ2UiLCJpc3MiOiJvbHgtZXUtY29tbXMiLCJub3RpZmljYXRpb25DYXRlZ29yeSI6ImFuc3dlcnMiLCJjb3JyZWxhdGlvbklkIjoiMWM2N2QwMzYtYTE5NC00YTFhLWIxMjMtYjM3NDIxZWU1YmVhIiwiZXhwIjoxNzkwNTc5NjIxfQ.NGb6FP1JFUgXssr76VKDvpQl082QlhZ7uRKYCru8yQk>
+BIMI-Selector: v=BIMI1; s=noreply;
+Feedback-ID: ::1.eu-west-1.0aAh7v7JxQ+Agabuqzf6nMEV519sQ9X52RuBmf/Hr/U=:AmazonSES
+X-SES-Outgoing: 2026.08.29-54.240.6.10
+
+------=_Part_55668_858625773.1787987622224
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: quoted-printable
+
+Wiadomo=C5=9Bci dotycz=C4=85ce og=C5=82osze=C5=84
+
+https://www.olx.pl/myaccount/answer/963e8787-c8c6-4097-a6c2-dbac7b3316d3/?a=
+ction=3Danswer&id=3D963e8787-c8c6-4097-a6c2-dbac7b3316d3&my_chat=3D1#last
+
+Ta wiadomo=C5=9B=C4=87 zosta=C5=82a wys=C5=82ana automatycznie. Nie odpowia=
+daj na tego e-maila.
+W razie w=C4=85tpliwo=C5=9Bci skontaktuj si=C4=99 z nami za pomoc=C4=85 for=
+mularza kontaktowego.
+------=_Part_55668_858625773.1787987622224
+Content-Type: text/html; charset=UTF-8
+Content-Transfer-Encoding: quoted-printable
+
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>Wiadomo=C5=9B=C4=87 do og=C5=82oszenia: "Butelki PET 10 ml do li=
+quid=C3=B3w =E2=80=93 zestaw 10 szt. + dozownik + zakr=C4=99tka"</title>
+    <meta http-equiv=3D"Content-Type" content=3D"text/html; charset=3DUTF-8=
+" />
+    <meta name=3D"viewport" content=3D"width=3Ddevice-width, initial-scale=
+=3D1.0" />
+    <style type=3D"text/css">
+      body,
+      table {
+        font-family: 'Roboto', Roboto, Arial, Helvetica, sans-serif;
+        font-smoothing: antialiased;
+        -moz-font-smoothing: antialiased;
+        -moz-osx-font-smoothing: grayscale;
+        -webkit-font-smoothing: antialiased;
+      }
+
+      table {
+        border-collapse: collapse;
+        width: 100%;
+      }
+
+      a, a:hover {
+        text-decoration: none !important;
+      }
+
+      @media only screen and (max-width: 480px) {
+        body,
+        table,
+        td,
+        p,
+        a,
+        li,
+        blockquote {
+          -webkit-text-size-adjust: none !important;
+        }
+
+        *[class].responsive-full {
+          width: 100% !important;
+        }
+
+        *[class].responsive-block {
+          display: block !important;
+          width: 100% !important;
+          height: auto !important;
+        }
+
+        *[class].responsive-image img {
+          height: auto !important;
+          max-width: 100% !important;
+          width: 100% !important;
+        }
+
+        *[class].responsive-hidden {
+          display: none !important;
+        }
+
+        *[class].responsive-center {
+          text-align: center !important;
+        }
+
+        *[class].responsive-block-center {
+          margin: 0 auto !important;
+        }
+      }
+    </style>
+  </head>
+
+  <body
+    bgcolor=3D"#f2f4f5"
+    leftmargin=3D"0"
+    topmargin=3D"0"
+    marginwidth=3D"0"
+    marginheight=3D"0"
+  >
+    <table
+      class=3D"responsive-full"
+      border=3D"0"
+      cellpadding=3D"0"
+      cellspacing=3D"0"
+      style=3D"
+        font-size:14px;
+        color:#406367;
+        background-color:#f2f4f5;
+      "
+      lang=3D"pl"
+      title=3D"OLX.pl"
+    >
+      <tr>
+        <td class=3D"responsive-hidden"></td>
+        <td valign=3D"top" width=3D"600px">
+
+          <!-- Content body -->
+          <table
+            border=3D"0"
+            cellpadding=3D"0"
+            cellspacing=3D"0"
+            style=3D"
+              background:#ffffff;
+              margin-top: 16px;
+            "
+          >
+            <tr>
+              <td valign=3D"top">
+                <a
+                  href=3D"https://www.olx.pl/?bs=3Dsiren_chat_new_message&u=
+tm_source=3Dsiren&utm_medium=3Demail&utm_campaign=3Dchat_new_message"
+                  class=3D"responsive-block-center"
+                  target=3D"_blank"
+                  style=3D"width: 100%; display:block;"
+                >
+                  <!-- Header image -->
+                  <img
+                    src=3D"https://ireland.apollo.olxcdn.com/v1/files/vfhsn=
+6r9i47t1-HVYMSB/image;f=3Dpng"
+                    style=3D"width: 100%; display: block;"
+                    border=3D"0"
+                  />
+                </a>
+              </td>
+            </tr>
+            <tr>
+              <td
+                style=3D"
+                  text-align:center;
+                  padding: 40px;
+                  background: #FFFFFF;
+                "
+              >
+                <table
+                  border=3D"0"
+                  cellpadding=3D"0"
+                  cellspacing=3D"0"
+                >
+                  <tr>
+                    <td style=3D"text-align: left;">
+                      <h4
+                        style=3D"
+                          font-size: 24px;
+                          font-weight: normal;
+                          line-height: 1.2;
+                          margin: 0;
+                          color: #002f34;
+                        "
+                      >
+                        Czeka na Ciebie wiadomo=C5=9B=C4=87 do og=C5=82osze=
+nia: <span style=3D"font-weight: bold">Butelki PET 10 ml do liquid=C3=B3w =
+=E2=80=93 zestaw 10 szt. + dozownik + zakr=C4=99tka</span>
+                      </h4>
+                    </td>
+                  </tr>
+                  <tr>
+                    <td style=3D"padding: 32px 0; text-align: left">
+                      <span
+                        style=3D"
+                          font-size: 14px;
+                          line-height: 1.5;
+                          text-align: left;
+                        "
+                      >
+                        Pami=C4=99taj o zasadach bezpiecze=C5=84stwa:
+                        <ul>
+                          <li style=3D"padding-bottom: 16px">
+                            Zach=C4=99camy do korzystania z P=C5=82atno=C5=
+=9Bci OLX, kt=C3=B3re dost=C4=99pne s=C4=85 dla og=C5=82osze=C5=84 z Przesy=
+=C5=82k=C4=85 OLX. Pami=C4=99taj, =C5=BCe ca=C5=82y proces odbywa si=C4=99 =
+w ramach naszej strony - nie klikaj w =C5=BCadne linki wysy=C5=82ane przez =
+nieznajomych poza OLX - w SMSach czy komunikatorach, np. Whatsapp. Nigdy ni=
+e poprosimy Ci=C4=99 r=C3=B3wnie=C5=BC o podane kodu CVC/CVV do Twojej kart=
+y bankowej. Przeczytaj wi=C4=99cej na naszym <a href=3D"https://blog.olx.pl=
+/2020/06/18/uwaga-na-phishing/" style=3D"color: #2775ff;font-weight:bold">b=
+logu</a>.
+                          </li>
+                          <li style=3D"padding-bottom: 16px">
+                            Je=C5=9Bli sprzedaj=C4=85cy nie udost=C4=99pnia=
+ Przesy=C5=82ek OLX - zalecamy odbi=C3=B3r osobisty. Zawsze mo=C5=BCesz r=
+=C3=B3wnie=C5=BC poprosi=C4=87 o przesy=C5=82k=C4=99 za pobraniem z mo=C5=
+=BCliwo=C5=9Bci=C4=85 sprawdzenia zawarto=C5=9Bci.
+                          </li>
+                          <li style=3D"padding-bottom: 16px">
+                            Nie odpowiadaj na wiadomo=C5=9Bci w j=C4=99zyku=
+ angielskim lub pisane =C5=82aman=C4=85 polszczyzn=C4=85, w kt=C3=B3rych kt=
+o=C5=9B przekierowuje Ci=C4=99 poza OLX.
+                          </li>
+                        </ul>
+                        Zach=C4=99camy do lektury wpis=C3=B3w o bezpiecze=
+=C5=84stwie na naszym <a href=3D"https://blog.olx.pl/bezpieczenstwo/" style=
+=3D"color: #2775ff;font-weight:bold">blogu</a>
+                      </span>
+                    </td>
+                  </tr>
+                  <tr>
+                    <td colspan=3D"2" style=3D"text-align:center;padding: 8=
+px 0;">
+                      <a
+                        href=3D"https://www.olx.pl/myaccount/answer/963e878=
+7-c8c6-4097-a6c2-dbac7b3316d3/?action=3Danswer&id=3D963e8787-c8c6-4097-a6c2=
+-dbac7b3316d3&my_chat=3D1&bs=3Dsiren_chat_new_message&utm_source=3Dsiren&ut=
+m_medium=3Demail&utm_campaign=3Dchat_new_message"
+                        style=3D"
+                          color: #ffffff;
+                          display:inline-block;
+                          background-color:#002f34;
+                          line-height:20px;
+                          padding: 12px 24px;
+                          text-align:center;
+                          font-weight:bold;
+                          font-size:16px;
+                          -webkit-border-radius: 4px;
+                          -moz-border-radius: 4px;
+                          border-radius: 4px;
+                        "
+                      >
+                        Zobacz wiadomo=C5=9B=C4=87 i odpowiedz
+                      </a>
+                    </td>
+                  </tr>
+                </table>
+              </td>
+            </tr>
+          </table>
+
+          <!-- Footer -->
+          <table
+            border=3D"0"
+            cellpadding=3D"0"
+            cellspacing=3D"0"
+            style=3D"
+              background-color:#FFFFFF;
+              margin-bottom: 16px;
+              width: 100%;
+            "
+          >
+            <tr>
+              <td
+                style=3D"
+                  padding:32px 0px;
+                  text-align:center;
+                  width: 100%;
+                "
+              >
+                <a
+                  href=3D"https://pomoc.olx.pl/olxplhelp/s/"
+                  style=3D"
+                    margin: 0 16px;
+                    font-size: 12px;
+                    line-height: 1.5;
+                    text-align: center;
+                    color: #002f34;
+                    text-transform: uppercase;
+                    font-weight: bold;
+                    letter-spacing: 0.5px
+                  "
+                  >Pomoc</a
+                >
+                <a
+                  href=3D"https://pomoc.olx.pl/olxplhelp/s/contactsupport"
+                  style=3D"
+                    margin: 0 16px;
+                    font-size: 12px;
+                    line-height: 1.5;
+                    text-align: center;
+                    color: #002f34;
+                    text-transform: uppercase;
+                    font-weight: bold;
+                    letter-spacing: 0.5px
+                  "
+                  >Kontakt</a
+                >
+                <a
+                  href=3D"https://www.olx.pl/mojolx/?bs=3Dsiren_chat_new_me=
+ssage&utm_source=3Dsiren&utm_medium=3Demail&utm_campaign=3Dchat_new_message=
+"
+                  style=3D"
+                    margin: 0 16px;
+                    font-size: 12px;
+                    line-height: 1.5;
+                    text-align: center;
+                    color: #002f34;
+                    text-transform: uppercase;
+                    font-weight: bold;
+                    letter-spacing: 0.5px
+                  "
+                  >TWOJE KONTO</a
+                >
+              </td>
+            </tr>
+            <tr>
+              <td
+                style=3D"
+                  background: #fafbfb;
+                  padding: 24px 0px;
+                  text-align: center;
+                "
+              >
+                <span
+                  style=3D"
+                    color: #7f9799;
+                    font-size:12px;
+                    display: inline-block;
+                  "
+                >
+                  Ta wiadomo=C5=9B=C4=87 zosta=C5=82a wys=C5=82ana automaty=
+cznie. Nie odpowiadaj na tego e-maila.<br>W razie w=C4=85tpliwo=C5=9Bci sko=
+ntaktuj si=C4=99 z nami za pomoc=C4=85 formularza kontaktowego.
+                </span>
+              </td>
+            </tr>
+          </table>
+        </td>
+        <td class=3D"responsive-hidden"></td>
+      </tr>
+    </table>
+  <img alt=3D"" src=3D"https://ty5gwwjs.r.eu-west-1.awstrack.me/I0/010201a0=
+4c5df96a-9032580b-3612-4390-9a2d-26c6e1fdc5e1-000000/N1U3YcfK1_5tbXmITmb65T=
+CPl9U=3D473" style=3D"display: none; width: 1px; height: 1px;">
+</body>
+</html>
+------=_Part_55668_858625773.1787987622224--

@@ -134,19 +134,21 @@ export function StockScreen() {
     .map((offer: UnmappedOffer) => offer.name)
     .join(", ");
 
-  return (
-    <View style={styles.screen}>
-      <View style={styles.header}>
-        <Text style={styles.title}>Magazyn</Text>
-        <Pressable
-          onPress={() => setModalOpen(true)}
-          style={({ pressed }) => [styles.addButton, pressed && styles.addButtonPressed]}
-          hitSlop={8}
-        >
-          <PlusIcon size={18} color={colors.onPrimary} />
-        </Pressable>
-      </View>
-
+  // Wszystko, co stoi NAD listą, jedzie razem z nią przy przewijaniu.
+  // Wcześniej pasek KPI, ostrzeżenie o ofertach poza magazynem,
+  // wyszukiwarka i chipy filtrów były przyklejone do góry ekranu i na
+  // telefonie zabierały ok. 240 pt, a z ostrzeżeniem nawet 380 pt - na
+  // ekranie iPhone'a mini zostawało miejsce na dwie, trzy karty i lista
+  // ledwo dawała się przewijać. Teraz to `ListHeaderComponent`: przy
+  // pierwszym przewinięciu w dół znika i cały ekran należy do magazynu,
+  // a powrót na górę przywraca komplet.
+  //
+  // To ELEMENT, nie funkcja komponentu - inline'owa funkcja tworzyłaby
+  // przy każdym wpisanym znaku nowy typ komponentu, więc pole
+  // wyszukiwarki montowałoby się od nowa i gubiło fokus po pierwszej
+  // literze.
+  const listHeader = (
+    <View>
       {report.data ? (
         <View style={styles.summary}>
           <View style={styles.summaryCell}>
@@ -212,20 +214,44 @@ export function StockScreen() {
           ItemSeparatorComponent={() => <View style={{ width: spacing.sm }} />}
         />
       </View>
+    </View>
+  );
+
+  return (
+    <View style={styles.screen}>
+      <View style={styles.header}>
+        <Text style={styles.title}>Magazyn</Text>
+        <Pressable
+          onPress={() => setModalOpen(true)}
+          style={({ pressed }) => [styles.addButton, pressed && styles.addButtonPressed]}
+          hitSlop={8}
+        >
+          <PlusIcon size={18} color={colors.onPrimary} />
+        </Pressable>
+      </View>
 
       {stock.isPending ? (
         <View style={styles.listPadding}>
+          {listHeader}
           <Skeleton height={76} radius={radii.lg} style={{ marginBottom: spacing.sm }} />
           <Skeleton height={76} radius={radii.lg} />
         </View>
       ) : stock.isError ? (
-        <ErrorState onRetry={() => stock.refetch()} />
+        <View style={styles.listPadding}>
+          {listHeader}
+          <ErrorState onRetry={() => stock.refetch()} />
+        </View>
       ) : (
         <FlatList
           data={filtered}
           keyExtractor={(item) => item.sku}
           renderItem={renderItem}
           contentContainerStyle={styles.listContent}
+          ListHeaderComponent={listHeader}
+          // Stuknięcie w chip filtra albo w kartę przy otwartej klawiaturze
+          // ma zadziałać od razu, a nie dopiero po jej schowaniu.
+          keyboardShouldPersistTaps="handled"
+          keyboardDismissMode="on-drag"
           refreshControl={
             <RefreshControl
               refreshing={stock.isRefetching}
@@ -345,7 +371,6 @@ const styles = StyleSheet.create({
     borderRadius: radii.lg,
     paddingVertical: spacing.md,
     paddingHorizontal: spacing.lg,
-    marginHorizontal: spacing.xl,
     marginTop: spacing.md,
   },
   summaryCell: {
@@ -373,7 +398,6 @@ const styles = StyleSheet.create({
     borderColor: colors.warning,
     borderRadius: radii.lg,
     padding: spacing.lg,
-    marginHorizontal: spacing.xl,
     marginTop: spacing.md,
     gap: spacing.xs,
   },
@@ -388,11 +412,9 @@ const styles = StyleSheet.create({
     lineHeight: 17,
   },
   searchWrap: {
-    paddingHorizontal: spacing.xl,
     paddingTop: spacing.md,
   },
   filterRow: {
-    paddingHorizontal: spacing.xl,
     paddingVertical: spacing.md,
   },
   listPadding: {

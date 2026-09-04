@@ -6,6 +6,7 @@ from abc import ABC, abstractmethod
 
 from app.domain.entities.allegro_lokalnie_event import AllegroLokalnieEvent
 from app.domain.entities.dispute_notice import DisputeNotice
+from app.domain.entities.olx_event import OlxEvent
 from app.domain.entities.order import Order
 from app.domain.entities.order_return import OrderReturn
 from app.shared.dto.reminder_dto import ShippingReminderData
@@ -70,6 +71,23 @@ class Notifier(ABC):
         pozycją z katalogu `push_payload`.
         """
         await self.send_text(f"Allegro Lokalnie: {event.subject or event.snippet}")
+
+    async def notify_olx_event(self, event: OlxEvent) -> None:
+        """
+        Zgłasza zdarzenie z OLX (wiadomość od kupującego, zwrot,
+        nierozpoznany szablon) odczytane z powiadomienia e-mail.
+
+        Sprzedaż z kompletem danych tu NIE trafia - idzie torem
+        `OrderCreated`, czyli tym samym co Allegro.pl, żeby jedna
+        sprzedaż nie dała dwóch powiadomień.
+
+        Ma domyślną implementację opartą o `send_text` - tak jak
+        `notify_allegro_lokalnie` - żeby dodanie nowego kanału powiadomień
+        nie wymagało od razu własnego formatowania. Oba istniejące kanały
+        tę metodę nadpisują: Telegram własnym układem HTML, Web Push
+        pozycją z katalogu `push_payload`.
+        """
+        await self.send_text(f"OLX: {event.subject or event.snippet}")
 
     async def notify_new_dispute(self, notice: DisputeNotice) -> None:
         """

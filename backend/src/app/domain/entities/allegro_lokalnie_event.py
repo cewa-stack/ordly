@@ -13,6 +13,12 @@ EVENT_NEW_ORDER = "new_order"
 EVENT_NEW_MESSAGE = "new_message"
 EVENT_INTEREST = "interest"
 EVENT_ORDER_STATUS = "order_status"
+#: Zwrot/reklamacja - wydzielony z `EVENT_ORDER_STATUS`, bo wymaga
+#: Twojej reakcji, a „paczka dostarczona” i „anulowano” nie wymagają
+#: żadnej. Do tej pory wszystkie trzy dawały ten sam, ogólny tytuł
+#: powiadomienia („Zmiana zamówienia”) i nie dało się ich odróżnić na
+#: ekranie blokady.
+EVENT_RETURN = "return"
 EVENT_UNKNOWN = "unknown"
 
 
@@ -65,7 +71,7 @@ class AllegroLokalnieEvent:
     @property
     def is_order(self) -> bool:
         """Czy zdarzenie dotyczy sprzedaży (a nie rozmowy z kupującym)."""
-        return self.event_type in (EVENT_NEW_ORDER, EVENT_ORDER_STATUS)
+        return self.event_type in (EVENT_NEW_ORDER, EVENT_ORDER_STATUS, EVENT_RETURN)
 
     @property
     def buyer(self) -> str | None:

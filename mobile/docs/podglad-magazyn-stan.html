@@ -1,0 +1,636 @@
+<title>Magazyn na telefonie</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap">
+<style>
+  :root {
+    --ground: #F1F5F3;
+    --ink: #17201C;
+    --muted: #5E6D66;
+    --faint: #8C9A93;
+    --rule: rgba(23, 32, 28, 0.11);
+    --accent: #1F7D80;
+    --accent-soft: rgba(31, 125, 128, 0.10);
+    --stop: #C4523A;
+    --stop-soft: rgba(196, 82, 58, 0.10);
+    --frame-shadow: rgba(23, 32, 28, 0.55);
+
+    /* Paleta ORDLY Mobile (mobile/src/theme/colors.ts). Te wartości NIE
+       zmieniają się z motywem strony: aplikacja mobilna jest jasna
+       celowo, więc podgląd telefonu zostaje jasny także w ciemnym. */
+    --m-bg: #EFF4F1;
+    --m-surface: #FFFFFF;
+    --m-raised: #E4EDE8;
+    --m-border: rgba(35, 43, 39, 0.055);
+    --m-text: #232B27;
+    --m-text-2: #68766F;
+    --m-dim: #96A49E;
+    --m-primary: #1F7D80;
+    --m-warning: #9A6F22;
+    --m-danger: #C4523A;
+
+    color-scheme: light dark;
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --ground: #0F1513;
+      --ink: #E7EFEB;
+      --muted: #9DACA5;
+      --faint: #6F7E77;
+      --rule: rgba(231, 239, 235, 0.13);
+      --accent: #5FD9CC;
+      --accent-soft: rgba(95, 217, 204, 0.12);
+      --stop: #E8836A;
+      --stop-soft: rgba(232, 131, 106, 0.13);
+      --frame-shadow: rgba(0, 0, 0, 0.75);
+    }
+  }
+
+  :root[data-theme="dark"] {
+    --ground: #0F1513;
+    --ink: #E7EFEB;
+    --muted: #9DACA5;
+    --faint: #6F7E77;
+    --rule: rgba(231, 239, 235, 0.13);
+    --accent: #5FD9CC;
+    --accent-soft: rgba(95, 217, 204, 0.12);
+    --stop: #E8836A;
+    --stop-soft: rgba(232, 131, 106, 0.13);
+    --frame-shadow: rgba(0, 0, 0, 0.75);
+  }
+
+  body {
+    background: var(--ground);
+    color: var(--ink);
+    font-family: "IBM Plex Sans", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    font-size: 15px;
+    line-height: 1.6;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  .wrap {
+    max-width: 1000px;
+    margin: 0 auto;
+    padding: 48px 24px 72px;
+    display: flex;
+    flex-direction: column;
+    gap: 44px;
+  }
+
+  .eyebrow {
+    font-family: "IBM Plex Mono", ui-monospace, monospace;
+    font-size: 11.5px;
+    font-weight: 500;
+    letter-spacing: 0.13em;
+    text-transform: uppercase;
+    color: var(--accent);
+    margin: 0 0 10px;
+  }
+  h1 {
+    font-size: clamp(28px, 4.6vw, 38px);
+    font-weight: 600;
+    line-height: 1.14;
+    letter-spacing: -0.021em;
+    margin: 0 0 16px;
+    text-wrap: balance;
+  }
+  .lede {
+    max-width: 62ch;
+    color: var(--muted);
+    margin: 0;
+  }
+  .lede b { color: var(--ink); font-weight: 600; }
+
+  code {
+    font-family: "IBM Plex Mono", ui-monospace, monospace;
+    font-size: 0.88em;
+    color: var(--ink);
+    background: var(--accent-soft);
+    padding: 1px 5px;
+    border-radius: 4px;
+  }
+
+  .cause {
+    border-left: 2px solid var(--stop);
+    padding: 2px 0 2px 18px;
+    max-width: 66ch;
+    color: var(--muted);
+  }
+  .cause b { color: var(--ink); font-weight: 600; }
+  .cause .formula {
+    display: block;
+    font-family: "IBM Plex Mono", ui-monospace, monospace;
+    font-size: 12.5px;
+    line-height: 1.7;
+    color: var(--ink);
+    margin-top: 8px;
+    overflow-x: auto;
+    white-space: pre;
+  }
+
+  .phones {
+    display: flex;
+    gap: 28px;
+    align-items: flex-start;
+    overflow-x: auto;
+    padding-bottom: 6px;
+  }
+  .phone { flex: 0 0 auto; }
+  .phone-label {
+    display: flex;
+    align-items: baseline;
+    gap: 10px;
+    margin-bottom: 12px;
+    padding-left: 2px;
+  }
+  .phone-label h2 {
+    font-size: 16px;
+    font-weight: 600;
+    letter-spacing: -0.01em;
+    margin: 0;
+  }
+  .phone-label .tag {
+    font-family: "IBM Plex Mono", ui-monospace, monospace;
+    font-size: 10.5px;
+    font-weight: 500;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    padding: 2px 7px;
+    border-radius: 4px;
+  }
+  .tag.is-before { color: var(--stop); background: var(--stop-soft); }
+  .tag.is-after { color: var(--accent); background: var(--accent-soft); }
+
+  .screen {
+    width: 375px;
+    background: var(--m-bg);
+    border: 1px solid var(--rule);
+    border-radius: 26px;
+    padding: 16px;
+    box-shadow: 0 18px 42px -28px var(--frame-shadow);
+  }
+  .screen-head {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    font-size: 15.5px;
+    font-weight: 600;
+    line-height: 21px;
+    color: var(--m-text);
+    padding: 4px 2px 14px;
+  }
+
+  /* Karta produktu odwzorowuje mobile/src/components/StockRow.tsx. */
+  .card {
+    background: var(--m-surface);
+    border: 1px solid var(--m-border);
+    border-radius: 17px;
+    padding: 16px;
+    margin-bottom: 8px;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  }
+  .card:last-child { margin-bottom: 0; }
+  .card-main {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 12px;
+  }
+  .card-info { flex: 1; min-width: 0; }
+  .card-name {
+    font-size: 13px;
+    font-weight: 600;
+    line-height: 19px;
+    color: var(--m-text);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .card-sku {
+    font-size: 12px;
+    font-weight: 500;
+    line-height: 16px;
+    font-variant-numeric: tabular-nums;
+    color: var(--m-dim);
+    margin-top: 2px;
+  }
+  .card-stock {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 6px;
+  }
+  .qty {
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+    color: var(--m-text);
+    white-space: nowrap;
+  }
+  .qty .unit {
+    font-size: 11px;
+    font-weight: 500;
+    line-height: 15px;
+    color: var(--m-text-2);
+  }
+  .qty.warning { color: var(--m-warning); }
+  .qty.critical { color: var(--m-danger); }
+  /* Przed: 18/700 z globalnej typography.statValue. Po: lokalne 21/700. */
+  .is-before .qty { font-size: 18px; line-height: 23px; }
+  .is-after .qty { font-size: 21px; line-height: 27px; }
+
+  .bar {
+    width: 60px;
+    height: 4px;
+    border-radius: 999px;
+    background: var(--m-raised);
+    overflow: hidden;
+  }
+  .bar > i { display: block; height: 100%; border-radius: 999px; }
+  .fill-ok { background: var(--m-primary); }
+  .fill-warning { background: var(--m-warning); }
+  .fill-critical { background: var(--m-danger); }
+
+  .low-flag {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin-top: 8px;
+    font-size: 11px;
+    font-weight: 500;
+    line-height: 15px;
+    color: var(--m-warning);
+  }
+  .low-flag svg { flex: 0 0 auto; }
+
+  /* --- sekcja: ile listy widac na telefonie --- */
+  .viewport {
+    width: 320px;
+    height: 560px;
+    overflow: hidden;
+    position: relative;
+    background: var(--m-bg);
+    border: 1px solid var(--rule);
+    border-radius: 26px;
+    box-shadow: 0 18px 42px -28px var(--frame-shadow);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  }
+  .viewport-inner { padding: 14px; }
+  .vp-title {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 4px 2px 0;
+  }
+  .vp-title span:first-child { font-size: 22px; font-weight: 700; color: var(--m-text); }
+  .vp-add {
+    width: 32px;
+    height: 32px;
+    border-radius: 999px;
+    background: var(--m-primary);
+    color: #fff;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 17px;
+    line-height: 1;
+  }
+  .vp-kpi {
+    display: flex;
+    gap: 10px;
+    background: var(--m-surface);
+    border: 1px solid var(--m-border);
+    border-radius: 17px;
+    padding: 10px 12px;
+    margin-top: 10px;
+  }
+  .vp-kpi div { flex: 1; }
+  .vp-kpi b { display: block; font-size: 16px; font-weight: 700; color: var(--m-text); }
+  .vp-kpi small { font-size: 10px; color: var(--m-text-2); }
+  .vp-warn {
+    background: #FBF0D8;
+    border: 1px solid var(--m-warning);
+    border-radius: 17px;
+    padding: 12px;
+    margin-top: 10px;
+  }
+  .vp-warn b { display: block; font-size: 13px; font-weight: 600; color: var(--m-warning); }
+  .vp-warn p { margin: 4px 0 0; font-size: 10.5px; line-height: 1.45; color: var(--m-text-2); }
+  .vp-search {
+    margin-top: 10px;
+    height: 38px;
+    border-radius: 999px;
+    background: var(--m-surface);
+    border: 1px solid var(--m-border);
+    display: flex;
+    align-items: center;
+    padding: 0 14px;
+    font-size: 12.5px;
+    color: var(--m-dim);
+  }
+  .vp-chips { display: flex; gap: 7px; margin: 10px 0; }
+  .vp-chip {
+    font-size: 11px;
+    font-weight: 500;
+    padding: 6px 11px;
+    border-radius: 999px;
+    background: var(--m-surface);
+    border: 1px solid var(--m-border);
+    color: var(--m-text-2);
+    white-space: nowrap;
+  }
+  .vp-chip.on { background: var(--m-primary); color: #fff; border-color: var(--m-primary); }
+  .vp-card {
+    background: var(--m-surface);
+    border: 1px solid var(--m-border);
+    border-radius: 17px;
+    padding: 13px;
+    margin-bottom: 7px;
+    display: flex;
+    justify-content: space-between;
+    gap: 10px;
+  }
+  .vp-card i {
+    font-style: normal;
+    font-size: 12.5px;
+    font-weight: 600;
+    color: var(--m-text);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .vp-card em {
+    font-style: normal;
+    font-size: 19px;
+    font-weight: 700;
+    color: var(--m-text);
+    white-space: nowrap;
+  }
+  .fold {
+    position: absolute;
+    left: 0;
+    right: 0;
+    border-top: 2px dashed var(--stop);
+    pointer-events: none;
+  }
+  .fold::after {
+    content: attr(data-label);
+    position: absolute;
+    right: 8px;
+    top: -9px;
+    background: var(--stop);
+    color: #fff;
+    font-family: "IBM Plex Mono", ui-monospace, monospace;
+    font-size: 9px;
+    font-weight: 500;
+    letter-spacing: 0.05em;
+    padding: 2px 6px;
+    border-radius: 3px;
+  }
+  .measure {
+    display: flex;
+    gap: 22px;
+    flex-wrap: wrap;
+    margin-top: 18px;
+    font-family: "IBM Plex Mono", ui-monospace, monospace;
+    font-size: 12px;
+  }
+  .measure div { display: flex; flex-direction: column; gap: 2px; }
+  .measure b { font-size: 20px; font-weight: 600; color: var(--ink); }
+  .measure span { color: var(--faint); font-size: 10.5px; letter-spacing: 0.05em; text-transform: uppercase; }
+
+  .cases h2 {
+    font-size: 19px;
+    font-weight: 600;
+    letter-spacing: -0.013em;
+    margin: 0 0 6px;
+  }
+  .cases p {
+    color: var(--muted);
+    margin: 0 0 20px;
+    max-width: 62ch;
+  }
+  .table-scroll { overflow-x: auto; }
+  table {
+    width: 100%;
+    min-width: 640px;
+    border-collapse: collapse;
+    font-size: 13.5px;
+  }
+  th {
+    text-align: left;
+    font-family: "IBM Plex Mono", ui-monospace, monospace;
+    font-size: 10.5px;
+    font-weight: 500;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--faint);
+    padding: 0 14px 9px 0;
+    border-bottom: 1px solid var(--rule);
+    white-space: nowrap;
+  }
+  td {
+    padding: 11px 14px 11px 0;
+    border-bottom: 1px solid var(--rule);
+    vertical-align: top;
+    color: var(--muted);
+  }
+  td.num {
+    font-family: "IBM Plex Mono", ui-monospace, monospace;
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+  }
+  td.case { color: var(--ink); font-weight: 500; }
+  td.was { color: var(--stop); }
+  td.now { color: var(--ink); }
+  tbody tr:last-child td { border-bottom: none; }
+
+  .note {
+    border-top: 1px solid var(--rule);
+    padding-top: 24px;
+    color: var(--muted);
+    font-size: 13.5px;
+    max-width: 74ch;
+  }
+  .note b { color: var(--ink); font-weight: 600; }
+  .note ul { margin: 10px 0 0; padding-left: 20px; }
+  .note li { margin-bottom: 8px; }
+
+  @media (max-width: 860px) {
+    .phones { gap: 20px; }
+    .wrap { padding: 32px 18px 56px; gap: 36px; }
+  }
+</style>
+
+<div class="wrap">
+  <header>
+    <p class="eyebrow">ORDLY Mobile · Magazyn</p>
+    <h1>Stan magazynu wreszcie widać przy przewijaniu</h1>
+    <p class="lede">Na nagraniu z listy „Magazyn” stan produktów przy przewijaniu był nieczytelny. Powód nie leżał w kontraście ani w animacji: pasek zapasu pokazywał <b>100% wypełnienia dla każdego produktu bez ustawionego progu alertu</b> — a próg jest polem opcjonalnym, więc dotyczyło to większości magazynu.</p>
+  </header>
+
+  <div class="cause">
+    <b>Stary wzór</b> — <code>StockRow.tsx</code>, linia 21. Gdy <code>min_stock</code> wynosił 0, każda dodatnia ilość dawała <code>ratio = 1</code>:
+    <span class="formula">const ratio = item.min_stock &gt; 0 ? item.stock / (item.min_stock * 2) : item.stock &gt; 0 ? 1 : 0;</span>
+    <span class="formula">// pole max_stock istniało w typie StockItem, ale nie było tu używane</span>
+  </div>
+
+  <div class="phones">
+    <div class="phone is-before">
+      <div class="phone-label"><h2>Przed</h2><span class="tag is-before">wersja na telefonie</span></div>
+      <div class="screen">
+        <div class="screen-head">Magazyn</div>
+        <div id="list-before"></div>
+      </div>
+    </div>
+    <div class="phone is-after">
+      <div class="phone-label"><h2>Po</h2><span class="tag is-after">po poprawce</span></div>
+      <div class="screen">
+        <div class="screen-head">Magazyn</div>
+        <div id="list-after"></div>
+      </div>
+    </div>
+  </div>
+
+  <section class="cases">
+    <h2>Ile listy widać po otwarciu zakładki</h2>
+    <p>Ten sam ekran, ta sama wysokość okna (iPhone mini po odjęciu paska stanu i zakładek). Czerwona linia to dolna krawędź ekranu — poniżej niej trzeba przewijać.</p>
+    <div class="phones" style="margin-top:20px">
+      <div class="phone is-before">
+        <div class="phone-label"><h2>Przed</h2><span class="tag is-before">nagłówek przyklejony</span></div>
+        <div class="viewport">
+          <div class="viewport-inner">
+            <div class="vp-title"><span>Magazyn</span><span class="vp-add">+</span></div><div class="vp-kpi"><div><b>128</b><small>Produkty</small></div><div><b>7</b><small>Poniżej minimum</small></div><div><b>14 280 zł</b><small>Wartość</small></div></div><div class="vp-warn"><b>2 oferty sprzedają się poza magazynem</b><p>Butelki PET 10 ml do liquidów, Zestaw buteleczek 10ml — sprzedaż tych ofert nie zdejmuje nic ze stanów, bo nie mają przypisanych składników. Powiązania ustawisz na desktopie: Magazyn → Powiązania ofert.</p></div><div class="vp-search">Szukaj po SKU lub nazwie…</div><div class="vp-chips"><span class="vp-chip on">Wszystkie · 128</span><span class="vp-chip">Niski stan · 7</span><span class="vp-chip">Bez sprzedaży</span></div><div class="vp-card"><i>Butelka Gorilla 10ml Liquid</i><em>5</em></div><div class="vp-card"><i>Butelka Gorilla 60ml Liquid</i><em>500</em></div><div class="vp-card"><i>Płyta gazowa AMICA PG0720</i><em>0</em></div><div class="vp-card"><i>Zakrętka DIN18</i><em>8</em></div><div class="vp-card"><i>Butelka PET 30 ml</i><em>40</em></div><div class="vp-card"><i>Kroplomierz szklany 10 ml</i><em>150</em></div><div class="vp-card"><i>Etykieta samoprzylepna 40×20</i><em>820</em></div><div class="vp-card"><i>Karton wysyłkowy A5</i><em>64</em></div>
+          </div>
+          <div class="fold" data-label="KONIEC EKRANU" style="top:558px"></div>
+        </div>
+      </div>
+      <div class="phone is-after">
+        <div class="phone-label"><h2>Po</h2><span class="tag is-after">nagłówek przewija się z listą</span></div>
+        <div class="viewport">
+          <div class="viewport-inner">
+            <div class="vp-title"><span>Magazyn</span><span class="vp-add">+</span></div>
+            <div style="margin-top:10px"><div class="vp-card"><i>Butelka Gorilla 10ml Liquid</i><em>5</em></div><div class="vp-card"><i>Butelka Gorilla 60ml Liquid</i><em>500</em></div><div class="vp-card"><i>Płyta gazowa AMICA PG0720</i><em>0</em></div><div class="vp-card"><i>Zakrętka DIN18</i><em>8</em></div><div class="vp-card"><i>Butelka PET 30 ml</i><em>40</em></div><div class="vp-card"><i>Kroplomierz szklany 10 ml</i><em>150</em></div><div class="vp-card"><i>Etykieta samoprzylepna 40×20</i><em>820</em></div><div class="vp-card"><i>Karton wysyłkowy A5</i><em>64</em></div><div class="vp-card"><i>Butelka Gorilla 10ml Liquid</i><em>5</em></div><div class="vp-card"><i>Butelka Gorilla 60ml Liquid</i><em>500</em></div><div class="vp-card"><i>Płyta gazowa AMICA PG0720</i><em>0</em></div><div class="vp-card"><i>Zakrętka DIN18</i><em>8</em></div><div class="vp-card"><i>Butelka PET 30 ml</i><em>40</em></div><div class="vp-card"><i>Kroplomierz szklany 10 ml</i><em>150</em></div><div class="vp-card"><i>Etykieta samoprzylepna 40×20</i><em>820</em></div><div class="vp-card"><i>Karton wysyłkowy A5</i><em>64</em></div></div>
+          </div>
+          <div class="fold" data-label="KONIEC EKRANU" style="top:558px"></div>
+        </div>
+        <p style="font-size:11.5px;color:var(--faint);margin:10px 2px 0;max-width:320px;line-height:1.5">Po przewinięciu w dół. Pasek KPI, ostrzeżenie, wyszukiwarka i filtry są nad pierwszą kartą — wracają, gdy wrócisz na górę.</p>
+      </div>
+    </div>
+    <div class="measure">
+      <div><b>3</b><span>całe karty przed</span></div>
+      <div><b>7</b><span>całych kart po</span></div>
+      <div><b>311 pt</b><span>odzyskanej wysokości</span></div>
+    </div>
+  </section>
+
+  <section class="cases">
+    <h2>Sześć kombinacji progów</h2>
+    <p>Te same produkty w obu telefonach. Kolumna „było” to szerokość paska ze starego wzoru, „jest” — z nowego.</p>
+    <div class="table-scroll">
+      <table>
+        <thead>
+          <tr>
+            <th>Przypadek</th>
+            <th>stan</th>
+            <th>min_stock</th>
+            <th>max_stock</th>
+            <th>pasek: było</th>
+            <th>pasek: jest</th>
+          </tr>
+        </thead>
+        <tbody id="cases"></tbody>
+      </table>
+    </div>
+  </section>
+
+  <div class="note">
+    <b>Co dokładnie się zmieniło</b>
+    <ul>
+      <li><b>Mianownikiem jest teraz <code>max_stock</code></b>, kiedy jest ustawiony — to jedyna proporcja, która naprawdę coś znaczy. Dopiero bez niego zostaje stare przybliżenie „pełno = dwa razy próg alertu”.</li>
+      <li><b>Bez żadnego progu pasek znika</b> zamiast pokazywać fałszywe 100%. Nie ma z czym porównać ilości, więc rysowanie paska tylko udawałoby informację. Wyjątek: stan zerowy dalej dostaje czerwony ślad — zero to konkretna wiadomość, a nie brak danych.</li>
+      <li><b>Liczba sztuk urosła z 18 do 21 px</b> i przy niskim albo zerowym stanie przejmuje kolor statusu. To ona, a nie pasek szeroki na 60 px, rzuca się w oczy przy szybkim przewijaniu. Globalna <code>typography.statValue</code> została nietknięta — zmiana jest lokalna dla karty magazynowej.</li>
+      <li>Flaga „poniżej minimum — zamów dostawę” działa jak dotąd, bez zmian.</li>
+    </ul>
+  </div>
+</div>
+
+<script>
+  // Zestaw dobrany tak, żeby pokryć wszystkie kombinacje progów. Nazwy
+  // pochodzą z asortymentu tego sklepu, ale liczby NIE są zrzutem żywej
+  // bazy z Pi - ostateczne potwierdzenie to spojrzenie na prawdziwą listę
+  // magazynu po wdrożeniu.
+  var ITEMS = [
+    { name: "Butelka Gorilla 10ml Liquid Aromat Baza olejki DIY", sku: "GOR-10-PET", stock: 5, min: 0, max: null, opis: "bez progów, mały stan" },
+    { name: "Butelka Gorilla 60ml Liquid Aromat Baza olejki DIY", sku: "GOR-60-PET", stock: 500, min: 0, max: null, opis: "bez progów, duży stan" },
+    { name: "Płyta gazowa AMICA PG0720 / PMG2.0", sku: "AMI-PG0720", stock: 0, min: 0, max: null, opis: "bez progów, stan zerowy" },
+    { name: "Zakrętka DIN18 z zabezpieczeniem", sku: "ZAK-DIN18", stock: 8, min: 20, max: null, opis: "sam próg alertu" },
+    { name: "Butelka PET 30 ml przezroczysta", sku: "PET-30-CL", stock: 40, min: 0, max: 200, opis: "sam stan docelowy" },
+    { name: "Kroplomierz szklany 10 ml", sku: "KRP-10-SZ", stock: 150, min: 20, max: 200, opis: "oba progi" }
+  ];
+
+  // Status liczony tak jak w backendzie (domain/entities/inventory_item.py).
+  function status(it) {
+    if (it.stock === 0) return "critical";
+    if (it.min > 0 && it.stock <= it.min) return "warning";
+    return "ok";
+  }
+
+  // Stary wzór: brak progu = zawsze pełny pasek.
+  function ratioBefore(it) {
+    if (it.min > 0) return it.stock / (it.min * 2);
+    return it.stock > 0 ? 1 : 0;
+  }
+
+  // Nowy wzór: null = nie ma z czego policzyć proporcji.
+  function ratioAfter(it) {
+    if (it.max !== null && it.max > 0) return it.stock / it.max;
+    if (it.min > 0) return it.stock / (it.min * 2);
+    return it.stock === 0 ? 0 : null;
+  }
+
+  function pct(r) {
+    if (r === null) return null;
+    return Math.max(4, Math.min(100, Math.round(r * 100)));
+  }
+
+  var ALERT = '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#9A6F22" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path><line x1="12" y1="9" x2="12" y2="13"></line><line x1="12" y1="17" x2="12.01" y2="17"></line></svg>';
+
+  function card(it, width, tintQty) {
+    var st = status(it);
+    var bar = width === null ? "" :
+      '<div class="bar"><i class="fill-' + st + '" style="width:' + width + '%"></i></div>';
+    var flagText = it.stock === 0 ? "brak towaru — zamów dostawę" : "poniżej minimum — zamów dostawę";
+    var flag = st === "ok" ? "" :
+      '<div class="low-flag">' + ALERT + '<span>' + flagText + '</span></div>';
+    var qtyClass = (tintQty && st !== "ok") ? " " + st : "";
+    return '<div class="card">' +
+      '<div class="card-main">' +
+        '<div class="card-info">' +
+          '<div class="card-name">' + it.name + '</div>' +
+          '<div class="card-sku">' + it.sku + '</div>' +
+        '</div>' +
+        '<div class="card-stock">' +
+          '<div class="qty' + qtyClass + '">' + it.stock + ' <span class="unit">szt.</span></div>' +
+          bar +
+        '</div>' +
+      '</div>' + flag +
+    '</div>';
+  }
+
+  document.getElementById("list-before").innerHTML =
+    ITEMS.map(function (it) { return card(it, pct(ratioBefore(it)), false); }).join("");
+  document.getElementById("list-after").innerHTML =
+    ITEMS.map(function (it) { return card(it, pct(ratioAfter(it)), true); }).join("");
+
+  document.getElementById("cases").innerHTML = ITEMS.map(function (it) {
+    var b = pct(ratioBefore(it));
+    var a = pct(ratioAfter(it));
+    return '<tr>' +
+      '<td class="case">' + it.opis + '</td>' +
+      '<td class="num">' + it.stock + '</td>' +
+      '<td class="num">' + (it.min || "—") + '</td>' +
+      '<td class="num">' + (it.max === null ? "—" : it.max) + '</td>' +
+      '<td class="num was">' + (b === null ? "brak paska" : b + "%") + '</td>' +
+      '<td class="num now">' + (a === null ? "brak paska" : a + "%") + '</td>' +
+    '</tr>';
+  }).join("");
+</script>

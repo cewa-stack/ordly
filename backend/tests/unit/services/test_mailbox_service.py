@@ -10,7 +10,7 @@ from pydantic import SecretStr
 
 from app.core.config import MailWatchSettings
 from app.core.event_bus.bus import EventBus
-from app.core.event_bus.events import AllegroLokalnieEventDetected
+from app.core.event_bus.events import AllegroLokalnieEventDetected, OlxEventDetected
 from app.domain.entities.mail_message import MailMessage
 from app.domain.exceptions.domain_exceptions import (
     MailboxNotConfiguredError,
@@ -123,6 +123,84 @@ class TestMailboxServiceSync:
 
         _, since = watcher.calls[0]
         assert since == sample_mail_message.received_at
+
+    @staticmethod
+    def _mail(sender: str, message_id: str) -> MailMessage:
+        return MailMessage(
+            message_id=message_id,
+            sender=sender,
+            subject="Wow - 70% rabatu na wszystko!",
+            received_at=utc_now(),
+            source="olx",
+            body_preview="Promocja tylko dzisiaj.",
+        )
+
+    @pytest.mark.asyncio
+    async def test_mail_marketingowy_z_olx_nie_trafia_do_bazy(self, fake_mail_repository):
+        """
+        `IMAP SEARCH FROM "olx"` dopasowuje PODCIĄG, więc
+        `powiadomienia@marketing.olx.pl` przechodzi tym samym filtrem co
+        prawdziwe powiadomienia. Ma odpaść PRZED zapisem, nie przy
+        wyświetlaniu - do `mail_messages` nie ma w ogóle wejść.
+        """
+        marketing = self._mail(
+            "OLX <powiadomienia@marketing.olx.pl>", "<promo.20260904@marketing.olx.pl>"
+        )
+        watcher = FakeWatcher(messages_to_return=[marketing])
+        service = MailboxService(
+            fake_mail_repository, _configured_settings(), watcher_factory=lambda: watcher
+        )
+
+        saved = await service.sync_now()
+
+        assert saved == []
+        assert not await fake_mail_repository.exists(marketing.message_id)
+
+    @pytest.mark.asyncio
+    async def test_newsletter_allegro_nie_trafia_do_bazy(self, fake_mail_repository):
+        newsletter = self._mail(
+            "Allegro <hello@newsletter.allegro.pl>", "<kupon.20260904@newsletter.allegro.pl>"
+        )
+        watcher = FakeWatcher(messages_to_return=[newsletter])
+        service = MailboxService(
+            fake_mail_repository, _configured_settings(), watcher_factory=lambda: watcher
+        )
+
+        assert await service.sync_now() == []
+        assert not await fake_mail_repository.exists(newsletter.message_id)
+
+    @pytest.mark.asyncio
+    async def test_prawdziwe_powiadomienie_olx_przechodzi_filtr(self, fake_mail_repository):
+        """Filtr wykluczeń nie może odciąć nadawcy, dla którego skrzynka istnieje."""
+        prawdziwy = self._mail("OLX <noreply@olx.pl>", "<sprzedaz.20260904@olx.pl>")
+        watcher = FakeWatcher(messages_to_return=[prawdziwy])
+        service = MailboxService(
+            fake_mail_repository, _configured_settings(), watcher_factory=lambda: watcher
+        )
+
+        saved = await service.sync_now()
+
+        assert [m.message_id for m in saved] == [prawdziwy.message_id]
+        assert await fake_mail_repository.exists(prawdziwy.message_id)
+
+    @pytest.mark.asyncio
+    async def test_pusta_lista_wykluczen_nie_odsiewa_niczego(self, fake_mail_repository):
+        marketing = self._mail(
+            "OLX <powiadomienia@marketing.olx.pl>", "<promo.20260904@marketing.olx.pl>"
+        )
+        settings = MailWatchSettings(
+            IMAP_HOST="imap.gmail.com",
+            IMAP_USER="sklep@gmail.com",
+            IMAP_PASS=SecretStr("haslo-aplikacji"),
+            MAIL_WATCH_SENDERS="allegro.pl,olx.pl",
+            MAIL_EXCLUDE_SENDERS="",
+        )
+        watcher = FakeWatcher(messages_to_return=[marketing])
+        service = MailboxService(
+            fake_mail_repository, settings, watcher_factory=lambda: watcher
+        )
+
+        assert len(await service.sync_now()) == 1
 
     @pytest.mark.asyncio
     async def test_blad_polaczenia_imap_zwraca_zero_zamiast_wyjatku(
@@ -365,10 +443,11 @@ class TestMailboxServiceAllegroLokalnieEvents:
         assert captured[0].event.event_type == "new_order"
 
     @pytest.mark.asyncio
-    async def test_nie_publikuje_dla_zwyklej_poczty(self, fake_mail_repository):
+    async def test_zdarzenie_lokalnie_nie_powstaje_z_cudzej_poczty(self, fake_mail_repository):
         """
-        Allegro.pl i OLX mają własne, bogatsze źródła zdarzeń - powiadomienie
-        ze skrzynki dublowałoby to, co użytkownik i tak już dostał.
+        Każdy kanał ma własny typ zdarzenia. Mail z Allegro.pl, z OLX
+        i od hurtowni nie ma prawa wygenerować zdarzenia z Lokalnie -
+        inaczej ten sam mail dałby dwa powiadomienia.
         """
         bus = EventBus()
         captured: list[AllegroLokalnieEventDetected] = []
@@ -419,3 +498,96 @@ class TestMailboxServiceAllegroLokalnieEvents:
 async def _collect(bucket: list, event) -> None:
     """Subskrybent testowy - Event Bus oczekuje korutyny, nie zwykłej funkcji."""
     bucket.append(event)
+
+
+class TestMailboxServiceOlxEvents:
+    """
+    Publikacja zdarzeń z OLX.
+
+    Do niedawna poczta OLX nie generowała żadnych zdarzeń - sprzedaż,
+    wiadomość i zwrot z tego kanału przechodziły przez ORDLY bezgłośnie.
+    Teraz każdy taki mail publikuje `OlxEventDetected`; dopóki parser nie
+    ma wzorców tematu, zdarzenie ma typ `unknown` i zostaje zwykłym
+    powiadomieniem, a nie zamówieniem.
+    """
+
+    @staticmethod
+    def _mail(message_id: str, source: str = "olx", subject: str = "Sprzedałeś przedmiot"):
+        return MailMessage(
+            message_id=message_id,
+            sender="OLX <noreply@olx.pl>",
+            subject=subject,
+            received_at=utc_now(),
+            source=source,
+            body_preview="Gratulacje! Kupujący opłacił zamówienie.",
+        )
+
+    @pytest.mark.asyncio
+    async def test_publikuje_zdarzenie_dla_maila_z_olx(self, fake_mail_repository):
+        bus = EventBus()
+        captured: list[OlxEventDetected] = []
+        bus.subscribe(OlxEventDetected, lambda event: _collect(captured, event))
+
+        service = MailboxService(fake_mail_repository, _configured_settings(), event_bus=bus)
+
+        await service.publish_mail_events([self._mail("<olx-1@olx.pl>")])
+
+        assert len(captured) == 1
+        assert captured[0].event.message_id == "<olx-1@olx.pl>"
+
+    @pytest.mark.asyncio
+    async def test_rozpoznaje_sprzedaz_po_temacie(self, fake_mail_repository):
+        """Wzorce tematu pochodzą z prawdziwych maili - patrz `tests/fixtures/olx/`."""
+        bus = EventBus()
+        captured: list[OlxEventDetected] = []
+        bus.subscribe(OlxEventDetected, lambda event: _collect(captured, event))
+
+        service = MailboxService(fake_mail_repository, _configured_settings(), event_bus=bus)
+
+        await service.publish_mail_events(
+            [
+                self._mail(
+                    "<olx-2@olx.pl>",
+                    subject="💵➡️👍 Kupujący już zapłacił, potwierdź sprzedaż do 15:29 16-12-2025",
+                )
+            ]
+        )
+
+        assert captured[0].event.event_type == "new_order"
+
+    @pytest.mark.asyncio
+    async def test_zdarzenie_olx_nie_powstaje_z_cudzej_poczty(self, fake_mail_repository):
+        bus = EventBus()
+        captured: list[OlxEventDetected] = []
+        bus.subscribe(OlxEventDetected, lambda event: _collect(captured, event))
+
+        service = MailboxService(fake_mail_repository, _configured_settings(), event_bus=bus)
+
+        await service.publish_mail_events(
+            [
+                self._mail("<al@allegrolokalnie.pl>", "allegro_lokalnie"),
+                self._mail("<a@allegromail.pl>", "allegro"),
+                self._mail("<x@example.com>", "other"),
+            ]
+        )
+
+        assert captured == []
+
+    @pytest.mark.asyncio
+    async def test_awaria_dociagania_tresci_nie_gubi_zdarzenia(self, fake_mail_repository):
+        """Gdy IMAP nie odpowie, zdarzenie ma powstać z podglądu - uboższe, ale jest."""
+        bus = EventBus()
+        captured: list[OlxEventDetected] = []
+        bus.subscribe(OlxEventDetected, lambda event: _collect(captured, event))
+        watcher = FakeWatcher(should_raise=ImapConnectionError("brak polaczenia"))
+        service = MailboxService(
+            fake_mail_repository,
+            _configured_settings(),
+            watcher_factory=lambda: watcher,
+            event_bus=bus,
+        )
+
+        await service.publish_mail_events([self._mail("<olx-3@olx.pl>")])
+
+        assert len(captured) == 1
+        assert captured[0].event.snippet == "Gratulacje! Kupujący opłacił zamówienie."

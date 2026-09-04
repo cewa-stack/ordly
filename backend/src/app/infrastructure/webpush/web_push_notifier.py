@@ -19,6 +19,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.domain.entities.allegro_lokalnie_event import AllegroLokalnieEvent
 from app.domain.entities.dispute_notice import DisputeNotice
+from app.domain.entities.olx_event import OlxEvent
 from app.domain.entities.order import Order
 from app.domain.entities.order_return import OrderReturn
 from app.domain.entities.push_subscription import PushSubscription
@@ -180,6 +181,22 @@ class WebPushNotifier(Notifier):
                 listing_title=event.opis,
                 quantity=event.quantity,
                 amount=event.amount,
+                message_id=event.message_id,
+            )
+        )
+
+    async def notify_olx_event(self, event: OlxEvent) -> None:
+        """
+        Zdarzenie z OLX - katalog, pozycja „OLX".
+
+        Treść budujemy z katalogu, a NIE przez `send_text`: tamta ścieżka
+        jest wspólna z Telegramem, gdzie formatowanie jest HTML-em, a
+        Web Push HTML-a nie renderuje i pokazałby dosłowne znaczniki.
+        """
+        await self._send(
+            push_payload.olx_event(
+                event_type=event.event_type,
+                opis=event.opis,
                 message_id=event.message_id,
             )
         )

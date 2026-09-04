@@ -12,6 +12,7 @@ from datetime import datetime
 
 from app.domain.entities.allegro_lokalnie_event import AllegroLokalnieEvent
 from app.domain.entities.dispute_notice import DisputeNotice
+from app.domain.entities.olx_event import OlxEvent
 from app.domain.entities.order import Order
 from app.domain.entities.order_return import OrderReturn
 
@@ -75,6 +76,23 @@ class AllegroLokalnieEventDetected(DomainEvent):
     """
 
     event: AllegroLokalnieEvent
+
+
+@dataclass(frozen=True, slots=True)
+class OlxEventDetected(DomainEvent):
+    """
+    Emitowane, gdy synchronizacja skrzynki wykryje nowe powiadomienie
+    z OLX.
+
+    Bliźniacze wobec `AllegroLokalnieEventDetected` i z tego samego
+    powodu: OLX nie ma samoobsługowego API dla sprzedawców, więc mail
+    jest jedynym sygnałem, że cokolwiek się tam wydarzyło. Zdarzenie
+    jest publikowane raz na mail - `Message-ID` jest kluczem głównym
+    tabeli `mail_messages`, więc ponowny skan tego samego zakresu dat
+    nie wygeneruje duplikatu powiadomienia.
+    """
+
+    event: OlxEvent
 
 
 @dataclass(frozen=True, slots=True)

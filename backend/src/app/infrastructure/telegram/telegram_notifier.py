@@ -7,6 +7,7 @@ from loguru import logger
 
 from app.domain.entities.allegro_lokalnie_event import AllegroLokalnieEvent
 from app.domain.entities.dispute_notice import DisputeNotice
+from app.domain.entities.olx_event import OlxEvent
 from app.domain.entities.order import Order
 from app.domain.entities.order_return import OrderReturn
 from app.domain.interfaces.notifier import Notifier
@@ -18,9 +19,21 @@ from app.shared.dto.reminder_dto import ShippingReminderData
 _ALLEGRO_LOKALNIE_HEADLINES = {
     "new_order": "🛒 <b>Nowe zamówienie — Allegro Lokalnie</b>",
     "order_status": "🔄 <b>Zmiana zamówienia — Allegro Lokalnie</b>",
+    "return": "↩️ <b>Zwrot / reklamacja — Allegro Lokalnie</b>",
     "new_message": "💬 <b>Nowa wiadomość — Allegro Lokalnie</b>",
     "interest": "👀 <b>Pytanie o ogłoszenie — Allegro Lokalnie</b>",
     "unknown": "📩 <b>Powiadomienie z Allegro Lokalnie</b>",
+}
+
+
+#: Nagłówki zdarzeń z OLX. „Sprzedano", a nie „Nowe zamówienie" -
+#: zamówienie w ORDLY z tego nie powstaje, bo mail z OLX nie podaje
+#: kwoty (patrz `domain/entities/olx_event.py`).
+_OLX_HEADLINES = {
+    "new_order": "🛒 <b>Sprzedano — OLX</b>",
+    "new_message": "💬 <b>Nowa wiadomość — OLX</b>",
+    "return": "↩️ <b>Zwrot / reklamacja — OLX</b>",
+    "unknown": "📩 <b>Powiadomienie z OLX</b>",
 }
 
 
@@ -171,6 +184,35 @@ class TelegramNotifier(Notifier):
             "na stronie serwisu. ORDLY tylko o nim mówi.</i>"
         )
         await self.send_text(text)
+
+    async def notify_olx_event(self, event: OlxEvent) -> None:
+        """
+        Zdarzenie z OLX odczytane z powiadomienia e-mail.
+
+        Tytuł ogłoszenia pochodzi z maila od obcego nadawcy, więc idzie
+        przez `html.quote` - inaczej znak `<` w nazwie ogłoszenia
+        wywróciłby parsowanie HTML po stronie Telegrama i wiadomość by
+        nie doszła. Realne tytuły z OLX zawierają np. `|`, więc to nie
+        jest teoretyczne ryzyko.
+
+        Przy sprzedaży dopisujemy WPROST, że magazyn się nie zmienił -
+        na Telegramie jest miejsce, żeby powiedzieć również dlaczego,
+        czego nie da się zmieścić na ekranie blokady.
+        """
+        headline = _OLX_HEADLINES.get(event.event_type, _OLX_HEADLINES["unknown"])
+        wiersze = [headline, f"🛍️ {html.quote(event.opis)}"]
+        if event.event_type == "new_order":
+            wiersze.append(
+                "📦 <b>Stan magazynowy bez zmian</b> — odejmij go ręcznie.\n"
+                "<i>Mail z OLX nie podaje kwoty sprzedaży, więc ORDLY nie tworzy "
+                "z niego zamówienia: rekord z kwotą 0 zł zafałszowałby przychód.</i>"
+            )
+        else:
+            wiersze.append(
+                "<i>OLX nie ma API dla sprzedawców — tym ogłoszeniem zarządzasz "
+                "na stronie serwisu. ORDLY tylko o nim mówi.</i>"
+            )
+        await self.send_text("\n".join(wiersze))
 
     async def notify_new_dispute(self, notice: DisputeNotice) -> None:
         """

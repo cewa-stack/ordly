@@ -1,0 +1,503 @@
+Delivered-To: sklep.dopefoam@gmail.com
+Received: by 2002:a05:6022:545:b0:e4:5d50:3223 with SMTP id r5csp3614433lar;
+        Tue, 11 Nov 2025 05:08:06 -0800 (PST)
+X-Google-Smtp-Source: AGHT+IFPC0PEXMnRrNj3ir+pkg/lI5emDVHuCreZziOltflE3W0gr48flVLHcqwZTUW2VtcAnUYj
+X-Received: by 2002:a05:6000:22c5:b0:42b:3220:9414 with SMTP id ffacd0b85a97d-42b322097c6mr9366865f8f.21.1762866486292;
+        Tue, 11 Nov 2025 05:08:06 -0800 (PST)
+ARC-Seal: i=1; a=rsa-sha256; t=1762866486; cv=none;
+        d=google.com; s=arc-20240605;
+        b=cUK8b6feTqcWGKfyryDUmQtkCGZh0JwTvzsoac5w6xg8RzGbmbQR6Rqj5sWtceFLH6
+         ojPfcu5SOIe6kCuE40D9CWxmuWmNI+VlvZOs6vNnOlTbg8hcLV4JEpSCOLm7RigNeuWv
+         ysfeQ6c+ZPX4FjBpy+sMuCoeJZ58YI5naHi/LPAp006Ljm8gr0tsVKXXfsilHn/zl71i
+         93KYbH1X994h4WAXqBpvyalwNUuJYpB4fBp7ff+xVjMdIxGsJx4wDEHnpahCfRQBVxK0
+         cSA+FFJgbS3wZkKNx2Z0HnF4AqV9E0iG/XI/zFDLsrLQx7Zlx8xqGmwl5iSgizH4Gv5U
+         uy6g==
+ARC-Message-Signature: i=1; a=rsa-sha256; c=relaxed/relaxed; d=google.com; s=arc-20240605;
+        h=feedback-id:bimi-selector:mime-version:subject:message-id:to
+         :reply-to:from:date:dkim-signature:dkim-signature;
+        bh=D/NaqRmBE3TVfC3BzkWhifZNwKkhaeao+xMRDfvaGJQ=;
+        fh=ncS/P45YE5WFLOohRMKkY92QoHbbPEq+2rnFy84TJFQ=;
+        b=PFjIP1uzaBjFXY5hz/15Az4kDxHzJ6qyuOzCYMESOdDWPGhVigUbQAwn4R0qzFlVhp
+         vHDwL1O3CLwRQQlHvbe9eBMWuKdnCe6/w0fEDpz1YJ/gyv4bHY6B4AmoPLRRmC0WVImm
+         QkNntP8T8/gEl/T6APdcjGkzHMdXdsCcH8/RDjKjkGUj3Fm3jWrAJL72owXQio9Zfwp3
+         TcahbeO0K8CSOzEWoTMOQP6DoxZG15H8iLfYgPOO1963ni/jjtyBWv4O1MyVcKcUP8SD
+         eo+IVobuOKtnUA89sBE7R4AMrim2+EKGoX6ARhFy6QuYJ8rVSIBa9WWu5Lk/PSHBS81a
+         8hjQ==;
+        dara=google.com
+ARC-Authentication-Results: i=1; mx.google.com;
+       dkim=pass header.i=@olx.pl header.s=ucyoihvon3vahutjbyn4edunxtulk7mq header.b=u5BeaBjn;
+       dkim=pass header.i=@amazonses.com header.s=ihchhvubuqgjsxyuhssfvqohv7z3u4hn header.b=pr1jipU5;
+       spf=pass (google.com: domain of 0102019a7307d8d6-d4c1fb73-a38f-49e6-ab85-29ec1e973209-000000@comms-ses-eu-from.olx.pl designates 54.240.89.89 as permitted sender) smtp.mailfrom=0102019a7307d8d6-d4c1fb73-a38f-49e6-ab85-29ec1e973209-000000@comms-ses-eu-from.olx.pl;
+       dmarc=pass (p=REJECT sp=REJECT dis=NONE) header.from=olx.pl
+Return-Path: <0102019a7307d8d6-d4c1fb73-a38f-49e6-ab85-29ec1e973209-000000@comms-ses-eu-from.olx.pl>
+Received: from a89-89.smtp-out.eu-west-1.amazonses.com (a89-89.smtp-out.eu-west-1.amazonses.com. [54.240.89.89])
+        by mx.google.com with ESMTPS id ffacd0b85a97d-42ac67a6fc6si7952777f8f.499.2025.11.11.05.08.06
+        for <sklep.dopefoam@gmail.com>
+        (version=TLS1_3 cipher=TLS_AES_128_GCM_SHA256 bits=128/128);
+        Tue, 11 Nov 2025 05:08:06 -0800 (PST)
+Received-SPF: pass (google.com: domain of 0102019a7307d8d6-d4c1fb73-a38f-49e6-ab85-29ec1e973209-000000@comms-ses-eu-from.olx.pl designates 54.240.89.89 as permitted sender) client-ip=54.240.89.89;
+Authentication-Results: mx.google.com;
+       dkim=pass header.i=@olx.pl header.s=ucyoihvon3vahutjbyn4edunxtulk7mq header.b=u5BeaBjn;
+       dkim=pass header.i=@amazonses.com header.s=ihchhvubuqgjsxyuhssfvqohv7z3u4hn header.b=pr1jipU5;
+       spf=pass (google.com: domain of 0102019a7307d8d6-d4c1fb73-a38f-49e6-ab85-29ec1e973209-000000@comms-ses-eu-from.olx.pl designates 54.240.89.89 as permitted sender) smtp.mailfrom=0102019a7307d8d6-d4c1fb73-a38f-49e6-ab85-29ec1e973209-000000@comms-ses-eu-from.olx.pl;
+       dmarc=pass (p=REJECT sp=REJECT dis=NONE) header.from=olx.pl
+DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/simple;
+	s=ucyoihvon3vahutjbyn4edunxtulk7mq; d=olx.pl; t=1762866486;
+	h=Date:From:Reply-To:To:Message-ID:Subject:MIME-Version:Content-Type;
+	bh=dYiLFQmJbOchGu/jXanIWYv+EozIxs5U6x4p3FNqx/E=;
+	b=u5BeaBjnNfiYgPYCmoWOpdgD/AqJJ+MeVKfAjBA+HUggEjKOcJQ/jVpG8O4zaXmd
+	NqduoaiYgG5IwTTJL94K0IjJ7goGaV8pPIBSqoL2Ce+DClP1GEerJKiIt8LvKUHOSkJ
+	ma4EZbnrb0X6pawGePdeuMT+UL9lxykvVV9IhbrA=
+DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/simple;
+	s=ihchhvubuqgjsxyuhssfvqohv7z3u4hn; d=amazonses.com; t=1762866486;
+	h=Date:From:Reply-To:To:Message-ID:Subject:MIME-Version:Content-Type:Feedback-ID;
+	bh=dYiLFQmJbOchGu/jXanIWYv+EozIxs5U6x4p3FNqx/E=;
+	b=pr1jipU5a1KzB+PFALt1QRRTeltHL5XvDOwHj/Pu7djd//bY8oZsPDr52nAYegyB
+	8D2B3iv2RzezxwaxCh+Ndvx+xFbSe8Gjou1mFN01NCENgypgHelOt/HxHD/FKtiUGDk
+	q81w4buw8Ki6N3eT60WR8za3fFu00k2UvF1emjdo=
+Date: Tue, 11 Nov 2025 13:08:05 +0000
+From: OLX <noreply@olx.pl>
+Reply-To: noreply@olx.pl
+To: sklep.dopefoam@gmail.com
+Message-ID: <0102019a7307d8d6-d4c1fb73-a38f-49e6-ab85-29ec1e973209-000000@eu-west-1.amazonses.com>
+Subject: =?UTF-8?Q?=F0=9F=92=B5=E2=9E=A1=EF=B8=8F=F0=9F=91=8D_Kupuj=C4=85cy_j?=
+ =?UTF-8?Q?u=C5=BC_zap=C5=82aci=C5=82,_potw?=
+ =?UTF-8?Q?ierd=C5=BA_sprzeda=C5=BC_do_14:07_14-11-2025?=
+MIME-Version: 1.0
+Content-Type: multipart/alternative; 
+	boundary="----=_Part_4319583_151006603.1762866485457"
+X-OLX-Correlation-ID: 4d238958-c696-4bd7-bd0e-b4082916046f
+BIMI-Selector: v=BIMI1; s=noreply;
+Feedback-ID: ::1.eu-west-1.0aAh7v7JxQ+Agabuqzf6nMEV519sQ9X52RuBmf/Hr/U=:AmazonSES
+X-SES-Outgoing: 2025.11.11-54.240.89.89
+
+------=_Part_4319583_151006603.1762866485457
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: quoted-printable
+
+Cze=C5=9B=C4=87!
+Dobra wiadomo=C5=9B=C4=87 =E2=80=93 kto=C5=9B chce kupi=C4=87 Tw=C3=B3j prz=
+edmiot z Przesy=C5=82k=C4=85 OLX.
+
+<a href=3D"https://delivery.olx.pl/orders/sales/">Potwied=C5=BA sprzeda=C5=
+=BC</a>
+
+Co teraz? To proste.
+<a href=3D"https://delivery.olx.pl/orders/sales/a04f4f11-4e3a-a7e4-ab79-a1e=
+2e517473d">Potwierd=C5=BA sprzeda=C5=BC</a> w ci=C4=85gu 72 h
+
+Od 13 marca, je=C5=9Bli zg=C5=82oszenie z Pakietu Ochronnego kupuj=C4=85ceg=
+o zostanie uznane, w celu otrzymania swojego przedmiotu z powrotem trzeba b=
+=C4=99dzie zap=C5=82aci=C4=87 za zwrot.
+
+Wy=C5=9Blij przedmiot w ci=C4=85gu 72 h od momentu, gdy potwierdzisz sprzed=
+a=C5=BC.
+Gdy etykieta nadania b=C4=99dzie dost=C4=99pna, prze=C5=9Blemy j=C4=85 do C=
+iebie e-mailem. Etykiet=C4=99 mo=C5=BCesz r=C3=B3wnie=C5=BC znale=C5=BA=C4=
+=87 w <a href=3D"https://delivery.olx.pl/orders/sales/" style=3D"font-weigh=
+t: bold; color: #3a77ff;">swoich przesy=C5=82kach</a>. Je=C5=9Bli wybierzes=
+z opcj=C4=99 nadania =E2=80=9ENadawaj bez etykiety=E2=80=9D za po=C5=9Bredn=
+ictwem InPostu, nie b=C4=99dzie trzeba nic drukowa=C4=87. InPost wy=C5=9Ble=
+ Ci 9-cyfrowy kod w Twojej aplikacji InPost i na Tw=C3=B3j e-mail.
+
+
+Mo=C5=BCesz =C5=9Bledzi=C4=87 swoj=C4=85 przesy=C5=82k=C4=99 w <a href=3D"h=
+ttps://delivery.olx.pl/orders/sales/">Twoich przesy=C5=82kach</a>.
+
+Nie klikaj w =C5=BCadne linki, kt=C3=B3re wy=C5=9Ble Ci rzekomy kupuj=C4=85=
+cy poza OLX, np. przez Whatsapp. Linki prowadz=C4=85 do fa=C5=82szywych str=
+on, za pomoc=C4=85 kt=C3=B3rych oszu=C5=9Bci pr=C3=B3buj=C4=85 wy=C5=82udzi=
+=C4=87 Twoje dane.
+
+Pami=C4=99taj, by swoje dane do p=C5=82atno=C5=9Bci podawa=C4=87 tylko na O=
+LX. Koniecznie przeczytaj nasz wpis na Blogu OLX - tam zobaczysz, jak mo=C5=
+=BCe wygl=C4=85da=C4=87 pr=C3=B3ba oszustwa.
+
+Jaki jest status Twojego og=C5=82oszenia?
+Og=C5=82oszenie wci=C4=85=C5=BC jest dost=C4=99pne dla innych kupuj=C4=85cy=
+ch, ale bez opcji przesy=C5=82ki. Je=C5=9Bli chcesz ponownie udost=C4=99pni=
+=C4=87 opcj=C4=99 przesy=C5=82ki innym kupuj=C4=85cym, dodaj to og=C5=82osz=
+enie jeszcze raz.
+
+Jak przygotowa=C4=87 paczk=C4=99?
+
+Wydrukuj etykiet=C4=99 i przyklej j=C4=85 do paczki (mo=C5=BCesz pomin=C4=
+=85=C4=87 ten krok, je=C5=9Bli wybierzesz opcj=C4=99 nadania =E2=80=9ENadaw=
+aj bez etykiety=E2=80=9D za po=C5=9Brednictwem InPostu).
+Maksymalny rozmiar paczki: 19 =C3=97 38 =C3=97 64 cm (mniej wi=C4=99cej roz=
+miar mikrofal=C3=B3wki).
+Minimalny rozmiar paczki: 1 =C3=97 10 =C3=97 16 cm (troch=C4=99 wi=C4=99ksz=
+a ni=C5=BC tabliczka czekolady).
+Dodatkowo przyda si=C4=99 informacja: Paczka nie mo=C5=BCe wa=C5=BCy=C4=87 =
+wi=C4=99cej ni=C5=BC 5 kg w przypadku wysy=C5=82ki Poczt=C4=85 Polsk=C4=85 =
+i 25 kg w przypadku wysy=C5=82ki Paczkomatem.=20
+Przyjmowane s=C4=85 jedynie standardowe przesy=C5=82ki zapakowane w kopert=
+=C4=99 lub prostopad=C5=82o=C5=9Bcienny karton.
+Pami=C4=99taj! Na paczce nie powinny znajdowa=C4=87 si=C4=99 dodatkowe nakl=
+ejki, napisy, kolorowe dodatki czy ta=C5=9Bmy (np. =E2=80=9COstro=C5=BCnie=
+=E2=80=9D, =E2=80=9CUwaga szk=C5=82o=E2=80=9D, =E2=80=9CG=C3=B3ra-d=C3=B3=
+=C5=82=E2=80=9D itp.). Usu=C5=84 z paczki takie elementy.
+
+Co z p=C5=82atno=C5=9Bci=C4=85?
+Kupuj=C4=85cy zap=C5=82aci przy pomocy p=C5=82atno=C5=9Bci online. Twoja p=
+=C5=82atno=C5=9B=C4=87 ca=C5=82y czas b=C4=99dzie zabezpieczona. Kupuj=C4=
+=85cy odbiera paczk=C4=99, a operator p=C5=82atno=C5=9Bci przelewa pieni=C4=
+=85dze na Twoje konto bankowe.
+
+Masz pytania dotycz=C4=85ce Przesy=C5=82ek OLX?
+Odwied=C5=BA nasze centrum pomocy i sprawd=C5=BA wszystkie najcz=C4=99=C5=
+=9Bciej zadawane pytania. Je=C5=9Bli nie znajdziesz odpowiedzi, skontaktuj =
+si=C4=99 z nami: https://pomoc.olx.pl/olxplhelp/s/contactsupport
+------=_Part_4319583_151006603.1762866485457
+Content-Type: text/html; charset=UTF-8
+Content-Transfer-Encoding: quoted-printable
+
+<!DOCTYPE html>
+<html>
+<head>
+  <title>=F0=9F=92=B5=E2=9E=A1=EF=B8=8F=F0=9F=91=8D Kupuj=C4=85cy ju=C5=BC =
+zap=C5=82aci=C5=82, potwierd=C5=BA sprzeda=C5=BC 14:07 14-11-2025</title>
+  <meta http-equiv=3D"Content-Type" content=3D"text/html; charset=3DUTF-8" =
+/>
+  <meta name=3D"viewport" content=3D"width=3Ddevice-width, initial-scale=3D=
+1.0" />
+  <style type=3D"text/css">
+    body,
+    table {
+      font-family: "Roboto", Roboto, Arial, Helvetica, sans-serif;
+      font-smoothing: antialiased;
+      -moz-font-smoothing: antialiased;
+      -moz-osx-font-smoothing: grayscale;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    table {
+      border-collapse: collapse;
+      width: 100%;
+    }
+
+    a,
+    a:hover {
+      text-decoration: none !important;
+    }
+
+    @media only screen and (max-width: 480px) {
+      body,
+      table,
+      td,
+      p,
+      a,
+      li,
+      blockquote {
+        -webkit-text-size-adjust: none !important;
+      }
+
+      *[class].responsive-full {
+        width: 100% !important;
+      }
+
+      *[class].responsive-block {
+        display: block !important;
+        width: 100% !important;
+        height: auto !important;
+      }
+
+      *[class].responsive-image img {
+        height: auto !important;
+        max-width: 100% !important;
+        width: 100% !important;
+      }
+
+      *[class].responsive-hidden {
+        display: none !important;
+      }
+
+      *[class].responsive-center {
+        text-align: left !important;
+      }
+
+      *[class].responsive-block-center {
+        margin: 0 auto !important;
+      }
+    }
+  </style>
+</head>
+
+<body
+bgcolor=3D"#f2f4f5"
+leftmargin=3D"0"
+topmargin=3D"0"
+marginwidth=3D"0"
+marginheight=3D"0"
+>
+<table
+class=3D"responsive-full"
+border=3D"0"
+cellpadding=3D"0"
+cellspacing=3D"0"
+style=3D"font-size: 14px; color: #406367; background-color: #f2f4f5"
+lang=3D"pl"
+title=3D"OLX.pl"
+>
+<tr>
+  <td class=3D"responsive-hidden"></td>
+  <td valign=3D"top" width=3D"600px">
+    <!-- Content body -->
+    <table
+    border=3D"0"
+    cellpadding=3D"0"
+    cellspacing=3D"0"
+    style=3D"background: #ffffff; margin-top: 16px"
+    >
+    <tr>
+      <td valign=3D"top">
+        <a
+        href=3D"https://www.olx.pl/?bs=3Dsiren_delivery_pl_seller_order_cre=
+ated&utm_source=3Dsiren&utm_medium=3Demail&utm_campaign=3Ddelivery_pl_selle=
+r_order_created"
+        class=3D"responsive-block-left"
+        target=3D"_blank"
+        style=3D"width: 100%; display: block"
+        >
+        <!-- Header image -->
+        <img
+        src=3D"https://ireland.apollo.olxcdn.com/v1/files/8h5zlypjbcdm3-HVY=
+MSB/image;f=3Dpng"
+        style=3D"width: 100%; display: block"
+        border=3D"0"
+        />
+      </a>
+    </td>
+  </tr>
+  <tr>
+    <td
+    style=3D"text-align: left; padding: 40px; background: #ffffff"
+    >
+    <table border=3D"0" cellpadding=3D"0" cellspacing=3D"0">
+      <tr>
+        <td style=3D"text-align: center;">
+          <h4
+          style=3D"
+          font-size: 22px;
+          font-weight: strong;
+          line-height: 1.2;
+          margin: 0 0 32px 0;
+          color: #002f34;
+          "
+          >
+          Tw=C3=B3j przedmiot =E2=80=9EZestaw buteleczek 10ml do kosmetyk=
+=C3=B3w / liquid=C3=B3w =E2=80=93 20 szt.=E2=80=9D zosta=C5=82 kupiony. P=
+=C5=82atno=C5=9B=C4=87 zosta=C5=82a dokonana.
+        </h4>
+      </td>
+    </tr>
+    <tr>
+      <td style=3D"padding: 0; text-align: center">
+    =20
+      <a
+      href=3D"https://delivery.olx.pl/orders/sales/a04f4f11-4e3a-a7e4-ab79-=
+a1e2e517473d?bs=3Dsiren_delivery_pl_seller_order_created&utm_source=3Dsiren=
+&utm_medium=3Demail&utm_campaign=3Ddelivery_pl_seller_order_created&utm_con=
+tent=3D1001021889"
+      style=3D"
+      color: #ffffff;
+      display: inline-block;
+      background-color: #3A77FF;
+      line-height: 20px;
+      padding: 12px 24px;
+      text-align: center;
+      font-weight: bold;
+      font-size: 17px;
+      -webkit-border-radius: 4px;
+      -moz-border-radius: 4px;
+      border-radius: 4px;
+      margin: 0 0 32px 0;
+      "
+      >
+      Potwierd=C5=BA sprzeda=C5=BC
+    </a>
+
+    <span
+    style=3D"
+    font-size: 16px;
+    display: block;
+    margin: 0 0 32px 0;
+    line-height: 1.5;
+    font-weight: bold;
+    text-align: left;
+    color: #991801;
+    text-align: center;
+    "
+    >
+    <bold>  masz na to 72 godziny do 14:07 14-11-2025 </bold>
+  </span>
+  <span
+    style=3D"
+    font-size: 16px;
+    display: block;
+    margin: 0 0 32px 0;
+    line-height: 1.5;
+    text-align: left;
+    color: #002f34;
+    text-align: left;
+    "
+    >
+<strong>Zanim nadasz przesy=C5=82k=C4=99 sprawd=C5=BA, czy wybrany rozmiar =
+paczki jest prawid=C5=82owy:<br></strong><br>
+<li><strong>Kurier DPD</strong> =E2=80=93 u=C5=BCyj <a href=3D"https://pomo=
+c.olx.pl/olxplhelp/s/kalkulator-wagi-gabarytowej"
+                            style=3D"color: inherit; text-decoration: under=
+line !important;">kalkulatora OLX</a>, wpisuj=C4=85c wag=C4=99 oraz wymiary=
+ paczki, dzi=C4=99ki zobaczysz jaki rozmiar jest dla niej w=C5=82a=C5=9Bciw=
+y. <br>
+<li><strong>InPost, Orlen Paczka, Poczta Polska </strong> =E2=80=93 S, M, L=
+ czy XL? Wystarczy, =C5=BCe sprawdzisz <a href=3D"https://pomoc.olx.pl/olxp=
+lhelp/s/article/sprzedaj-z-przesy%C5%82k%C4%85-olx-instrukcja-krok-po-kroku=
+-V49-olx"
+                            style=3D"color: inherit; text-decoration: under=
+line !important;">tabel=C4=99 z wymiarami</a>.<br><br><strong> Dlaczego to =
+wa=C5=BCne?</strong><br>Kurier nie b=C4=99dzie m=C3=B3g=C5=82 odebra=C4=87 =
+od Ciebie paczki, je=C5=9Bli przekroczy maksymalne wymiary lub b=C4=99dzie =
+nieprawid=C5=82owo zapakowana. Problemy mog=C4=85 si=C4=99 te=C5=BC pojawi=
+=C4=87 podczas nadania w punkcie lub automacie paczkowym.
+<bold>
+  <img
+  src=3D"https://cdn.braze.eu/appboy/communication/assets/image_assets/imag=
+es/67b45c2ea6d7e316c42198fa/original.png?1739873326"
+  style=3D"width: 100%; display: block"
+  border=3D"0"
+  />
+  <span
+  style=3D"
+  font-size: 14px;
+  display: block;
+  margin: 0 0 32px 0;
+  line-height: 1.5;
+  text-align: left;
+  "
+  >
+  Gdy etykieta nadania b=C4=99dzie dost=C4=99pna, prze=C5=9Blemy j=C4=85 do=
+ Ciebie e-mailem. Etykiet=C4=99 mo=C5=BCesz r=C3=B3wnie=C5=BC znale=C5=BA=
+=C4=87 w <a href=3D"https://delivery.olx.pl/orders/sales/" style=3D"font-we=
+ight: bold; color: #3a77ff;">swoich przesy=C5=82kach</a>. Je=C5=9Bli wybier=
+zesz opcj=C4=99 nadania =E2=80=9ENadawaj bez etykiety=E2=80=9D za po=C5=9Br=
+ednictwem InPostu, nie b=C4=99dzie trzeba nic drukowa=C4=87. InPost wy=C5=
+=9Ble Ci 9-cyfrowy kod w Twojej aplikacji InPost i na Tw=C3=B3j e-mail.
+</span>
+
+</td>
+</tr>
+
+ <tr>
+      <td style=3D"padding: 0; text-align: left">
+  <span
+  style=3D"
+  font-size: 14px;
+  display: block;
+  margin: 0 0 32px 0;
+  line-height: 1.5;
+  text-align: left;
+  "
+  >
+  <strong> Uwaga! Zmiana zakresu Pakietu Ochronnego </strong>
+<br>Przypominamy, =C5=BCe transakcje z Przesy=C5=82k=C4=85 OLX zawarte od 2=
+7.02.2024 b=C4=99d=C4=85 obj=C4=99te Pakietem Ochronnym w nowym, rozszerzon=
+ym zakresie.   <a href=3D"https://pomoc.olx.pl/olxplhelp/s/article/Zmiany-w=
+-Pakiecie-Ochronnym" style=3D"font-weight: bold; color: #3a77ff;">Dowiedz s=
+i=C4=99 wi=C4=99cej o zmianach.</a>
+</span>
+</td>
+</tr>
+</table>
+</td>
+</tr>
+</table>
+
+<!-- Footer -->
+<table
+border=3D"0"
+cellpadding=3D"0"
+cellspacing=3D"0"
+style=3D"background-color: #ffffff; margin-bottom: 16px; width: 100%"
+>
+<tr>
+  <td style=3D"padding: 32px 0px; text-align: center; width: 100%">
+    <a
+    href=3D"https://pomoc.olx.pl/olxplhelp/s/"
+    style=3D"
+    margin: 0 16px;
+    font-size: 12px;
+    line-height: 1.5;
+    text-align: center;
+    color: #002f34;
+    text-transform: uppercase;
+    font-weight: bold;
+    letter-spacing: 0.5px;
+    "
+    >Pomoc</a
+    >
+    <a
+    href=3D"https://pomoc.olx.pl/olxplhelp/s/contactsupport?ticket_form_id=
+=3D227685&bs=3Dsiren_delivery_pl_seller_order_created&utm_source=3Dsiren&ut=
+m_medium=3Demail&utm_campaign=3Ddelivery_pl_seller_order_created&utm_conten=
+t=3DcontactLinkFooter"
+    style=3D"
+    margin: 0 16px;
+    font-size: 12px;
+    line-height: 1.5;
+    text-align: center;
+    color: #002f34;
+    text-transform: uppercase;
+    font-weight: bold;
+    letter-spacing: 0.5px;
+    "
+    >Kontakt</a
+    >
+    <a
+    href=3D"https://www.olx.pl/mojolx/?bs=3Dsiren_delivery_pl_seller_order_=
+created&utm_source=3Dsiren&utm_medium=3Demail&utm_campaign=3Ddelivery_pl_se=
+ller_order_created"
+    style=3D"
+    margin: 0 16px;
+    font-size: 12px;
+    line-height: 1.5;
+    text-align: center;
+    color: #002f34;
+    text-transform: uppercase;
+    font-weight: bold;
+    letter-spacing: 0.5px;
+    "
+    >M=C3=B3j OLX</a
+    >
+  </td>
+</tr>
+<tr>
+  <td
+  style=3D"
+  background: #fafbfb;
+  padding: 24px 0px;
+  text-align: center;
+  "
+  >
+  <span
+  style=3D"color: #7f9799; font-size: 12px; display: inline-block"
+  >
+  Ta wiadomo=C5=9B=C4=87 zosta=C5=82a wys=C5=82ana automatycznie. Nie odpow=
+iadaj na
+  tego e-maila.<br />W razie w=C4=85tpliwo=C5=9Bci skontaktuj si=C4=99 z na=
+mi
+  za pomoc=C4=85 formularza kontaktowego.
+</span>
+</td>
+</tr>
+</table>
+</td>
+<td class=3D"responsive-hidden"></td>
+</tr>
+</table>
+<img alt=3D"" src=3D"https://ty5gwwjs.r.eu-west-1.awstrack.me/I0/0102019a73=
+07d8d6-d4c1fb73-a38f-49e6-ab85-29ec1e973209-000000/R9C8KiVOa88vQKnAx3csIOKr=
+b1Q=3D451" style=3D"display: none; width: 1px; height: 1px;">
+</body>
+</html>
+------=_Part_4319583_151006603.1762866485457--
