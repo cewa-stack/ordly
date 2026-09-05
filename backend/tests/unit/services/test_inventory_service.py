@@ -280,3 +280,87 @@ class TestProduktGlownyIPodprodukty:
         lista = await service.get_shopping_list()
 
         assert [i.sku for i in lista] == ["NAK10"]
+
+
+class TestUsuwanieProduktu:
+    """
+    Usuwanie pozycji z magazynu (przycisk "Usuń" w aplikacji desktopowej).
+
+    Usunięcie jest jedyną operacją magazynową bez śladu w historii -
+    wpisy ruchów znikają razem z produktem, bo wiszą na jego SKU.
+    Dlatego serwis oddaje podsumowanie tego, co zniknęło i co się
+    odwiązało: to jedyny moment, w którym można o tym powiedzieć.
+    """
+
+    @staticmethod
+    async def _butelka_z_nakretka(service: InventoryService) -> None:
+        await service.create_item("BUT10", "Butelka 10 ml")
+        await service.create_item("NAK10", "Nakrętka 10 ml")
+        await service.set_parent("NAK10", "BUT10")
+
+    async def test_produkt_znika_z_magazynu(self, service: InventoryService) -> None:
+        await service.create_item("PET60", "Butelka PET 60 ml")
+        await service.add_stock("PET60", 12)
+
+        deletion = await service.delete_item("PET60")
+
+        assert deletion.sku == "PET60"
+        assert deletion.stock == 12
+        assert await service.get_stock_overview() == []
+        with pytest.raises(InventoryItemNotFoundError):
+            await service.get_item("PET60")
+
+    async def test_historia_ruchow_znika_razem_z_produktem(
+        self, service: InventoryService, repository: FakeInventoryRepository
+    ) -> None:
+        await service.create_item("PET60", "Butelka PET 60 ml")
+        await service.add_stock("PET60", 5)
+        assert repository.movements != []
+
+        await service.delete_item("PET60")
+
+        assert repository.movements == []
+
+    async def test_podprodukty_zostaja_i_wracaja_na_liste(
+        self, service: InventoryService
+    ) -> None:
+        await self._butelka_z_nakretka(service)
+
+        deletion = await service.delete_item("BUT10")
+
+        assert deletion.detached_sub_items == ("NAK10",)
+        nakretka = await service.get_item("NAK10")
+        assert nakretka.parent_sku is None
+
+    async def test_usuniecie_podproduktu_nie_rusza_produktu_glownego(
+        self, service: InventoryService
+    ) -> None:
+        await self._butelka_z_nakretka(service)
+
+        await service.delete_item("NAK10")
+
+        assert await service.get_sub_items("BUT10") == []
+        assert (await service.get_item("BUT10")).sku == "BUT10"
+
+    async def test_produkt_wypada_z_receptur_ofert(
+        self, service: InventoryService, repository: FakeInventoryRepository
+    ) -> None:
+        await service.create_item("BUT10", "Butelka 10 ml")
+        await service.create_item("KARTON", "Karton zbiorczy")
+        await service.link_offer("allegro", "OFFER-1", "BUT10", 1)
+        await service.link_offer("allegro", "OFFER-1", "KARTON", 1)
+        await service.link_offer("allegro", "OFFER-2", "BUT10", 3)
+
+        deletion = await service.delete_item("BUT10")
+
+        assert deletion.removed_offer_links == 2
+        pozostale = {
+            component.sku
+            for components in repository.links.values()
+            for component in components
+        }
+        assert pozostale == {"KARTON"}
+
+    async def test_nieistniejace_sku(self, service: InventoryService) -> None:
+        with pytest.raises(InventoryItemNotFoundError):
+            await service.delete_item("NIE-MA")

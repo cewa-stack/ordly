@@ -24,6 +24,7 @@ import type {
   StatsSummary,
   StockAdjustPayload,
   StockCreatePayload,
+  StockDeletion,
   StockItem,
   StockMovement,
   StockReport,
@@ -48,6 +49,7 @@ export interface OrdlyBridge {
   stock: {
     list: () => Promise<BridgeResult<StockItem[]>>;
     create: (payload: StockCreatePayload) => Promise<BridgeResult<StockItem>>;
+    remove: (sku: string) => Promise<BridgeResult<StockDeletion>>;
     history: (sku: string) => Promise<BridgeResult<StockMovement[]>>;
     adjust: (sku: string, payload: StockAdjustPayload) => Promise<BridgeResult<StockItem>>;
     subItems: (sku: string) => Promise<BridgeResult<StockItem[]>>;

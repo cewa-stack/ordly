@@ -40,6 +40,21 @@ class FakeInventoryRepository(InventoryRepository):
             raise InventoryItemNotFoundError(item.parent_sku)
         self.items[item.sku] = item
 
+    async def delete(self, sku: str) -> None:
+        if sku not in self.items:
+            raise InventoryItemNotFoundError(sku)
+        del self.items[sku]
+        self.movements = [m for m in self.movements if m.item_sku != sku]
+        for offer, components in list(self.links.items()):
+            remaining = [c for c in components if c.sku != sku]
+            if remaining:
+                self.links[offer] = remaining
+            else:
+                del self.links[offer]
+        for other_sku, item in list(self.items.items()):
+            if item.parent_sku == sku:
+                self.items[other_sku] = replace(item, parent_sku=None)
+
     async def get_sub_items(self, parent_sku: str) -> list[InventoryItem]:
         return sorted(
             (i for i in self.items.values() if i.parent_sku == parent_sku),

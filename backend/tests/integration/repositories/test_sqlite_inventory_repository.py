@@ -275,3 +275,82 @@ class TestProduktGlownyIPodprodukty:
 
         assert [i.sku for i in niskie] == ["NAK10"]
         assert niskie[0].parent_sku == "BUT10"
+
+
+class TestUsuwanieProduktu:
+    """
+    Usunięcie produktu na prawdziwym SQLite.
+
+    Testy celowo sprawdzają stan SĄSIEDNICH tabel, a nie tylko brak
+    wiersza produktu: repozytorium kasuje ruchy i receptury jawnie,
+    zamiast liczyć na `ON DELETE CASCADE`, więc to właśnie tam może
+    zostać sierota, gdyby ktoś to uproszczenie kiedyś "posprzątał".
+    """
+
+    @staticmethod
+    async def _magazyn(repository: SqliteInventoryRepository) -> None:
+        await repository.create(_make_item("BUT10", name="Butelka 10 ml"))
+        await repository.create(_make_item("NAK10", name="Nakrętka 10 ml"))
+        await repository.create(_make_item("KARTON", name="Karton zbiorczy"))
+
+    async def test_produkt_znika_z_bazy(
+        self, repository: SqliteInventoryRepository
+    ) -> None:
+        await self._magazyn(repository)
+
+        await repository.delete("BUT10")
+
+        assert await repository.get_by_sku("BUT10") is None
+        assert {i.sku for i in await repository.get_all()} == {"NAK10", "KARTON"}
+
+    async def test_ruchy_magazynowe_znikaja_razem_z_produktem(
+        self, repository: SqliteInventoryRepository
+    ) -> None:
+        await self._magazyn(repository)
+        await repository.record_movement(
+            InventoryMovement(
+                item_sku="BUT10",
+                item_name="Butelka 10 ml",
+                change=-2,
+                stock_after=98,
+                reason="Nowe zamówienie",
+                source=MOVEMENT_SOURCE_ORDER,
+                reference="ORDER-1",
+                occurred_at=utc_now(),
+            )
+        )
+
+        await repository.delete("BUT10")
+
+        assert await repository.get_movements(None, limit=10) == []
+
+    async def test_podprodukty_traca_powiazanie_ale_zostaja(
+        self, repository: SqliteInventoryRepository
+    ) -> None:
+        await self._magazyn(repository)
+        await repository.set_parent("NAK10", "BUT10")
+
+        await repository.delete("BUT10")
+
+        nakretka = await repository.get_by_sku("NAK10")
+        assert nakretka is not None
+        assert nakretka.parent_sku is None
+
+    async def test_skladniki_receptur_znikaja(
+        self, repository: SqliteInventoryRepository
+    ) -> None:
+        await self._magazyn(repository)
+        await repository.add_offer_link("allegro", "KIT-1", "BUT10", 1)
+        await repository.add_offer_link("allegro", "KIT-1", "KARTON", 1)
+
+        await repository.delete("BUT10")
+
+        assert [c.sku for c in await repository.get_offer_links("allegro", "KIT-1")] == [
+            "KARTON"
+        ]
+
+    async def test_nieistniejace_sku(
+        self, repository: SqliteInventoryRepository
+    ) -> None:
+        with pytest.raises(InventoryItemNotFoundError):
+            await repository.delete("NIE-MA")

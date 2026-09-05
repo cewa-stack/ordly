@@ -38,6 +38,18 @@ class InventoryRepository(ABC):
         raise NotImplementedError
 
     @abstractmethod
+    async def delete(self, sku: str) -> None:
+        """
+        Usuwa produkt razem z jego historią ruchów i wypisuje go ze
+        wszystkich receptur ofert; jego podprodukty tracą powiązanie
+        z nim, ale zostają w magazynie.
+
+        Raises:
+            InventoryItemNotFoundError: Gdy produkt nie istnieje.
+        """
+        raise NotImplementedError
+
+    @abstractmethod
     async def set_stock(self, sku: str, new_stock: int) -> None:
         """
         Ustawia stan magazynowy produktu.

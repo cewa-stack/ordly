@@ -25,7 +25,7 @@
  */
 import * as React from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { ChevronIcon, ClockIcon, LinkIcon, PlusIcon } from "../icons";
+import { ChevronIcon, ClockIcon, LinkIcon, PlusIcon, TrashIcon } from "../icons";
 import {
   Button,
   Chip,
@@ -37,11 +37,11 @@ import {
   StockBar,
   Stepper,
 } from "../components/ui";
-import { Modal } from "../components/Modal";
+import { ConfirmDialog, Modal } from "../components/Modal";
 import { Mascot } from "../components/Mascot";
 import { PowiazaniaOfertView } from "./PowiazaniaOfertView";
 import { useToast } from "../lib/toast";
-import { formatDateTime, formatStock } from "../lib/format";
+import { formatDateTime, formatPlural, formatStock } from "../lib/format";
 import type { StockItem } from "../types/api";
 
 type StockFilter = "all" | "low" | "zero";
@@ -211,6 +211,141 @@ function HistoryModal({ sku, onClose }: { sku: string | null; onClose: () => voi
         ))}
       </div>
     </Modal>
+  );
+}
+
+/**
+ * Potwierdzenie usuniecia pozycji magazynowej.
+ *
+ * Komunikat wylicza SKUTKI zamiast pytac "czy na pewno": stan, ktory
+ * zniknie z ewidencji, podprodukty, ktore przestana schodzic razem
+ * z produktem, i receptury ofert, z ktorych produkt wypadnie. To
+ * jedyna operacja magazynowa bez sladu w historii - wpisy ruchow wisza
+ * na SKU i znikaja razem z nim, wiec po fakcie nie ma juz gdzie tego
+ * przeczytac.
+ *
+ * Liczba receptur idzie z tego samego zapytania, ktore karmi zakladke
+ * "Powiazania ofert" (klucz `offer-recipes`), wiec zwykle siedzi juz
+ * w cache. Kiedy jeszcze leci albo sie nie powiodlo, dialog mowi to
+ * wprost - milczenie czytaloby sie jako "zadna receptura", a to
+ * najgorszy moment na zgadywanie.
+ */
+function DeleteProductDialog({
+  item,
+  subItems,
+  onClose,
+}: {
+  item: StockItem | null;
+  subItems: StockItem[];
+  onClose: () => void;
+}) {
+  const queryClient = useQueryClient();
+  const toast = useToast();
+
+  const recipesQuery = useQuery({
+    queryKey: ["offer-recipes"],
+    enabled: item !== null,
+    queryFn: async () => {
+      const result = await window.ordly.stock.recipes();
+      if (!result.ok) throw new Error(result.message);
+      return result.data;
+    },
+  });
+
+  const recipeCount = React.useMemo(() => {
+    if (!item) return 0;
+    return (recipesQuery.data ?? []).filter((recipe) =>
+      recipe.components.some((component) => component.sku === item.sku)
+    ).length;
+  }, [item, recipesQuery.data]);
+
+  const mutation = useMutation({
+    mutationFn: async (sku: string) => {
+      const result = await window.ordly.stock.remove(sku);
+      if (!result.ok) throw new Error(result.message);
+      return result.data;
+    },
+    onSuccess: (deletion) => {
+      void queryClient.invalidateQueries({ queryKey: ["stock"] });
+      void queryClient.invalidateQueries({ queryKey: ["offer-recipes"] });
+      void queryClient.invalidateQueries({ queryKey: ["unmapped-offers"] });
+      void queryClient.invalidateQueries({ queryKey: ["dashboard"] });
+      const skutki = [`${deletion.sku} zniknął z magazynu`];
+      if (deletion.detached_sub_items.length > 0) {
+        skutki.push(
+          `odłączono ${formatPlural(deletion.detached_sub_items.length, [
+            "podprodukt",
+            "podprodukty",
+            "podproduktów",
+          ])}`
+        );
+      }
+      if (deletion.removed_offer_links > 0) {
+        skutki.push(
+          `wypadł z ${formatPlural(deletion.removed_offer_links, [
+            "receptury",
+            "receptur",
+            "receptur",
+          ])}`
+        );
+      }
+      toast.success("Usunięto produkt", skutki.join(" · "));
+      onClose();
+    },
+    onError: (error) => {
+      toast.error(
+        "Nie udało się usunąć produktu",
+        error instanceof Error ? error.message : "Odśwież listę i spróbuj ponownie."
+      );
+    },
+  });
+
+  const zdania: string[] = [];
+  if (item) {
+    zdania.push(
+      `„${item.name}" (${item.sku}) zniknie z magazynu razem z całą historią ruchów. Tego nie da się cofnąć.`
+    );
+    if (item.stock > 0) {
+      zdania.push(`Stan ${item.stock} szt. przestanie być liczony.`);
+    }
+    if (subItems.length > 0) {
+      const lista = subItems.map((sub) => sub.sku).join(", ");
+      zdania.push(
+        subItems.length === 1
+          ? `Podprodukt ${lista} zostanie w magazynie, ale przestanie schodzić razem z tym produktem.`
+          : `Podprodukty (${lista}) zostaną w magazynie, ale przestaną schodzić razem z tym produktem.`
+      );
+    }
+    if (item.parent_sku) {
+      zdania.push(`Produkt główny ${item.parent_sku} zostaje bez zmian.`);
+    }
+    if (recipesQuery.isLoading) {
+      zdania.push("Sprawdzam jeszcze, w ilu recepturach ofert ten produkt występuje…");
+    } else if (recipesQuery.isError) {
+      zdania.push(
+        "Nie udało się sprawdzić receptur ofert - jeśli produkt w którejś jest, wypadnie z niej razem z usunięciem."
+      );
+    } else if (recipeCount > 0) {
+      zdania.push(
+        `Produkt wypadnie z ${formatPlural(recipeCount, [
+          "receptury",
+          "receptur",
+          "receptur",
+        ])} ofert - ich sprzedaż przestanie ruszać magazyn.`
+      );
+    }
+  }
+
+  return (
+    <ConfirmDialog
+      open={item !== null}
+      title="Usunąć produkt z magazynu?"
+      message={zdania.join(" ")}
+      confirmLabel="Usuń produkt"
+      pending={mutation.isPending}
+      onConfirm={() => item && mutation.mutate(item.sku)}
+      onClose={onClose}
+    />
   );
 }
 
@@ -403,6 +538,7 @@ export function MagazynScreen({ focusSku, onFocusHandled }: MagazynScreenProps) 
   const [newOpen, setNewOpen] = React.useState(false);
   const [historySku, setHistorySku] = React.useState<string | null>(null);
   const [subItemsSku, setSubItemsSku] = React.useState<string | null>(null);
+  const [deleteSku, setDeleteSku] = React.useState<string | null>(null);
   const [expanded, setExpanded] = React.useState<Set<string>>(new Set());
   const [highlightSku, setHighlightSku] = React.useState<string | null>(null);
   const rowRefs = React.useRef<Record<string, HTMLTableRowElement | null>>({});
@@ -492,6 +628,9 @@ export function MagazynScreen({ focusSku, onFocusHandled }: MagazynScreenProps) 
   const subItemsParent =
     subItemsSku === null ? null : (items.find((i) => i.sku === subItemsSku) ?? null);
 
+  const deleteTarget =
+    deleteSku === null ? null : (items.find((i) => i.sku === deleteSku) ?? null);
+
   function toggleExpanded(sku: string) {
     setExpanded((previous) => {
       const next = new Set(previous);
@@ -558,7 +697,7 @@ export function MagazynScreen({ focusSku, onFocusHandled }: MagazynScreenProps) 
           <table className="w-full border-collapse">
             <thead>
               <tr>
-                {["Produkt", "SKU", "Zapas", "Korekta", "Status", "Historia"].map(
+                {["Produkt", "SKU", "Zapas", "Korekta", "Status", "Akcje"].map(
                   (header, index, all) => (
                     <th
                       key={header}
@@ -666,6 +805,14 @@ export function MagazynScreen({ focusSku, onFocusHandled }: MagazynScreenProps) 
                         >
                           Historia
                         </MiniButton>
+                        <MiniButton
+                          icon={<TrashIcon size={13} />}
+                          aria-label={`Usuń produkt ${item.name}`}
+                          onClick={() => setDeleteSku(item.sku)}
+                          className="hover:!border-coral hover:!text-coral"
+                        >
+                          Usuń
+                        </MiniButton>
                       </span>
                     </td>
                   </tr>
@@ -688,9 +835,21 @@ export function MagazynScreen({ focusSku, onFocusHandled }: MagazynScreenProps) 
                         </td>
                         <td
                           className="border-b border-line px-3 py-2.5 text-[11px] text-slate-dim"
-                          colSpan={3}
+                          colSpan={2}
                         >
                           Schodzi razem z „{item.name}"
+                        </td>
+                        <td className="border-b border-line px-[22px] py-2.5 text-right">
+                          <span className="flex items-center justify-end">
+                            <MiniButton
+                              icon={<TrashIcon size={13} />}
+                              aria-label={`Usuń podprodukt ${sub.name}`}
+                              onClick={() => setDeleteSku(sub.sku)}
+                              className="hover:!border-coral hover:!text-coral"
+                            >
+                              Usuń
+                            </MiniButton>
+                          </span>
                         </td>
                       </tr>
                     ))}
@@ -708,6 +867,11 @@ export function MagazynScreen({ focusSku, onFocusHandled }: MagazynScreenProps) 
         parent={subItemsParent}
         items={items}
         onClose={() => setSubItemsSku(null)}
+      />
+      <DeleteProductDialog
+        item={deleteTarget}
+        subItems={deleteTarget ? (subItemsByParent.get(deleteTarget.sku) ?? []) : []}
+        onClose={() => setDeleteSku(null)}
       />
     </div>
   );

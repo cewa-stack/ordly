@@ -23,7 +23,11 @@ from app.domain.exceptions.domain_exceptions import (
     InventoryItemNotFoundError,
 )
 from app.domain.interfaces.inventory_repository import InventoryRepository
-from app.shared.dto.inventory_dto import InventoryReport, ItemForecast
+from app.shared.dto.inventory_dto import (
+    InventoryItemDeletion,
+    InventoryReport,
+    ItemForecast,
+)
 from app.utils.time import utc_now
 
 _FORECAST_WINDOW_DAYS = 30
@@ -63,6 +67,43 @@ class InventoryService:
         item = InventoryItem(sku=sku, name=name, stock=0, min_stock=min_stock)
         await self._repository.create(item)
         return item
+
+    async def delete_item(self, sku: str) -> InventoryItemDeletion:
+        """
+        Usuwa produkt magazynowy razem z jego historią ruchów.
+
+        Podprodukty NIE znikają razem z produktem głównym - wracają na
+        listę jako samodzielne. Skasowanie butelki w ORDLY nie sprawia,
+        że nakrętki przestaje być na półce; jedyne, co ginie, to
+        informacja, że schodziły razem.
+
+        Usunięcie wypina produkt ze wszystkich receptur ofert, w których
+        występował. Te oferty dalej się sprzedają - przestają tylko
+        ruszać magazyn - dlatego ich liczba wraca w podsumowaniu, żeby
+        interfejs mógł o tym uprzedzić PRZED usunięciem.
+
+        Raises:
+            InventoryItemNotFoundError: Gdy produkt nie istnieje.
+        """
+        item = await self._require_item(sku)
+        sub_items = await self._repository.get_sub_items(sku)
+        recipes = await self._repository.get_all_offer_links()
+        removed_offer_links = sum(
+            1
+            for recipe in recipes
+            for component in recipe.components
+            if component.sku == sku
+        )
+
+        await self._repository.delete(sku)
+
+        return InventoryItemDeletion(
+            sku=item.sku,
+            name=item.name,
+            stock=item.stock,
+            detached_sub_items=tuple(sub_item.sku for sub_item in sub_items),
+            removed_offer_links=removed_offer_links,
+        )
 
     async def set_stock(
         self, sku: str, quantity: int, reason: str = "Korekta magazynowa"
