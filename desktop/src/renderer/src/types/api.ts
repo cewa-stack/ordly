@@ -7,6 +7,23 @@
 
 export type StockStatus = "ok" | "warning" | "critical";
 
+/**
+ * Podsumowanie usuniecia pozycji magazynowej (`DELETE /api/v1/stock/{sku}`).
+ *
+ * Backend oddaje nie sam fakt usuniecia, tylko jego SKUTKI UBOCZNE:
+ * ktore podprodukty przestaly byc podproduktami i z ilu receptur ofert
+ * produkt wypadl. Bez tego toast po usunieciu moglby powiedziec tylko
+ * "usunieto", a rozpieta receptura wyszlaby na jaw dopiero po tym, ze
+ * sprzedaz przestala ruszac magazyn.
+ */
+export interface StockDeletion {
+  sku: string;
+  name: string;
+  stock: number;
+  detached_sub_items: string[];
+  removed_offer_links: number;
+}
+
 export interface StockItem {
   sku: string;
   name: string;

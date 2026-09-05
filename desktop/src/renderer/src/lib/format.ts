@@ -74,3 +74,25 @@ export function formatAge(iso: string): string {
 export function formatStock(value: number, max: number): string {
   return `${value} / ${max}`;
 }
+
+/**
+ * Polska odmiana rzeczownika przez liczbe:
+ * `formatPlural(2, ["receptura", "receptury", "receptur"])` -> `2 receptury`.
+ *
+ * Trzy formy, nie dwie: polski ma osobna forme dla 2-4 i osobna dla 5+,
+ * a nastolatki (12-14) ida jak 5+. "5 receptury" albo "2 receptur"
+ * w potwierdzeniu usuniecia widac natychmiast.
+ */
+export function formatPlural(
+  count: number,
+  forms: [one: string, few: string, many: string]
+): string {
+  const absolute = Math.abs(count);
+  const lastDigit = absolute % 10;
+  const lastTwo = absolute % 100;
+  if (absolute === 1) return `${count} ${forms[0]}`;
+  if (lastDigit >= 2 && lastDigit <= 4 && (lastTwo < 12 || lastTwo > 14)) {
+    return `${count} ${forms[1]}`;
+  }
+  return `${count} ${forms[2]}`;
+}

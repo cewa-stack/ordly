@@ -46,3 +46,23 @@ class StockSyncOutcome:
     reference: str
     low_stock_items: tuple[InventoryItem, ...] = field(default_factory=tuple)
     unmatched_products: tuple[str, ...] = field(default_factory=tuple)
+
+
+@dataclass(frozen=True, slots=True)
+class InventoryItemDeletion:
+    """
+    Podsumowanie usunięcia produktu magazynowego.
+
+    Zwracamy nie sam fakt usunięcia, tylko to, co usunięcie POCIĄGNĘŁO
+    ZA SOBĄ: skasowanie butelki odwiązuje przy okazji jej nakrętkę
+    i wypina ją ze wszystkich receptur ofert. Bez tej listy interfejs
+    mógłby powiedzieć wyłącznie "usunięto", a użytkownik dowiedziałby
+    się o rozpiętych recepturach dopiero po tym, że sprzedaż przestała
+    ruszać magazyn.
+    """
+
+    sku: str
+    name: str
+    stock: int
+    detached_sub_items: tuple[str, ...] = field(default_factory=tuple)
+    removed_offer_links: int = 0

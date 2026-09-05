@@ -23,6 +23,7 @@ from app.api.schemas import (
     OfferRecipeOut,
     StockAdjustIn,
     StockCreateIn,
+    StockDeleteOut,
     StockItemOut,
     StockLinkIn,
     StockMovementOut,
@@ -31,6 +32,7 @@ from app.api.schemas import (
     UnmappedOfferOut,
     backfill_plan_out,
     offer_recipe_out,
+    stock_delete_out,
     stock_item_out,
     stock_movement_out,
     stock_report_out,
@@ -221,6 +223,24 @@ async def get_stock_item(
     inventory_service = container.inventory_service(session)
     item = await inventory_service.get_item(sku)
     return stock_item_out(item)
+
+
+@router.delete("/stock/{sku}", response_model=StockDeleteOut)
+async def delete_stock_item(
+    container: Annotated[Container, Depends(get_container)],
+    session: Annotated[AsyncSession, Depends(get_session)],
+    sku: str,
+) -> StockDeleteOut:
+    """
+    Usuwa produkt magazynowy razem z jego historią ruchów.
+
+    Podprodukty zostają w magazynie - tracą tylko powiązanie z usuwanym
+    produktem głównym. Odpowiedź mówi, co dokładnie usunięcie zmieniło
+    poza samym zniknięciem wiersza z listy.
+    """
+    inventory_service = container.inventory_service(session)
+    deletion = await inventory_service.delete_item(sku)
+    return stock_delete_out(deletion)
 
 
 @router.post("/stock/{sku}/adjust", response_model=StockItemOut)

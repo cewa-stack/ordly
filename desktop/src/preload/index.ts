@@ -16,6 +16,7 @@ const ordly = {
     list: () => ipcRenderer.invoke("ordly:stock:list"),
     create: (payload: { sku: string; name: string; min_stock: number }) =>
       ipcRenderer.invoke("ordly:stock:create", payload),
+    remove: (sku: string) => ipcRenderer.invoke("ordly:stock:remove", sku),
     history: (sku: string) => ipcRenderer.invoke("ordly:stock:history", sku),
     adjust: (
       sku: string,

@@ -49,6 +49,18 @@ export function registerStockIpc(): void {
     })
   );
 
+  ipcMain.handle("ordly:stock:remove", async (_event, sku: string) =>
+    toResult(async () => {
+      const session = requireSession();
+      return apiRequest(
+        session.baseUrl,
+        session.token,
+        `/api/v1/stock/${encodeURIComponent(sku)}`,
+        { method: "DELETE" }
+      );
+    })
+  );
+
   ipcMain.handle("ordly:stock:history", async (_event, sku: string) =>
     toResult(async () => {
       const session = requireSession();

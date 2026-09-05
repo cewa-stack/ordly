@@ -27,7 +27,11 @@ from app.repositories.sqlite_event_repository import EventRecord
 from app.services.dashboard_service import DashboardSummary
 from app.services.mailbox_service import MailboxStatus
 from app.services.ordlak_service import OrdlakDraft, calculate_price
-from app.shared.dto.inventory_dto import InventoryReport, ItemForecast
+from app.shared.dto.inventory_dto import (
+    InventoryItemDeletion,
+    InventoryReport,
+    ItemForecast,
+)
 from app.shared.dto.offer_mapping_dto import BackfillPlan, OfferRecipe, SoldOffer
 from app.shared.dto.stats_dto import HealthStatus, StatsSummary, SyncResult
 
@@ -561,6 +565,35 @@ class StockSetParentIn(BaseModel):
     """
 
     parent_sku: str | None = None
+
+
+class StockDeleteOut(BaseModel):
+    """
+    Podsumowanie `DELETE /api/v1/stock/{sku}`.
+
+    Poza samym produktem wraca to, co usunięcie pociągnęło za sobą:
+    odwiązane podprodukty i liczba receptur ofert, z których produkt
+    wypadł. Aplikacja desktopowa pokazuje to w potwierdzeniu, żeby
+    nikt nie odkrył rozpiętej receptury dopiero po tym, że sprzedaż
+    przestała ruszać magazyn.
+    """
+
+    sku: str
+    name: str
+    stock: int
+    detached_sub_items: list[str]
+    removed_offer_links: int
+
+
+def stock_delete_out(deletion: InventoryItemDeletion) -> StockDeleteOut:
+    """Mapuje `InventoryItemDeletion` na schemat odpowiedzi API."""
+    return StockDeleteOut(
+        sku=deletion.sku,
+        name=deletion.name,
+        stock=deletion.stock,
+        detached_sub_items=list(deletion.detached_sub_items),
+        removed_offer_links=deletion.removed_offer_links,
+    )
 
 
 class StockCreateIn(BaseModel):

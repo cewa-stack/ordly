@@ -127,6 +127,43 @@ class SqliteInventoryRepository(InventoryRepository):
         except IntegrityError as exc:
             raise DuplicateInventoryItemError(item.sku) from exc
 
+    async def delete(self, sku: str) -> None:
+        """
+        Usuwa produkt wraz z historią ruchów i składnikami receptur,
+        odwiązując przy tym jego podprodukty.
+
+        Każde z tych kasowań jest CELOWO jawne, mimo że schemat ma już
+        `ON DELETE CASCADE` (ruchy, składniki ofert) i `ON DELETE SET
+        NULL` (podprodukty): w SQLite klucze obce działają tylko przy
+        włączonym `PRAGMA foreign_keys`, a to ustawienie POŁĄCZENIA,
+        nie bazy. Aplikacja je włącza (database/engine.py), ale skrypt
+        serwisowy czy `sqlite3` z konsoli już nie - i po takim usunięciu
+        zostałyby ruchy-sieroty oraz receptury wskazujące w pustkę.
+
+        Raises:
+            InventoryItemNotFoundError: Gdy produkt nie istnieje.
+        """
+        model = await self._get_model_by_sku(sku)
+        if model is None:
+            raise InventoryItemNotFoundError(sku)
+        item_id = model.id
+
+        await self._session.execute(
+            update(InventoryItemModel)
+            .where(InventoryItemModel.parent_item_id == item_id)
+            .values(parent_item_id=None)
+        )
+        await self._session.execute(
+            delete(OfferLinkModel).where(OfferLinkModel.item_id == item_id)
+        )
+        await self._session.execute(
+            delete(InventoryMovementModel).where(InventoryMovementModel.item_id == item_id)
+        )
+        await self._session.execute(
+            delete(InventoryItemModel).where(InventoryItemModel.id == item_id)
+        )
+        await self._session.flush()
+
     async def set_stock(self, sku: str, new_stock: int) -> None:
         """Ustawia stan magazynowy produktu lub rzuca InventoryItemNotFoundError."""
         stmt = (
