@@ -293,9 +293,7 @@ class TestUsuwanieProduktu:
         await repository.create(_make_item("NAK10", name="Nakrętka 10 ml"))
         await repository.create(_make_item("KARTON", name="Karton zbiorczy"))
 
-    async def test_produkt_znika_z_bazy(
-        self, repository: SqliteInventoryRepository
-    ) -> None:
+    async def test_produkt_znika_z_bazy(self, repository: SqliteInventoryRepository) -> None:
         await self._magazyn(repository)
 
         await repository.delete("BUT10")
@@ -349,8 +347,6 @@ class TestUsuwanieProduktu:
             "KARTON"
         ]
 
-    async def test_nieistniejace_sku(
-        self, repository: SqliteInventoryRepository
-    ) -> None:
+    async def test_nieistniejace_sku(self, repository: SqliteInventoryRepository) -> None:
         with pytest.raises(InventoryItemNotFoundError):
             await repository.delete("NIE-MA")

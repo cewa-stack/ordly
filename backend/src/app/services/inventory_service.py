@@ -89,10 +89,7 @@ class InventoryService:
         sub_items = await self._repository.get_sub_items(sku)
         recipes = await self._repository.get_all_offer_links()
         removed_offer_links = sum(
-            1
-            for recipe in recipes
-            for component in recipe.components
-            if component.sku == sku
+            1 for recipe in recipes for component in recipe.components if component.sku == sku
         )
 
         await self._repository.delete(sku)

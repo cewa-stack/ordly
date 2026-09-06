@@ -2,11 +2,27 @@
 Endpointy HTTP /api/v1/stock/* - odpowiednik komend /stock dla
 aplikacji mobilnej (Inventory Management System).
 
-Uwaga o kolejności tras: `/stock/report` i `/stock/shopping-list` muszą
-być zadeklarowane PRZED `/stock/{sku}`, z tego samego powodu co w
-`orders.py`. Dotyczy to wyłącznie tras o TEJ SAMEJ liczbie segmentów -
-`/stock/{sku}/sub-items` czy `/stock/{sku}/parent` nie kolidują
-z niczym, bo ostatni segment jest w nich literałem.
+DLACZEGO `{sku:path}`, A NIE `{sku}`. SKU wybiera użytkownik i bywa
+w nim ukośnik - "KRO10/30" dla kroplomierza pasującego do butelek 10
+i 30 ml. Zwykłe `{sku}` kompiluje się do `[^/]+`, a serwer ASGI
+dekoduje `%2F` ze ścieżki ZANIM router cokolwiek dopasuje (uvicorn:
+`unquote(raw_path)`). Żądanie `/stock/KRO10%2F30/adjust` docierało więc
+do routera jako `/stock/KRO10/30/adjust`, nie pasowało do żadnej trasy
+i spadało do `StaticFiles("/")`, który serwuje PWA - a ten na POST
+odpowiada `405 Method Not Allowed`. W aplikacji desktopowej wyglądało
+to jak awaria korekty stanu ("Korekta nie przeszła - Method Not
+Allowed") wyłącznie dla produktów z ukośnikiem w SKU. `{sku:path}`
+kompiluje się do `.*`, więc ukośnik zostaje częścią identyfikatora.
+To samo dotyczy `external_product_id` ofert marketplace.
+
+Kolejność tras jest przez to KRYTYCZNA, a nie tylko porządkowa:
+`.*` połyka wszystko, co pasuje, więc każda trasa o dłuższym wzorcu
+musi stać WYŻEJ niż ta, która kończy się na `{...:path}`. Stąd układ
+pliku: literały (`/stock/report`, `/stock/links`, `/stock/offers`),
+potem trasy z literałem na końcu (`/adjust`, `/history`, `/sub-items`,
+`/parent`, `/backfill`), a na samym dole gołe `/stock/{sku:path}`.
+Przestawienie czegokolwiek do góry cicho przechwyci sąsiednie trasy -
+`tests/integration/api/test_stock_slash_sku.py` pilnuje właśnie tego.
 """
 
 from __future__ import annotations
@@ -81,7 +97,7 @@ async def link_offer(
 
 
 @router.delete(
-    "/stock/links/{marketplace}/{external_product_id}",
+    "/stock/links/{marketplace}/{external_product_id:path}",
     response_model=dict,
 )
 async def unlink_offer(
@@ -120,39 +136,8 @@ async def list_unmapped_offers(
     return [unmapped_offer_out(o) for o in offers]
 
 
-@router.put("/stock/offers/{marketplace}/{external_product_id}", response_model=OfferRecipeOut)
-async def set_offer_recipe(
-    container: Annotated[Container, Depends(get_container)],
-    session: Annotated[AsyncSession, Depends(get_session)],
-    marketplace: str,
-    external_product_id: str,
-    payload: OfferRecipeIn,
-) -> OfferRecipeOut:
-    """Zapisuje pełną recepturę oferty, zastępując poprzednią."""
-    service = container.offer_mapping_service(session)
-    recipe = await service.set_recipe(
-        marketplace,
-        external_product_id,
-        [OfferComponent(sku=c.sku, quantity=c.quantity) for c in payload.components],
-    )
-    return offer_recipe_out(recipe)
-
-
-@router.delete("/stock/offers/{marketplace}/{external_product_id}", response_model=dict)
-async def delete_offer_recipe(
-    container: Annotated[Container, Depends(get_container)],
-    session: Annotated[AsyncSession, Depends(get_session)],
-    marketplace: str,
-    external_product_id: str,
-) -> dict:
-    """Usuwa recepturę oferty. Zwraca liczbę usuniętych składników."""
-    service = container.offer_mapping_service(session)
-    removed = await service.delete_recipe(marketplace, external_product_id)
-    return {"removed": removed}
-
-
 @router.get(
-    "/stock/offers/{marketplace}/{external_product_id}/backfill",
+    "/stock/offers/{marketplace}/{external_product_id:path}/backfill",
     response_model=BackfillPlanOut,
 )
 async def preview_offer_backfill(
@@ -169,7 +154,7 @@ async def preview_offer_backfill(
 
 
 @router.post(
-    "/stock/offers/{marketplace}/{external_product_id}/backfill",
+    "/stock/offers/{marketplace}/{external_product_id:path}/backfill",
     response_model=BackfillPlanOut,
 )
 async def apply_offer_backfill(
@@ -188,6 +173,39 @@ async def apply_offer_backfill(
     service = container.offer_mapping_service(session)
     plan = await service.apply_backfill(marketplace, external_product_id, days)
     return backfill_plan_out(plan)
+
+
+@router.put(
+    "/stock/offers/{marketplace}/{external_product_id:path}", response_model=OfferRecipeOut
+)
+async def set_offer_recipe(
+    container: Annotated[Container, Depends(get_container)],
+    session: Annotated[AsyncSession, Depends(get_session)],
+    marketplace: str,
+    external_product_id: str,
+    payload: OfferRecipeIn,
+) -> OfferRecipeOut:
+    """Zapisuje pełną recepturę oferty, zastępując poprzednią."""
+    service = container.offer_mapping_service(session)
+    recipe = await service.set_recipe(
+        marketplace,
+        external_product_id,
+        [OfferComponent(sku=c.sku, quantity=c.quantity) for c in payload.components],
+    )
+    return offer_recipe_out(recipe)
+
+
+@router.delete("/stock/offers/{marketplace}/{external_product_id:path}", response_model=dict)
+async def delete_offer_recipe(
+    container: Annotated[Container, Depends(get_container)],
+    session: Annotated[AsyncSession, Depends(get_session)],
+    marketplace: str,
+    external_product_id: str,
+) -> dict:
+    """Usuwa recepturę oferty. Zwraca liczbę usuniętych składników."""
+    service = container.offer_mapping_service(session)
+    removed = await service.delete_recipe(marketplace, external_product_id)
+    return {"removed": removed}
 
 
 @router.get("/stock", response_model=list[StockItemOut])
@@ -213,37 +231,7 @@ async def create_stock_item(
     return stock_item_out(item)
 
 
-@router.get("/stock/{sku}", response_model=StockItemOut)
-async def get_stock_item(
-    container: Annotated[Container, Depends(get_container)],
-    session: Annotated[AsyncSession, Depends(get_session)],
-    sku: str,
-) -> StockItemOut:
-    """Zwraca szczegóły jednego produktu magazynowego."""
-    inventory_service = container.inventory_service(session)
-    item = await inventory_service.get_item(sku)
-    return stock_item_out(item)
-
-
-@router.delete("/stock/{sku}", response_model=StockDeleteOut)
-async def delete_stock_item(
-    container: Annotated[Container, Depends(get_container)],
-    session: Annotated[AsyncSession, Depends(get_session)],
-    sku: str,
-) -> StockDeleteOut:
-    """
-    Usuwa produkt magazynowy razem z jego historią ruchów.
-
-    Podprodukty zostają w magazynie - tracą tylko powiązanie z usuwanym
-    produktem głównym. Odpowiedź mówi, co dokładnie usunięcie zmieniło
-    poza samym zniknięciem wiersza z listy.
-    """
-    inventory_service = container.inventory_service(session)
-    deletion = await inventory_service.delete_item(sku)
-    return stock_delete_out(deletion)
-
-
-@router.post("/stock/{sku}/adjust", response_model=StockItemOut)
+@router.post("/stock/{sku:path}/adjust", response_model=StockItemOut)
 async def adjust_stock(
     container: Annotated[Container, Depends(get_container)],
     session: Annotated[AsyncSession, Depends(get_session)],
@@ -282,7 +270,7 @@ async def adjust_stock(
     return stock_item_out(item)
 
 
-@router.get("/stock/{sku}/history", response_model=list[StockMovementOut])
+@router.get("/stock/{sku:path}/history", response_model=list[StockMovementOut])
 async def get_stock_history(
     container: Annotated[Container, Depends(get_container)],
     session: Annotated[AsyncSession, Depends(get_session)],
@@ -295,7 +283,7 @@ async def get_stock_history(
     return [stock_movement_out(m) for m in movements]
 
 
-@router.get("/stock/{sku}/sub-items", response_model=list[StockItemOut])
+@router.get("/stock/{sku:path}/sub-items", response_model=list[StockItemOut])
 async def get_stock_sub_items(
     container: Annotated[Container, Depends(get_container)],
     session: Annotated[AsyncSession, Depends(get_session)],
@@ -307,7 +295,7 @@ async def get_stock_sub_items(
     return [stock_item_out(i) for i in items]
 
 
-@router.put("/stock/{sku}/parent", response_model=StockItemOut)
+@router.put("/stock/{sku:path}/parent", response_model=StockItemOut)
 async def set_stock_parent(
     container: Annotated[Container, Depends(get_container)],
     session: Annotated[AsyncSession, Depends(get_session)],
@@ -326,3 +314,33 @@ async def set_stock_parent(
     inventory_service = container.inventory_service(session)
     item = await inventory_service.set_parent(sku, payload.parent_sku)
     return stock_item_out(item)
+
+
+@router.get("/stock/{sku:path}", response_model=StockItemOut)
+async def get_stock_item(
+    container: Annotated[Container, Depends(get_container)],
+    session: Annotated[AsyncSession, Depends(get_session)],
+    sku: str,
+) -> StockItemOut:
+    """Zwraca szczegóły jednego produktu magazynowego."""
+    inventory_service = container.inventory_service(session)
+    item = await inventory_service.get_item(sku)
+    return stock_item_out(item)
+
+
+@router.delete("/stock/{sku:path}", response_model=StockDeleteOut)
+async def delete_stock_item(
+    container: Annotated[Container, Depends(get_container)],
+    session: Annotated[AsyncSession, Depends(get_session)],
+    sku: str,
+) -> StockDeleteOut:
+    """
+    Usuwa produkt magazynowy razem z jego historią ruchów.
+
+    Podprodukty zostają w magazynie - tracą tylko powiązanie z usuwanym
+    produktem głównym. Odpowiedź mówi, co dokładnie usunięcie zmieniło
+    poza samym zniknięciem wiersza z listy.
+    """
+    inventory_service = container.inventory_service(session)
+    deletion = await inventory_service.delete_item(sku)
+    return stock_delete_out(deletion)
