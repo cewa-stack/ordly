@@ -210,11 +210,19 @@ export function Stepper({
   value,
   onDecrease,
   onIncrease,
+  onEdit,
   disabled = false,
 }: {
   value: number;
   onDecrease: () => void;
   onIncrease: () => void;
+  /**
+   * Klikniecie w sama liczbe - wejscie w reczna korekte. Bez tego
+   * jedyna droga do zmiany o 500 sztuk jest 500 klikniec w "+".
+   * Kropkowane podkreslenie liczby to jedyny sygnal, ze da sie ja
+   * kliknac; bez niego funkcja istnieje, ale nikt jej nie znajduje.
+   */
+  onEdit?: () => void;
   disabled?: boolean;
 }) {
   return (
@@ -228,7 +236,20 @@ export function Stepper({
       >
         −
       </button>
-      <span className="o-mono min-w-[34px] text-center text-[11.5px] text-white">{value}</span>
+      {onEdit ? (
+        <button
+          type="button"
+          onClick={onEdit}
+          disabled={disabled}
+          title="Kliknij, żeby wpisać stan ręcznie"
+          aria-label={`Wpisz stan ręcznie (teraz ${value})`}
+          className="o-mono flex h-6 min-w-[34px] items-center justify-center px-1 text-[11.5px] text-white underline decoration-line-strong decoration-dotted underline-offset-[3px] transition-colors hover:bg-panel-3 hover:text-teal-bright hover:decoration-teal-bright disabled:pointer-events-none disabled:opacity-40"
+        >
+          {value}
+        </button>
+      ) : (
+        <span className="o-mono min-w-[34px] text-center text-[11.5px] text-white">{value}</span>
+      )}
       <button
         type="button"
         onClick={onIncrease}

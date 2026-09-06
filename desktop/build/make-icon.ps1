@@ -1,3 +1,12 @@
+# Sklada `icon.ico` z `icon.png` (16/32/48/256 px).
+#
+# UWAGA: `icon.ico` w repozytorium pochodzi z gotowego pliku
+# `ordly_app_icon.ico` (Ordi z podkladka, 6 wrzesnia 2026) i ma OSIEM
+# rozmiarow - lacznie z 24, 64, 96 i 128 px. `icon.png` to wyciety z niego
+# obrazek 256 px, wiec ten skrypt odtworzy te sama grafike, ale w czterech
+# rozmiarach zamiast osmiu. Uruchamiaj go tylko wtedy, gdy naprawde
+# podmieniasz `icon.png` na nowy rysunek.
+
 Add-Type -AssemblyName System.Drawing
 
 $srcPath = Join-Path $PSScriptRoot "icon.png"

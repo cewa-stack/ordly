@@ -214,6 +214,222 @@ function HistoryModal({ sku, onClose }: { sku: string | null; onClose: () => voi
   );
 }
 
+type AdjustMode = "set" | "add" | "remove";
+
+const ADJUST_MODE_LABEL: Record<AdjustMode, string> = {
+  set: "Ustaw stan",
+  add: "Dostawa (+)",
+  remove: "Zdejmij (−)",
+};
+
+/** Domyslny powod wpisywany do historii, gdy uzytkownik nie poda swojego. */
+const ADJUST_MODE_REASON: Record<AdjustMode, string> = {
+  set: "Inwentaryzacja",
+  add: "Dostawa",
+  remove: "Korekta magazynowa",
+};
+
+const ADJUST_MODE_HINT: Record<AdjustMode, string> = {
+  set: "Stan po korekcie - tyle sztuk faktycznie leży na półce",
+  add: "Ile sztuk dochodzi do obecnego stanu",
+  remove: "Ile sztuk schodzi z obecnego stanu",
+};
+
+/**
+ * Reczna korekta stanu - wpisanie liczby zamiast klikania w "+".
+ *
+ * Trzy tryby, bo backend ma trzy operacje (`set`, `add`, `remove`),
+ * a kazda znaczy w historii co innego: inwentaryzacja ustala stan na
+ * sztywno, dostawa go podnosi, zdjecie obniza. Samo "ustaw" wystarcza
+ * technicznie, ale przy dostawie 500 butelek kazalo by liczyc w glowie
+ * (120 + 500) i zostawialo w historii wpis, z ktorego nie wynika, ze to
+ * byla dostawa.
+ *
+ * Podglad "120 -> 620 szt." jest czescia funkcji, nie ozdoba: tryb
+ * "ustaw" nadpisuje prawdziwy stan bez pytania, wiec skutek musi byc
+ * widoczny PRZED zapisem.
+ */
+function StockAdjustModal({
+  item,
+  onClose,
+}: {
+  item: StockItem | null;
+  onClose: () => void;
+}) {
+  const queryClient = useQueryClient();
+  const toast = useToast();
+  const [mode, setMode] = React.useState<AdjustMode>("set");
+  const [quantity, setQuantity] = React.useState("");
+  const [reason, setReason] = React.useState("");
+
+  // Zaleznosc po SKU, nie po calym obiekcie: lista magazynowa odswieza
+  // sie w tle i podmienia referencje `item`, co przy `[item]` czyscilo by
+  // pole w trakcie wpisywania liczby.
+  const sku = item?.sku ?? null;
+  const stock = item?.stock ?? 0;
+  const inputRef = React.useRef<HTMLInputElement>(null);
+
+  React.useEffect(() => {
+    if (sku === null) return;
+    setMode("set");
+    setQuantity(String(stock));
+    setReason("");
+    // Fokus jawnie na pole liczby, a nie przez `autoFocus`: `Modal` po
+    // otwarciu ustawia fokus na PIERWSZYM elemencie dialogu, czyli na
+    // przelaczniku trybu. Efekt rodzica wykonuje sie po efekcie dziecka,
+    // wiec to ustawienie jest tym ostatnim - i liczbe da sie wpisac od
+    // razu, bez klikania w pole.
+    inputRef.current?.focus();
+    inputRef.current?.select();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sku]);
+
+  const parsed = Number.parseInt(quantity, 10);
+  const amount = Number.isNaN(parsed) ? null : parsed;
+  const nextStock =
+    amount === null
+      ? null
+      : mode === "set"
+        ? amount
+        : mode === "add"
+          ? stock + amount
+          : stock - amount;
+
+  let problem: string | null = null;
+  if (amount !== null && amount < 0) {
+    problem = "Ilość nie może być ujemna.";
+  } else if (nextStock !== null && nextStock < 0) {
+    problem = `Nie można zdjąć więcej, niż jest na stanie (${stock} szt.).`;
+  } else if (nextStock !== null && nextStock === stock) {
+    problem = "Ta wartość niczego nie zmienia.";
+  }
+
+  const canSubmit = item !== null && amount !== null && problem === null;
+
+  const mutation = useMutation({
+    mutationFn: async () => {
+      const result = await window.ordly.stock.adjust(item!.sku, {
+        op: mode,
+        quantity: amount!,
+        reason: reason.trim() || ADJUST_MODE_REASON[mode],
+      });
+      if (!result.ok) throw new Error(result.message);
+      return { updated: result.data, previous: stock };
+    },
+    onSuccess: ({ updated, previous }) => {
+      void queryClient.invalidateQueries({ queryKey: ["stock"] });
+      void queryClient.invalidateQueries({ queryKey: ["stock-history"] });
+      void queryClient.invalidateQueries({ queryKey: ["dashboard"] });
+      toast.success(
+        "Stan zaktualizowany",
+        `${updated.sku} · ${previous} → ${updated.stock} szt.`
+      );
+      onClose();
+    },
+    onError: (error) => {
+      toast.error(
+        "Korekta nie przeszła",
+        error instanceof Error ? error.message : "Odśwież listę i spróbuj ponownie."
+      );
+    },
+  });
+
+  function changeMode(next: AdjustMode) {
+    setMode(next);
+    // "Ustaw" startuje od biezacego stanu (zwykle poprawia sie jedna
+    // cyfre), dostawa i zdjecie od pustego pola - tam wpisuje sie
+    // roznice, a podpowiedziana liczba bylaby zaproszeniem do pomylki.
+    setQuantity(next === "set" ? String(stock) : "");
+    // Po wyborze trybu i tak nastepnym krokiem jest wpisanie liczby.
+    inputRef.current?.focus();
+    inputRef.current?.select();
+  }
+
+  return (
+    <Modal
+      open={item !== null}
+      onClose={onClose}
+      title="Korekta stanu"
+      subtitle={item ? `${item.name} · ${item.sku}` : ""}
+      width={460}
+      footer={
+        <>
+          <Button variant="ghost" onClick={onClose} disabled={mutation.isPending}>
+            Anuluj
+          </Button>
+          <Button
+            onClick={() => mutation.mutate()}
+            disabled={!canSubmit || mutation.isPending}
+          >
+            {mutation.isPending ? "Zapisuję…" : "Zapisz stan"}
+          </Button>
+        </>
+      }
+    >
+      <div className="flex flex-col gap-3.5">
+        <div className="flex flex-wrap items-center gap-2">
+          {(["set", "add", "remove"] as const).map((option) => (
+            <Chip
+              key={option}
+              active={mode === option}
+              onClick={() => changeMode(option)}
+            >
+              {ADJUST_MODE_LABEL[option]}
+            </Chip>
+          ))}
+        </div>
+
+        <Field
+          label={mode === "set" ? "Nowy stan" : "Liczba sztuk"}
+          hint={ADJUST_MODE_HINT[mode]}
+        >
+          <input
+            ref={inputRef}
+            type="number"
+            min={0}
+            value={quantity}
+            onChange={(event) => setQuantity(event.target.value)}
+            onFocus={(event) => event.target.select()}
+            onKeyDown={(event) => {
+              if (event.key === "Enter" && canSubmit && !mutation.isPending) {
+                event.preventDefault();
+                mutation.mutate();
+              }
+            }}
+            className="o-mono w-full rounded-sm border border-line bg-ink-raised px-3 py-2.5 text-[12.5px] text-white outline-none focus:border-teal-bright"
+          />
+        </Field>
+
+        <Field label="Powód" hint={`Trafia do historii. Puste = „${ADJUST_MODE_REASON[mode]}"`}>
+          <input
+            value={reason}
+            onChange={(event) => setReason(event.target.value)}
+            placeholder={ADJUST_MODE_REASON[mode]}
+            className="w-full rounded-sm border border-line bg-ink-raised px-3 py-2.5 text-[12.5px] text-white outline-none placeholder:text-slate-dim focus:border-teal-bright"
+          />
+        </Field>
+
+        <div className="rounded-sm border border-line bg-ink-raised px-3 py-2.5">
+          {problem ? (
+            <p className="text-[12px] text-coral">{problem}</p>
+          ) : nextStock === null ? (
+            <p className="text-[12px] text-slate-dim">Wpisz liczbę, żeby zobaczyć wynik.</p>
+          ) : (
+            <p className="o-mono text-[12.5px] text-slate">
+              {stock} szt. <span className="text-slate-dim">→</span>{" "}
+              <span className="text-teal-bright">{nextStock} szt.</span>
+              <span className="ml-2 text-[11px] text-slate-dim">
+                ({nextStock > stock ? "+" : ""}
+                {nextStock - stock})
+              </span>
+            </p>
+          )}
+        </div>
+      </div>
+    </Modal>
+  );
+}
+
 /**
  * Potwierdzenie usuniecia pozycji magazynowej.
  *
@@ -539,6 +755,7 @@ export function MagazynScreen({ focusSku, onFocusHandled }: MagazynScreenProps) 
   const [historySku, setHistorySku] = React.useState<string | null>(null);
   const [subItemsSku, setSubItemsSku] = React.useState<string | null>(null);
   const [deleteSku, setDeleteSku] = React.useState<string | null>(null);
+  const [adjustSku, setAdjustSku] = React.useState<string | null>(null);
   const [expanded, setExpanded] = React.useState<Set<string>>(new Set());
   const [highlightSku, setHighlightSku] = React.useState<string | null>(null);
   const rowRefs = React.useRef<Record<string, HTMLTableRowElement | null>>({});
@@ -630,6 +847,9 @@ export function MagazynScreen({ focusSku, onFocusHandled }: MagazynScreenProps) 
 
   const deleteTarget =
     deleteSku === null ? null : (items.find((i) => i.sku === deleteSku) ?? null);
+
+  const adjustTarget =
+    adjustSku === null ? null : (items.find((i) => i.sku === adjustSku) ?? null);
 
   function toggleExpanded(sku: string) {
     setExpanded((previous) => {
@@ -786,6 +1006,7 @@ export function MagazynScreen({ focusSku, onFocusHandled }: MagazynScreenProps) 
                         disabled={adjustMutation.isPending}
                         onDecrease={() => adjustMutation.mutate({ sku: item.sku, delta: -1 })}
                         onIncrease={() => adjustMutation.mutate({ sku: item.sku, delta: 1 })}
+                        onEdit={() => setAdjustSku(item.sku)}
                       />
                     </td>
                     <td className="border-b border-line px-3 py-3">{statusPill(item)}</td>
@@ -831,7 +1052,15 @@ export function MagazynScreen({ focusSku, onFocusHandled }: MagazynScreenProps) 
                           {sub.sku}
                         </td>
                         <td className="o-mono border-b border-line px-3 py-2.5 text-[11.5px] text-slate">
-                          {sub.stock} szt.
+                          <button
+                            type="button"
+                            onClick={() => setAdjustSku(sub.sku)}
+                            title="Kliknij, żeby wpisać stan ręcznie"
+                            aria-label={`Wpisz stan ręcznie dla ${sub.name} (teraz ${sub.stock})`}
+                            className="underline decoration-line-strong decoration-dotted underline-offset-[3px] transition-colors hover:text-teal-bright hover:decoration-teal-bright"
+                          >
+                            {sub.stock} szt.
+                          </button>
                         </td>
                         <td
                           className="border-b border-line px-3 py-2.5 text-[11px] text-slate-dim"
@@ -868,6 +1097,7 @@ export function MagazynScreen({ focusSku, onFocusHandled }: MagazynScreenProps) 
         items={items}
         onClose={() => setSubItemsSku(null)}
       />
+      <StockAdjustModal item={adjustTarget} onClose={() => setAdjustSku(null)} />
       <DeleteProductDialog
         item={deleteTarget}
         subItems={deleteTarget ? (subItemsByParent.get(deleteTarget.sku) ?? []) : []}
