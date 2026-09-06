@@ -1,12 +1,12 @@
 /**
- * Ordlak - maskotka modulu generowania ofert, OSOBNA postac od Ordiego.
+ * Ordlak - maskotka asystenta, OSOBNA postac od Ordiego.
  *
  * Podzial ról: Ordi (`Mascot.tsx`) jest wskaznikiem stanu CALEJ aplikacji,
- * Ordlak jest twarza jednego modulu i reaguje wylacznie na to, co dzieje
- * sie z generowaniem oferty:
- * - "idle"     - formularz czeka na dane
- * - "thinking" - trwa zapytanie do modelu
- * - "happy"    - oferta wygenerowana
+ * Ordlak jest twarza asystenta i reaguje wylacznie na to, co dzieje sie
+ * w rozmowie:
+ * - "idle"     - czat czeka na pytanie
+ * - "thinking" - asystent odpytuje dane
+ * - "happy"    - rozmowa trwa, odpowiedz jest na ekranie
  */
 import mascotHappy from "../assets/mascot_ordlak_happy.png";
 import mascotIdle from "../assets/mascot_ordlak_idle.png";

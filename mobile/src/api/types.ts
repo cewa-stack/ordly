@@ -5,21 +5,30 @@
  * odzwierciedla po stronie klienta).
  */
 
+/**
+ * Kwota w JSON-ie z API. Backend serializuje `Decimal` przez alias
+ * `Money` (schemas.py) jako LICZBE - wczesniej pydantic oddawal string,
+ * przez co dodawanie kwot w JS sklejalo teksty zamiast sumowac.
+ * `formatMoney` przyjmuje oba warianty, wiec starszy backend na Pi
+ * dalej sie wyswietli poprawnie.
+ */
+export type Money = number;
+
 export type StockStatus = "ok" | "warning" | "critical";
 
 export interface OrderProduct {
   external_id: string;
   name: string;
   quantity: number;
-  unit_price: string;
-  total_price: string;
+  unit_price: Money;
+  total_price: Money;
 }
 
 export interface Order {
   external_id: string;
   marketplace: string;
   buyer_login: string;
-  total_amount: string;
+  total_amount: Money;
   currency: string;
   status: string;
   fulfillment_status: string | null;
@@ -51,9 +60,9 @@ export interface StockItem {
   ean: string | null;
   category: string | null;
   location: string | null;
-  purchase_cost: string | null;
-  sale_price: string | null;
-  stock_value: string;
+  purchase_cost: Money | null;
+  sale_price: Money | null;
+  stock_value: Money;
   is_low_stock: boolean;
   status: StockStatus;
 }
@@ -81,7 +90,7 @@ export interface ItemForecast {
 
 export interface StockReport {
   total_items: number;
-  total_stock_value: string;
+  total_stock_value: Money;
   low_stock_items: StockItem[];
   items_without_sales: StockItem[];
   forecasts: ItemForecast[];

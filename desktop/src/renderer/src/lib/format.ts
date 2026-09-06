@@ -34,10 +34,32 @@ const LONG_DATE_FORMAT = new Intl.DateTimeFormat("pl-PL", {
   month: "long",
 });
 
+/**
+ * Kwota z API jako liczba - odporna na to, ze starszy backend na Pi
+ * moze jeszcze oddawac kwoty jako STRINGI ("19.99").
+ *
+ * Pydantic v2 domyslnie serializuje `Decimal` do stringa; backend
+ * naprawiono aliasem `Money` (schemas.py), ale desktop bywa
+ * nowszy niz uslugi na Pi. Bez tej konwersji `0 + "19.99" + "19.99"`
+ * dawalo sklejony tekst "019.9919.99", a formatCurrency -> `NaN zl`.
+ *
+ * `NaN`/`null`/`undefined` swiadomie schodza do 0: w podsumowaniu
+ * lepiej pokazac `0,00 zl` niz `NaN zl`.
+ */
+export function toAmount(value: number | string | null | undefined): number {
+  if (typeof value === "number") return Number.isFinite(value) ? value : 0;
+  if (typeof value !== "string") return 0;
+  const parsed = Number(value.trim());
+  return Number.isFinite(parsed) ? parsed : 0;
+}
+
 /** `249,90 zł`. Wartosci calkowite bez groszy: `2 340 zł`. */
-export function formatCurrency(amount: number, { round = false } = {}): string {
+export function formatCurrency(
+  amount: number | string | null | undefined,
+  { round = false } = {}
+): string {
   const formatter = round ? CURRENCY_FORMAT_ROUND : CURRENCY_FORMAT;
-  return `${formatter.format(amount)} zł`;
+  return `${formatter.format(toAmount(amount))} zł`;
 }
 
 /** `08:12` */

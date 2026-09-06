@@ -1,36 +1,32 @@
 /**
- * IPC Ordlaka - generator ofert Allegro.
+ * IPC Ordlaka - asystent aplikacji.
  *
- * Zdjęcia przechodzą przez mostek jako zwykłe bajty (`Uint8Array`), bo
- * `File`/`Blob` nie przetrwałyby serializacji IPC. Renderer czyta plik do
- * `ArrayBuffer`, main składa z tego `multipart/form-data`.
+ * Historia rozmowy zyje w bazie na Pi, wiec renderer wysyla POJEDYNCZE
+ * pytanie plus numer watku - nie cala rozmowe. Zapis odpowiedzi do pliku
+ * jest jedyna operacja czysto lokalna: okno zapisu i `writeFile` moga
+ * dzialac tylko w procesie glownym.
  */
-import { ipcMain } from "electron";
-import { apiRequest, apiUpload, type UploadFilePart } from "../lib/apiClient";
+import { BrowserWindow, dialog, ipcMain } from "electron";
+import { writeFileSync } from "node:fs";
+import { apiRequest } from "../lib/apiClient";
 import { requireSession } from "../lib/tokenStore";
 import { toResult } from "../lib/result";
 
-interface OrdlakPhotoInput {
-  fileName: string;
-  mimeType: string;
-  bytes: Uint8Array;
+interface OrdlakAskInput {
+  message: string;
+  conversationId?: number | null;
 }
 
-interface OrdlakGenerateInput {
-  note: string;
-  condition: string;
-  purchaseCost: number;
-  inboundShippingCost: number;
-  buyerShippingCost: number;
-  commissionPercent: number;
-  targetMarginPercent: number;
-  photos?: OrdlakPhotoInput[];
+interface SaveReplyInput {
+  /** Sugerowana nazwa pliku bez rozszerzenia - zwykle tytul rozmowy. */
+  suggestedName: string;
+  content: string;
 }
 
-interface OrdlakFinalizeInput {
-  id: number;
-  finalTitle: string;
-  finalDescriptionHtml: string;
+/** Znaki zakazane w nazwie pliku na Windowsie - tytul rozmowy bywa dowolny. */
+function toFileName(title: string): string {
+  const cleaned = title.replace(/[\\/:*?"<>|]/g, "-").replace(/\s+/g, " ").trim();
+  return (cleaned || "Raport Ordlaka").slice(0, 80);
 }
 
 export function registerOrdlakIpc(): void {
@@ -41,60 +37,71 @@ export function registerOrdlakIpc(): void {
     })
   );
 
-  ipcMain.handle("ordly:ordlak:generate", async (_event, input: OrdlakGenerateInput) =>
+  ipcMain.handle("ordly:ordlak:ask", async (_event, input: OrdlakAskInput) =>
     toResult(async () => {
       const session = requireSession();
-      const files: UploadFilePart[] = (input.photos ?? []).map((photo) => ({
-        fieldName: "photos",
-        fileName: photo.fileName,
-        mimeType: photo.mimeType,
-        bytes: photo.bytes,
-      }));
-
-      return apiUpload(
-        session.baseUrl,
-        session.token,
-        "/api/v1/ordlak/generate",
-        {
-          note: input.note,
-          condition: input.condition,
-          purchase_cost: input.purchaseCost,
-          inbound_shipping_cost: input.inboundShippingCost,
-          buyer_shipping_cost: input.buyerShippingCost,
-          commission_percent: input.commissionPercent,
-          target_margin_percent: input.targetMarginPercent,
+      return apiRequest(session.baseUrl, session.token, "/api/v1/ordlak/chat", {
+        method: "POST",
+        body: {
+          message: input.message,
+          conversation_id: input.conversationId ?? null,
         },
-        files
-      );
+      });
     })
   );
 
-  ipcMain.handle("ordly:ordlak:history", async (_event, limit = 20) =>
+  ipcMain.handle("ordly:ordlak:conversations", async () =>
+    toResult(async () => {
+      const session = requireSession();
+      return apiRequest(session.baseUrl, session.token, "/api/v1/ordlak/conversations");
+    })
+  );
+
+  ipcMain.handle("ordly:ordlak:conversation", async (_event, id: number) =>
     toResult(async () => {
       const session = requireSession();
       return apiRequest(
         session.baseUrl,
         session.token,
-        `/api/v1/ordlak/history?limit=${encodeURIComponent(String(limit))}`
+        `/api/v1/ordlak/conversations/${encodeURIComponent(String(id))}`
       );
     })
   );
 
-  ipcMain.handle("ordly:ordlak:finalize", async (_event, input: OrdlakFinalizeInput) =>
+  ipcMain.handle("ordly:ordlak:deleteConversation", async (_event, id: number) =>
     toResult(async () => {
       const session = requireSession();
-      return apiRequest(
+      await apiRequest(
         session.baseUrl,
         session.token,
-        `/api/v1/ordlak/${encodeURIComponent(String(input.id))}/finalize`,
-        {
-          method: "POST",
-          body: {
-            final_title: input.finalTitle,
-            final_description_html: input.finalDescriptionHtml,
-          },
-        }
+        `/api/v1/ordlak/conversations/${encodeURIComponent(String(id))}`,
+        { method: "DELETE" }
       );
+      return null;
+    })
+  );
+
+  ipcMain.handle("ordly:ordlak:saveReply", async (_event, input: SaveReplyInput) =>
+    toResult(async () => {
+      const win = BrowserWindow.getFocusedWindow();
+      const options: Electron.SaveDialogOptions = {
+        title: "Zapisz odpowiedź Ordlaka",
+        defaultPath: `${toFileName(input.suggestedName)}.md`,
+        filters: [
+          { name: "Markdown", extensions: ["md"] },
+          { name: "Plik tekstowy", extensions: ["txt"] },
+        ],
+      };
+      const result = win
+        ? await dialog.showSaveDialog(win, options)
+        : await dialog.showSaveDialog(options);
+      if (result.canceled || !result.filePath) {
+        return { saved: false, path: null };
+      }
+      // BOM - inaczej Notatnik w polskiej lokalizacji pokazuje krzaki
+      // zamiast ogonków, tak samo jak przy eksporcie CSV zamówień.
+      writeFileSync(result.filePath, "﻿" + input.content, "utf-8");
+      return { saved: true, path: result.filePath };
     })
   );
 }

@@ -12,7 +12,10 @@ from app.database.models.inventory_movement_model import InventoryMovementModel
 from app.database.models.mail_message_model import MailMessageModel
 from app.database.models.offer_link_model import OfferLinkModel
 from app.database.models.order_model import OrderModel
-from app.database.models.ordlak_generation_model import OrdlakGenerationModel
+from app.database.models.ordlak_conversation_model import (
+    OrdlakConversationModel,
+    OrdlakMessageModel,
+)
 from app.database.models.product_model import ProductModel
 from app.database.models.push_subscription_model import PushSubscriptionModel
 from app.database.models.return_model import ReturnModel
@@ -29,7 +32,8 @@ __all__ = [
     "InventoryMovementModel",
     "MailMessageModel",
     "OfferLinkModel",
-    "OrdlakGenerationModel",
+    "OrdlakConversationModel",
+    "OrdlakMessageModel",
     "OrderModel",
     "ProductModel",
     "PushSubscriptionModel",

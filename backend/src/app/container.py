@@ -31,7 +31,9 @@ from app.repositories.sqlite_event_repository import SqliteEventRepository
 from app.repositories.sqlite_inventory_repository import SqliteInventoryRepository
 from app.repositories.sqlite_mail_repository import SqliteMailRepository
 from app.repositories.sqlite_order_repository import SqliteOrderRepository
-from app.repositories.sqlite_ordlak_repository import SqliteOrdlakRepository
+from app.repositories.sqlite_ordlak_conversation_repository import (
+    SqliteOrdlakConversationRepository,
+)
 from app.repositories.sqlite_push_subscription_repository import (
     SqlitePushSubscriptionRepository,
 )
@@ -54,7 +56,7 @@ from app.services.issues_service import IssuesService
 from app.services.mail_service import MailService
 from app.services.mailbox_service import MailboxService
 from app.services.offer_mapping_service import OfferMappingService
-from app.services.ordlak_service import OrdlakService
+from app.services.ordlak_assistant_service import OrdlakAssistantService
 from app.services.returns_service import ReturnsService
 from app.services.search_service import SearchService
 from app.services.shipping_reminder_service import ShippingReminderService
@@ -179,9 +181,26 @@ class Container:
         """
         return AllegroLokalnieOrdersService(SqliteOrderRepository(session))
 
-    def ordlak_service(self, session: AsyncSession) -> OrdlakService:
-        """Buduje OrdlakService dla /api/v1/ordlak/* (generator ofert AI)."""
-        return OrdlakService(SqliteOrdlakRepository(session), self._settings.ordlak)
+    def ordlak_assistant_service(self, session: AsyncSession) -> OrdlakAssistantService:
+        """
+        Buduje asystenta Ordlaka dla `POST /api/v1/ordlak/chat`.
+
+        Dostaje gotowe serwisy, a nie repozytoria - asystent ma widzieć
+        dokładnie te same liczby co ekrany aplikacji (magazyn liczy
+        podprodukty, prognoza ma swoje okno), a to jest wiedza serwisów.
+        """
+        return OrdlakAssistantService(
+            settings=self._settings.ordlak,
+            order_repository=SqliteOrderRepository(session),
+            inventory_service=self.inventory_service(session),
+            returns_service=self.returns_service(session),
+            dashboard_service=self.dashboard_service(session),
+            health_service=self.health_service(session),
+            search_service=self.search_service(session),
+            issues_service=self.issues_service(session),
+            mailbox_service=self.mailbox_service(session),
+            conversation_repository=SqliteOrdlakConversationRepository(session),
+        )
 
     def ordlak_settings(self) -> OrdlakSettings:
         """Zwraca konfigurację Ordlaka dla `GET /api/v1/ordlak/status`."""

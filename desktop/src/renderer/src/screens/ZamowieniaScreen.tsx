@@ -25,7 +25,7 @@ import {
 } from "../components/ui";
 import { ConfirmDialog } from "../components/Modal";
 import { useToast } from "../lib/toast";
-import { formatCurrency, formatDateTime, formatTime } from "../lib/format";
+import { formatCurrency, formatDateTime, formatTime, toAmount } from "../lib/format";
 import {
   ORDER_FILTER_LABEL,
   fulfillmentLabel,
@@ -112,7 +112,10 @@ function OrderDetail({ order }: { order: Order }) {
     },
   });
 
-  const itemsTotal = order.products.reduce((sum, product) => sum + product.total_price, 0);
+  const itemsTotal = order.products.reduce(
+    (sum, product) => sum + toAmount(product.total_price),
+    0
+  );
 
   return (
     <div className="flex min-h-0 flex-col gap-[18px] overflow-y-auto border-l border-line p-5">
@@ -245,7 +248,7 @@ export function ZamowieniaScreen({ focusOrderId, onFocusHandled }: ZamowieniaScr
     );
     return [...filtered].sort((a, b) =>
       sort === "amount"
-        ? b.total_amount - a.total_amount
+        ? toAmount(b.total_amount) - toAmount(a.total_amount)
         : new Date(b.order_date).getTime() - new Date(a.order_date).getTime()
     );
   }, [data, filter, sort]);
@@ -296,7 +299,7 @@ export function ZamowieniaScreen({ focusOrderId, onFocusHandled }: ZamowieniaScr
         order.external_id,
         order.marketplace,
         order.buyer_login,
-        order.total_amount.toFixed(2).replace(".", ","),
+        toAmount(order.total_amount).toFixed(2).replace(".", ","),
         fulfillmentLabel(order.fulfillment_status),
         order.order_date,
       ].join(";")

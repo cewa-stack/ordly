@@ -10,9 +10,9 @@ from __future__ import annotations
 
 from datetime import datetime
 from decimal import Decimal
-from typing import Literal
+from typing import Annotated, Literal
 
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, Field, PlainSerializer, field_validator
 
 from app.domain.entities.inventory_item import InventoryItem
 from app.domain.entities.inventory_movement import InventoryMovement
@@ -20,13 +20,13 @@ from app.domain.entities.issue import Issue, IssueMessage
 from app.domain.entities.mail_message import MailMessage
 from app.domain.entities.order import Order
 from app.domain.entities.order_return import ReturnRecord
-from app.domain.entities.ordlak_generation import OrdlakGeneration, PriceBreakdown
+from app.domain.entities.ordlak_conversation import OrdlakConversation
 from app.domain.entities.shipment import Shipment
 from app.infrastructure.mail.mime import MailBodies, html_to_plain_text
 from app.repositories.sqlite_event_repository import EventRecord
 from app.services.dashboard_service import DashboardSummary
 from app.services.mailbox_service import MailboxStatus
-from app.services.ordlak_service import OrdlakDraft, calculate_price
+from app.services.ordlak_assistant_service import ChatResult
 from app.shared.dto.inventory_dto import (
     InventoryItemDeletion,
     InventoryReport,
@@ -36,6 +36,17 @@ from app.shared.dto.offer_mapping_dto import BackfillPlan, OfferRecipe, SoldOffe
 from app.shared.dto.stats_dto import HealthStatus, StatsSummary, SyncResult
 
 StockStatus = Literal["ok", "warning", "critical"]
+
+#: Kwota pieniężna w odpowiedzi API - w Pythonie dalej `Decimal` (dokładne
+#: sumowanie i zaokrąglanie), ale w JSON-ie ZAWSZE liczba, nigdy string.
+#:
+#: Pydantic v2 domyślnie serializuje `Decimal` do stringa ("19.99"), żeby nie
+#: stracić precyzji. Klienci brali to za liczbę i sumowali: `0 + "19.99"` w
+#: JavaScripcie to sklejenie tekstu, więc druga pozycja dawała "019.9919.99",
+#: a `Intl.NumberFormat` pokazywał z tego `NaN zł` (ekran Statystyki,
+#: "Najczęściej sprzedawane"). Kwoty w tej aplikacji mieszczą się w groszach,
+#: więc float w JSON-ie nic nie psuje, a usuwa całą klasę tego błędu.
+Money = Annotated[Decimal, PlainSerializer(float, return_type=float, when_used="json")]
 
 
 # --------------------------------------------------------------------------
@@ -71,8 +82,8 @@ class OrderProductOut(BaseModel):
     external_id: str
     name: str
     quantity: int
-    unit_price: Decimal
-    total_price: Decimal
+    unit_price: Money
+    total_price: Money
 
 
 class OrderOut(BaseModel):
@@ -81,7 +92,7 @@ class OrderOut(BaseModel):
     external_id: str
     marketplace: str
     buyer_login: str
-    total_amount: Decimal
+    total_amount: Money
     currency: str
     status: str
     fulfillment_status: str | None
@@ -375,56 +386,8 @@ class MailSyncResultOut(BaseModel):
 
 
 # --------------------------------------------------------------------------
-# Ordlak (generator ofert AI)
+# Ordlak (asystent AI)
 # --------------------------------------------------------------------------
-
-
-class OrdlakPriceBreakdownOut(BaseModel):
-    """Rozbicie kalkulacji ceny - to samo w wyniku generacji i w historii."""
-
-    purchase_cost: float
-    inbound_shipping_cost: float
-    buyer_shipping_cost: float
-    commission_percent: float
-    target_margin_percent: float
-    commission_amount: float
-    suggested_price: float
-
-
-class OrdlakGenerationOut(BaseModel):
-    """Wygenerowana oferta zwracana przez `POST /api/v1/ordlak/generate`."""
-
-    id: int
-    created_at: datetime
-    title: str
-    description_html: str
-    condition_notes: str | None
-    condition: str
-    photo_count: int
-    title_below_target: bool
-    price_breakdown: OrdlakPriceBreakdownOut
-
-
-class OrdlakHistoryItemOut(BaseModel):
-    """Pozycja historii generacji (`GET /api/v1/ordlak/history`)."""
-
-    id: int
-    created_at: datetime
-    title: str
-    description_html: str
-    condition_notes: str | None
-    condition: str
-    photo_count: int
-    user_note: str
-    is_edited: bool
-    price_breakdown: OrdlakPriceBreakdownOut
-
-
-class OrdlakFinalizeIn(BaseModel):
-    """Ręcznie poprawiony tytuł/opis zapisywany do historii."""
-
-    final_title: str = Field(min_length=1, max_length=200)
-    final_description_html: str = Field(min_length=1)
 
 
 class OrdlakStatusOut(BaseModel):
@@ -432,70 +395,90 @@ class OrdlakStatusOut(BaseModel):
     Stan modułu Ordlak (`GET /api/v1/ordlak/status`).
 
     Pozwala ekranowi powiedzieć wprost "brak klucza API na Pi" zamiast
-    czekać, aż użytkownik kliknie "Generuj" i dostanie błąd - ta sama
-    zasada co przy `GET /api/v1/mail/status`.
+    czekać, aż użytkownik wyśle pytanie i dostanie błąd - ta sama zasada
+    co przy `GET /api/v1/mail/status`.
     """
 
     configured: bool
     model: str
-    max_photos: int
-    max_photo_size_mb: int
 
 
-def _ordlak_price_breakdown_out(breakdown: PriceBreakdown) -> OrdlakPriceBreakdownOut:
-    return OrdlakPriceBreakdownOut(
-        purchase_cost=breakdown.purchase_cost,
-        inbound_shipping_cost=breakdown.inbound_shipping_cost,
-        buyer_shipping_cost=breakdown.buyer_shipping_cost,
-        commission_percent=breakdown.commission_percent,
-        target_margin_percent=breakdown.target_margin_percent,
-        commission_amount=breakdown.commission_amount,
-        suggested_price=breakdown.suggested_price,
-    )
-
-
-def ordlak_generation_out(draft: OrdlakDraft) -> OrdlakGenerationOut:
-    """Mapuje świeżo wygenerowaną ofertę na schemat odpowiedzi API."""
-    generation = draft.generation
-    return OrdlakGenerationOut(
-        id=generation.id or 0,
-        created_at=generation.created_at,
-        title=generation.title,
-        description_html=generation.description_html,
-        condition_notes=generation.ai_condition_notes,
-        condition=generation.condition,
-        photo_count=generation.photo_count,
-        title_below_target=draft.title_below_target,
-        price_breakdown=_ordlak_price_breakdown_out(draft.price_breakdown),
-    )
-
-
-def ordlak_history_item_out(generation: OrdlakGeneration) -> OrdlakHistoryItemOut:
+class OrdlakChatIn(BaseModel):
     """
-    Mapuje zapisaną generację na pozycję historii.
+    Ciało żądania `POST /api/v1/ordlak/chat` - JEDNO pytanie.
 
-    Rozbicie ceny odtwarzamy z zapisanych parametrów wejściowych, żeby
-    historia pokazywała dokładnie tę samą kartę ceny co świeży wynik -
-    bez duplikowania siedmiu kolumn w bazie.
+    Historia rozmowy żyje w bazie na Pi, więc aplikacja nie przysyła
+    kontekstu: podaje `conversation_id` istniejącego wątku albo pomija go,
+    żeby zacząć nowy.
     """
-    breakdown = calculate_price(
-        purchase_cost=generation.purchase_cost,
-        inbound_shipping_cost=generation.inbound_shipping_cost,
-        buyer_shipping_cost=generation.buyer_shipping_cost,
-        commission_percent=generation.commission_percent,
-        target_margin_percent=generation.target_margin_percent,
+
+    message: str = Field(min_length=1, max_length=8000)
+    conversation_id: int | None = None
+
+
+class OrdlakChatOut(BaseModel):
+    """
+    Odpowiedź asystenta.
+
+    `used_tools` to nazwy narzędzi, z których model faktycznie odczytał
+    dane - aplikacja pokazuje je pod odpowiedzią, żeby było widać, że
+    liczby wzięły się z bazy, a nie z modelu.
+    """
+
+    conversation_id: int
+    reply: str
+    used_tools: list[str]
+
+
+class OrdlakMessageOut(BaseModel):
+    """Zapisana wypowiedź w wątku."""
+
+    role: Literal["user", "assistant"]
+    content: str
+    created_at: datetime
+    used_tools: list[str]
+
+
+class OrdlakConversationOut(BaseModel):
+    """
+    Wątek rozmowy. Na liście `messages` jest puste - pełną historię
+    oddaje dopiero `GET /api/v1/ordlak/conversations/{id}`.
+    """
+
+    id: int
+    title: str
+    created_at: datetime
+    updated_at: datetime
+    message_count: int
+    messages: list[OrdlakMessageOut]
+
+
+def ordlak_chat_out(result: ChatResult) -> OrdlakChatOut:
+    """Mapuje wynik `OrdlakAssistantService.ask` na schemat odpowiedzi."""
+    return OrdlakChatOut(
+        conversation_id=result.conversation_id,
+        reply=result.reply,
+        used_tools=list(result.used_tools),
     )
-    return OrdlakHistoryItemOut(
-        id=generation.id or 0,
-        created_at=generation.created_at,
-        title=generation.title,
-        description_html=generation.description_html,
-        condition_notes=generation.ai_condition_notes,
-        condition=generation.condition,
-        photo_count=generation.photo_count,
-        user_note=generation.user_note,
-        is_edited=generation.final_title is not None,
-        price_breakdown=_ordlak_price_breakdown_out(breakdown),
+
+
+def ordlak_conversation_out(conversation: OrdlakConversation) -> OrdlakConversationOut:
+    """Mapuje wątek rozmowy na schemat odpowiedzi API."""
+    return OrdlakConversationOut(
+        id=conversation.id or 0,
+        title=conversation.title,
+        created_at=conversation.created_at,
+        updated_at=conversation.updated_at,
+        message_count=conversation.message_count,
+        messages=[
+            OrdlakMessageOut(
+                role=message.role,
+                content=message.content,
+                created_at=message.created_at,
+                used_tools=list(message.used_tools),
+            )
+            for message in conversation.messages
+        ],
     )
 
 
@@ -524,9 +507,9 @@ class StockItemOut(BaseModel):
     ean: str | None
     category: str | None
     location: str | None
-    purchase_cost: Decimal | None
-    sale_price: Decimal | None
-    stock_value: Decimal
+    purchase_cost: Money | None
+    sale_price: Money | None
+    stock_value: Money
     is_low_stock: bool
     status: StockStatus
 
@@ -664,7 +647,7 @@ class StockReportOut(BaseModel):
     """Raport magazynowy zwracany przez `/api/v1/stock/report`."""
 
     total_items: int
-    total_stock_value: Decimal
+    total_stock_value: Money
     low_stock_items: list[StockItemOut]
     items_without_sales: list[StockItemOut]
     forecasts: list[ItemForecastOut]

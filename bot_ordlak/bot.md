@@ -1,454 +1,204 @@
-# Ordlak — asystent AI do wystawiania ofert na Allegro
+# Ordlak — asystent ORDLY
 
-> Status: **wdrożone w kodzie 2026-08-09** (etapy 1–8 z sekcji 11). Backend,
-> API, IPC i ekran desktopowy gotowe; 259 testów backendu przechodzi,
-> `npm run typecheck` i `npm run build` desktopu przechodzą. Zostaje wgranie
-> na Pi i wpisanie `ANTHROPIC_API_KEY` — patrz sekcja 12.
->
-> Decyzje produktowe podjęte 2026-08-09 (sekcja 0). Jeśli coś się zmieni po
-> drodze, aktualizuj ten plik.
+Ordlak to czat wbudowany w ORDLY, który odpowiada na pytania o własny
+sklep: ile się sprzedało, co ma niski stan, co czeka na wysyłkę, jakie dni
+sprzedażowe się zbliżają. Jedna zakładka w pasku bocznym, jeden ekran.
 
-## 0. Podjęte decyzje (2026-08-09)
+> **Historia:** do 6 września 2026 Ordlak był generatorem ofert Allegro
+> (tytuł, opis HTML i cena z notatki + zdjęć). Generator został **usunięty
+> na życzenie użytkownika** — codzienną potrzebą okazało się raportowanie,
+> nie wystawianie. Kod generatora i jego pełna specyfikacja siedzą
+> w historii Gita; migracja `0007_create_ordlak_generations` zostaje
+> w repo (migracji się nie usuwa), a tabela `ordlak_generations` zostaje
+> w bazie na Pi razem z zapisanymi ofertami. Jeśli kiedyś ma zniknąć,
+> trzeba dopisać osobną migrację — świadomie.
 
-| Temat | Decyzja |
-|---|---|
-| Grafika | Ordlak dostaje **własną, osobną maskotkę** (nowy zestaw plików, nie wariant Ordiego) |
-| Historia generacji | **Zapisywana w bazie SQLite**, przetrwa restart apki |
-| Miejsce w UI | **Osobny ekran w Sidebarze** ("Ordlak"), pełnoprawna pozycja menu jak Magazyn/Zamówienia |
-| Edycja wyniku | Tytuł i opis to **edytowalne pola** po wygenerowaniu — użytkownik poprawia ręcznie przed skopiowaniem |
-| Model AI | **Claude Sonnet 5**, z obsługą obrazów (vision) |
-| Prowizja Allegro | **Ręczne pole %** — użytkownik sam wpisuje stawkę za każdym razem, bez listy kategorii |
-| Limit zdjęć | **Maksymalnie 3 zdjęcia** na jedną generację |
-| Stan produktu | **Rozszerzona skala**: Nowy / Bardzo dobry / Dobry / Uszkodzony |
-| Prowizja a wysyłka | Potwierdzone (2026-08-09): Allegro liczy prowizję od `cena + koszt wysyłki do kupującego`, nie od samej ceny — wzór w sekcji 5 to uwzględnia, formularz ma osobne pole na koszt wysyłki do kupującego |
-| Regulamin tytułów/opisów | Pobrany lokalnie do [`backend/docs/allegro_regulamin/`](backend/docs/allegro_regulamin/) (stan na 2026-08-09) — tytuł: 12–75 znaków / min. 3 słowa; opis: zakaz reklamy, danych kontaktowych, zachęt do kontaktu poza Allegro, wzmianek o wysyłce |
+---
 
-## 1. Pomysł w skrócie
+## 1. Zasada naczelna: liczby z bazy, nie z modelu
 
-Użytkownik wrzuca do apki desktopowej ORDLY: krótką notatkę o produkcie +
-do 3 zdjęć. Ordlak (AI) zwraca gotowy komplet do wklejenia na Allegro:
+Model **nie zna** żadnych danych sklepu. Dostaje wyłącznie narzędzia,
+którymi może o nie zapytać, a system prompt zabrania mu zgadywania
+i szacowania. Każdą liczbę z odpowiedzi da się sprawdzić, klikając w ten
+sam ekran w aplikacji.
 
-1. **Tytuł oferty** — SEO, w limicie znaków Allegro.
-2. **Opis produktu** — SEO, gotowy HTML do wklejenia.
-3. **Sugerowana cena sprzedaży** — wyliczona z kosztu zakupu, transportu,
-   ręcznie podanej prowizji Allegro i docelowej marży.
+Pod każdą odpowiedzią widać, z których narzędzi Ordlak skorzystał
+(`used_tools`). To jedyny sposób, żeby użytkownik odróżnił raport od
+gadania — bez tego czat byłby ładnie brzmiącą wróżbą.
 
-Tytuł i opis są edytowalne na miejscu, użytkownik poprawia i kopiuje
-przyciskiem. Bez automatycznego wystawiania na Allegro (poza zakresem —
-sekcja 8).
+## 2. Czego Ordlak NIE robi
 
-## 2. Nazwa i maskotka
+Nie wysyła maili, nie zmienia stanów magazynowych, nie wystawia ofert
+i nie zmienia niczego w aplikacji. Poproszony o akcję wskazuje ekran, na
+którym użytkownik zrobi ją sam.
 
-Osobna postać od "Ordiego" (istniejący wskaźnik stanu systemu w
-`Mascot.tsx`). Ordi = stan całej apki, Ordlak = twarz konkretnego modułu.
+To świadome ograniczenie, nie brak czasu: dopóki asystent tylko czyta,
+jego pomyłka kosztuje jedno zdanie, a nie rozjechany magazyn. Zdejmowanie
+tego ograniczenia (np. „wyślij zamówienie do hurtowni") ma być osobną,
+świadomą decyzją z własnym potwierdzeniem w UI — nie efektem ubocznym.
 
-Potrzebne assety (analogicznie do `mascot_idle/happy/orders/thinking.png`):
+## 3. Narzędzia
 
-- `mascot_ordlak_idle.png` — stan spoczynku na ekranie Ordlaka
-- `mascot_ordlak_thinking.png` — w trakcie generowania (odpytywanie API)
-- `mascot_ordlak_happy.png` — po udanej generacji
+Wszystkie w `backend/src/app/services/ordlak_assistant_service.py`
+(stała `TOOLS` + metody `_tool_*`).
 
-Grafiki dostarcza użytkownik (jak dotychczasowe maskotki) — kod tylko
-przygotowuje miejsce (`components/OrdlakMascot.tsx` wzorem `Mascot.tsx`,
-`OrdlakPose = "idle" | "thinking" | "happy"`).
+| Narzędzie | Co czyta | Źródło |
+|---|---|---|
+| `podsumowanie_sprzedazy` | zamówienia, przychód, kanały, topka produktów, przychód dzień po dniu | `OrderRepository` |
+| `niskie_stany` | pozycje na progu minimalnym lub poniżej | `InventoryService.get_shopping_list` |
+| `magazyn` | stan magazynowy, z opcjonalnym szukaniem po nazwie/SKU | `InventoryService.get_stock_overview` |
+| `prognoza_zapasow` | na ile dni starczy zapasu, wartość magazynu, produkty bez sprzedaży | `InventoryService.get_report` |
+| `ostatnie_zamowienia` | ostatnie zamówienia albo tylko czekające na wysyłkę | `OrderRepository` |
+| `zwroty` | ostatnie zwroty klientów | `ReturnsService` |
+| `kalendarz_sprzedazowy` | nadchodzące dni sprzedażowe i święta w Polsce | `domain/sales_calendar.py` |
+| `szukaj` | zamówienia po numerze, loginie kupującego albo nazwie produktu | `SearchService` |
+| `dyskusje` | lista dyskusji i reklamacji (na żywo z Allegro) | `IssuesService` |
+| `watek_dyskusji` | cała rozmowa jednej dyskusji, od najstarszej wiadomości | `IssuesService` |
+| `poczta` | maile od marketplace wykryte w skrzynce | `MailboxService` |
+| `kalkulator_ceny` | cena sprzedaży przy zadanej marży | `calculate_price` (Python) |
+| `stan_systemu` | synchronizacja, połączenie z Allegro, dzisiejsze liczby | `HealthService` + `DashboardService` |
 
-## 3. Model danych
+Asystent dostaje **gotowe serwisy, nie repozytoria** — ma widzieć
+dokładnie te same liczby co ekrany aplikacji (magazyn liczy podprodukty,
+prognoza ma swoje okno), a to jest wiedza serwisów.
 
-Nowa tabela w SQLite, wzorem istniejących modeli w
-`backend/src/app/database/models/`:
+Liczby zbiorcze (ile zamówień, za ile) idą z agregatów repozytorium i są
+dokładne. Rozbicie na kanały i topka produktów są liczone z próbki
+ostatnich 400 zamówień — narzędzie mówi o tym wprost w odpowiedzi, żeby
+model nie przedstawił próbki jako statystyki „ze wszech czasów".
 
-```python
-# database/models/ordlak_generation_model.py
-class OrdlakGenerationModel(Base):
-    __tablename__ = "ordlak_generations"
+Okresy: `dzis`, `wczoraj`, `7dni`, `30dni`, `biezacy_miesiac`. Dni liczone
+od północy UTC, tak samo jak `StatsService` i `DashboardService` — inaczej
+„dzisiaj" u asystenta znaczyłoby co innego niż „dzisiaj" na ekranie Start.
+Repozytorium umie tylko „od daty", więc zamknięty przedział (`wczoraj`)
+powstaje przez odjęcie dzisiejszego ogona.
 
-    id: Mapped[int] = mapped_column(primary_key=True)
-    created_at: Mapped[datetime]
+### Odpowiedzi na dyskusje
 
-    # input
-    user_note: Mapped[str]                  # notatka użytkownika
-    condition: Mapped[str]                  # "new" | "very_good" | "good" | "damaged"
-    purchase_cost: Mapped[float]            # PLN - koszt zakupu towaru
-    inbound_shipping_cost: Mapped[float]    # PLN - koszt sprowadzenia towaru do siebie (zakup)
-    buyer_shipping_cost: Mapped[float]      # PLN - koszt wysyłki DO KUPUJĄCEGO, wpisany przy wystawianiu oferty
-    commission_percent: Mapped[float]       # ręcznie wpisana prowizja Allegro, np. 10.0
-    target_margin_percent: Mapped[float]    # docelowa marża
-    photo_count: Mapped[int]                # ile zdjęć wysłano (same zdjęcia NIE są przechowywane w DB)
+Asystent czyta wątek (`watek_dyskusji`) i **proponuje** treść odpowiedzi -
+nigdy jej nie wysyła. Wysyła użytkownik, na ekranie Dyskusje. Sam tekst
+propozycji ma być ostatnim akapitem odpowiedzi, bez cudzysłowów
+i komentarza po nim, żeby dało się go skopiować jednym ruchem (przycisk
+**Kopiuj** pod każdą odpowiedzią).
 
-    # output (AI)
-    generated_title: Mapped[str]
-    generated_description_html: Mapped[str]
-    ai_condition_notes: Mapped[str | None]  # co AI zauważyło na zdjęciach
+### Cena: jedyna liczba spoza bazy
 
-    # output (kalkulacja, deterministyczna, nie AI)
-    suggested_price: Mapped[float]
+`calculate_price` w `ordlak_assistant_service.py` jest jedynym wyjątkiem od
+reguły „asystent tylko czyta bazę": liczba, której nie ma w żadnej tabeli,
+ale która musi być powtarzalna i audytowalna. Liczy ją Python, nigdy model
+- system prompt zabrania liczenia ceny w pamięci.
 
-    # edycja użytkownika (jeśli poprawił przed skopiowaniem)
-    final_title: Mapped[str | None]
-    final_description_html: Mapped[str | None]
-```
-
-**Zdjęcia nie są zapisywane trwale** — trafiają do promptu AI (base64, w
-pamięci) i są odrzucane po odpowiedzi. Historia trzyma tylko tekst i liczby,
-żeby nie rozdymać bazy i nie duplikować zdjęć, które i tak są już w
-Magazynie/na Allegro. Jeśli w przyszłości okaże się to niewystarczające
-(np. chęć podglądu zdjęć przy starej generacji), można dodać zapis na dysk
-— nie teraz.
-
-## 4. Kontrakt API
-
-`POST /api/ordlak/generate` — multipart/form-data (pola + do 3 plików):
+Wzór uwzględnia nieoczywistą regułę Allegro: prowizja naliczana jest od
+SUMY ceny i kosztu wysyłki pobranego od kupującego, nie od samej ceny.
 
 ```
-note: string                    # notatka użytkownika, wymagane
-condition: "new"|"very_good"|"good"|"damaged"
-purchase_cost: float
-inbound_shipping_cost: float    # koszt sprowadzenia towaru do siebie
-buyer_shipping_cost: float      # koszt wysyłki do kupującego (ustalany przy wystawianiu oferty)
-commission_percent: float
-target_margin_percent: float
-photos: File[] (0..3)           # jpg/png, walidacja rozmiaru (np. max 5 MB/szt.)
+P = (zakup + sprowadzenie + prowizja% * wysyłka_do_kupującego)
+    / (1 - prowizja% - marża%)
 ```
 
-Odpowiedź:
+To ten sam wzór, który miał usunięty generator ofert - został, bo jego
+wynik był realnie używany. Testy pilnują, że dla tych samych danych daje
+te same liczby co przedtem (57,00 zł przy zakupie 25 zł, prowizji 10%,
+marży 30%, sprowadzeniu 8 zł i wysyłce 12 zł).
 
-```json
-{
-  "id": 42,
-  "title": "...",
-  "title_below_target": false,
-  "description_html": "...",
-  "condition_notes": "krótka ocena stanu na podstawie zdjęć, albo null jeśli brak zdjęć",
-  "price_breakdown": {
-    "purchase_cost": 25.0,
-    "inbound_shipping_cost": 8.0,
-    "buyer_shipping_cost": 12.0,
-    "commission_percent": 10.0,
-    "target_margin_percent": 30.0,
-    "commission_amount": 6.9,
-    "suggested_price": 57.0
-  }
-}
+## 4. Kalendarz sprzedażowy ma bliźniaka
+
+`backend/src/app/domain/sales_calendar.py` powtarza dane z
+`desktop/src/renderer/src/lib/salesCalendar.ts` — ekran Kalendarz liczy je
+lokalnie w rendererze, a asystent odpowiada po stronie Pi i musi znać te
+daty bez pytania aplikacji. **Każde dodane lub zmienione wydarzenie trzeba
+nanieść w obu plikach**, inaczej Kalendarz i asystent zaczną mówić co
+innego o tym samym dniu.
+
+Uwaga na konwencję dnia tygodnia: TypeScript liczy od niedzieli
+(`Date.getDay()`), Python od poniedziałku (`date.weekday()`) — Black Friday
+to `weekday: 5` w TS i `weekday=4` w Pythonie.
+
+## 5. Kontrakt API
+
+`GET /api/v1/ordlak/status` → `{"configured": true, "model": "claude-sonnet-5"}`
+
+Ekran pyta o to przed pokazaniem pola tekstowego, żeby od razu powiedzieć
+„brak klucza na Pi" zamiast pozwolić napisać pytanie i dopiero wtedy
+pokazać błąd (ta sama zasada co przy `GET /api/v1/mail/status`).
+
+`POST /api/v1/ordlak/chat`
+
+```jsonc
+// żądanie - JEDNO pytanie; historia żyje w bazie na Pi
+{ "message": "Ile sprzedałem w tym tygodniu?", "conversation_id": 12 }
+
+// odpowiedź
+{ "conversation_id": 12, "reply": "W tym tygodniu…", "used_tools": ["podsumowanie_sprzedazy"] }
 ```
 
-`POST /api/ordlak/{id}/finalize` — zapisuje `final_title` /
-`final_description_html` po ręcznej edycji przez użytkownika (do historii;
-opcjonalne wywołanie, nie blokuje kopiowania).
+Pominięty `conversation_id` zakłada nowy wątek; jego tytuł powstaje
+z pierwszego pytania (do 60 znaków). Roli `system` nie da się przysłać
+z aplikacji — instrukcje asystenta ustala backend.
 
-`GET /api/ordlak/history` — lista poprzednich generacji (paginacja jak w
-innych list endpointach, np. `?limit=&offset=`).
+`GET /api/v1/ordlak/conversations` — lista wątków (bez treści),
+od ostatnio używanego.
+`GET /api/v1/ordlak/conversations/{id}` — jeden wątek z pełną historią.
+`DELETE /api/v1/ordlak/conversations/{id}` — usuwa wątek z wiadomościami.
 
-## 5. Kalkulacja ceny (deterministyczna, NIE przez AI)
+Kody błędów: `503` gdy brak `ANTHROPIC_API_KEY` na Pi, `404` gdy wskazany
+wątek nie istnieje, `422` gdy Anthropic odrzucił zapytanie albo model po
+`MAX_TOOL_ROUNDS` (6) rundach dalej tylko pytał o dane.
 
-**Ważne, zweryfikowane w źródłach (sekcja 5.1): Allegro nalicza prowizję od
-sumy ceny produktu I kosztu wysyłki pobranego od kupującego** — nie tylko
-od samej ceny. To rozróżnia dwa różne koszty transportu w tym module:
+### Zapisywanie rozmów
 
-- `purchase_cost` + `inbound_shipping_cost` — koszt zdobycia towaru (zakup
-  + jego sprowadzenie do siebie). Zwykły koszt własny, wchodzi wprost do
-  kalkulacji.
-- `buyer_shipping_cost` — koszt wysyłki, który **kupujący zapłaci przy
-  zakupie** (ustalany przy wystawianiu oferty). Od sumy `cena +
-  buyer_shipping_cost` Allegro liczy prowizję.
+Wątki i wiadomości leżą w tabelach `ordlak_conversations`
+i `ordlak_messages` (migracja `0010`). `used_tools` zapisujemy razem
+z odpowiedzią, a nie liczymy na nowo: wracając do wątku sprzed tygodnia
+trzeba widzieć narzędzia, które WTEDY dały tamte liczby.
 
-Wyprowadzenie: zysk netto (cena minus prowizja od `cena + wysyłka` minus
-koszty własne) ma równać się `target_margin_percent` liczonej od ceny
-sprzedaży `P`:
+Pytanie zapisuje się **przed** odpytaniem modelu - gdy Anthropic odmówi
+albo padnie sieć, użytkownik wraca do wątku i widzi, o co pytał, zamiast
+zastanawiać się, czy pytanie w ogóle wyszło.
 
-```
-P - commission% * (P + buyer_shipping_cost) - purchase_cost - inbound_shipping_cost = target_margin% * P
-```
+Do modelu leci tylko ostatnie `MAX_HISTORY_TURNS` (20) wypowiedzi wątku -
+dłuższa historia kosztowałaby przy KAŻDEJ kolejnej odpowiedzi, a raport
+i tak dotyczy ostatniego pytania.
 
-Po przekształceniu:
-
-```
-suggested_price = (purchase_cost + inbound_shipping_cost + commission_percent/100 * buyer_shipping_cost)
-                   / (1 - commission_percent/100 - target_margin_percent/100)
-
-commission_amount = commission_percent/100 * (suggested_price + buyer_shipping_cost)
-```
-
-Przykład: zakup 25 zł, sprowadzenie do siebie 8 zł, wysyłka do kupującego
-12 zł, prowizja 10%, marża docelowa 30% → `suggested_price = 57.0 zł`,
-`commission_amount = 6.9 zł`.
-
-Walidacja: `commission_percent + target_margin_percent` musi być < 100,
-inaczej mianownik wychodzi ≤ 0 — endpoint zwraca 422 z czytelnym
-komunikatem po polsku.
-
-Przeliczenie na żywo w UI (suwak marży) odbywa się **po stronie renderera**
-w JS — bez nowego zapytania do backendu/AI, bo to czysta matematyka.
-
-### 5.1 Źródło zasady o prowizji
-
-Potwierdzone w materiałach o cenniku Allegro 2026 (kalkulatory prowizji,
-poradniki sprzedażowe): prowizja od sprzedaży jest naliczana od łącznej
-kwoty transakcji — cena produktu plus opłata za dostawę pobrana od
-kupującego. Przykładowo: sprzedaż za 100 zł z dostawą 15 zł → prowizja
-liczona od 115 zł, nie od 100 zł. Stawka prowizji zależy od kategorii
-(zwykle 5–17%), stąd decyzja z sekcji 0: **wpisywana ręcznie przez
-użytkownika** przy każdej generacji, bez domyślnej wartości.
-
-## 6. Prompt / kontrakt z modelem AI
-
-Backend (`ordlak_service.py`) buduje jeden prompt do Claude Sonnet 5 (Anthropic
-Messages API, `tool_use` żeby wymusić strukturę JSON zamiast parsować wolny
-tekst):
-
-**Wejście do modelu:**
-- notatka użytkownika (tekst),
-- stan produktu (jedna z 4 wartości, przetłumaczona na opis po polsku dla
-  modelu),
-- do 3 zdjęć jako `image` content blocks (base64),
-- twarde ograniczenia opisane w 6.1/6.2 poniżej (zweryfikowane w
-  oficjalnych materiałach Allegro, zapisane też lokalnie w
-  [`backend/docs/allegro_regulamin/`](../backend/docs/allegro_regulamin/)).
-
-### 6.1 Zasady tytułu (wymuszone w promptcie i walidacji)
-
-Źródło: [`tytul-oferty.md`](../backend/docs/allegro_regulamin/tytul-oferty.md)
-(pobrane z oficjalnej pomocy Allegro + developer portalu, stan na
-2026-08-09).
-
-- **Twardy limit regulaminowy: 12–75 znaków, minimum 3 słowa.** (Limit
-  dolny obowiązuje od 7 maja 2025 — starsze poradniki mówiące tylko o
-  limicie 75 są nieaktualne w tym punkcie.)
-- **Cel produktowy Ordlaka: zawsze mierzyć w górną granicę, 74–75
-  znaków**, żeby wykorzystać maksimum miejsca na słowa kluczowe pod SEO
-  Allegro (algorytm indeksuje dokładnie to, co jest w tytule — im więcej
-  trafnych, realnych cech produktu w tytule, tym więcej fraz, na które
-  oferta może się wyświetlić). To nie oznacza upychania keywordów —
-  oznacza dopisywanie **kolejnych prawdziwych atrybutów produktu**
-  (marka, model, kolor, rozmiar, materiał, pojemność, przeznaczenie), aż
-  tytuł wypełni dostępne miejsce.
-- Tylko cechy dotyczące wystawianego produktu, najważniejsze słowa
-  kluczowe na początku, kolejne atrybuty dalej — aż do ~75 znaków.
-- Zakaz: powtórzeń słów kluczowych (**wypełnianie długości przez
-  powtarzanie tego samego słowa jest zakazane** — trzeba dodawać nowe,
-  różne, prawdziwe atrybuty), fraz o obniżkach ("tanio", "najtaniej"),
-  słów "okazja"/"nowość"/"promocja"/"hit", informacji o wysyłce/odbiorze
-  osobistym/fakturach/loginie/mieście, numerów magazynowych, znaków
-  specjalnych jako ozdobników (`@ ! [ ]`), nazw marek niezwiązanych z
-  produktem, CAPS LOCKA.
-- **Walidacja backendu (`ordlak_service.py`):**
-  - poza twardym zakresem 12–75 znaków → odrzucone, błąd zamiast
-    wysyłania dalej (regulaminowe minimum);
-  - **poniżej 65 znaków** (czyli wyraźnie poniżej celu 74–75, choć wciąż
-    "legalne") → backend automatycznie ponawia zapytanie do modelu **raz**
-    z dopiskiem w promptcie "tytuł za krótki, dodaj więcej prawdziwych
-    atrybutów produktu, docelowo 74–75 znaków"; jeśli druga próba wciąż
-    jest poniżej 65, zwracany jest ten wynik (lepszy krótszy trafny tytuł
-    niż wymuszony bełkot) wraz z flagą `title_below_target: true` w
-    odpowiedzi, żeby UI mogło to zasygnalizować użytkownikowi zamiast
-    cichego niedociągnięcia.
-
-### 6.2 Zasady opisu (wymuszone w promptcie)
-
-Źródło: [`opis-oferty.md`](../backend/docs/allegro_regulamin/opis-oferty.md)
-(pobrane z oficjalnej pomocy Allegro + regulaminu, stan na 2026-08-09).
-
-Opis ma się skupiać **wyłącznie na cechach i stanie produktu**. Zakaz:
-- danych kontaktowych (telefon, e-mail, numer konta),
-- zachęt do kontaktu/zakupu poza Allegro (np. "napisz prywatnie", "kontakt
-  na priv"),
-- fraz reklamowych/marketingowych ("gratis", "tanio", "promocja", "hit",
-  "prezent"),
-- **wzmianek o wysyłce, dostawie, czasie realizacji, kosztach transportu,
-  odbiorze osobistym** — to należy do dedykowanych pól oferty (czas
-  wysyłki, cennik dostawy w formularzu Allegro), nie do opisu produktu,
-- linków,
-- informacji o innych ofertach sprzedawcy, gwarancji, warunkach
-  niezwiązanych z samym przedmiotem.
-
-**Narzędzie (tool) definiujące wymagany output:**
-
-```json
-{
-  "name": "submit_offer_draft",
-  "input_schema": {
-    "type": "object",
-    "required": ["title", "description_html", "condition_notes"],
-    "properties": {
-      "title": {
-        "type": "string",
-        "minLength": 12,
-        "maxLength": 75,
-        "description": "Cel: 74-75 znakow (maksymalne wykorzystanie miejsca pod SEO), zawsze prawdziwe atrybuty produktu, nigdy powtorzenia slow"
-      },
-      "description_html": {"type": "string"},
-      "condition_notes": {"type": "string"}
-    }
-  }
-}
-```
-
-Cena **nigdy** nie wychodzi z modelu — nawet jeśli model coś zasugeruje w
-tekście, backend to ignoruje i liczy sam (sekcja 5). To świadoma decyzja:
-kalkulacja ma być przewidywalna i audytowalna, nie "zgadywana" przez LLM.
-
-**Regeneracja bez uwag**: przycisk "Generuj ponownie" po prostu wywołuje
-endpoint jeszcze raz z tymi samymi danymi wejściowymi (model i tak da inny
-wariant przy ponownym zapytaniu). Nie ma osobnego trybu "popraw z uwagami"
-w V1 — user edytuje wynik ręcznie w polach (patrz sekcja 0).
-
-## 7. UI — ekran "Ordlak" (Sidebar)
-
-Wzorem istniejących ekranów (`ZamowieniaScreen.tsx`, `MagazynScreen.tsx`):
-
-**Panel wejściowy (lewa/górna część):**
-- Textarea: notatka o produkcie.
-- Dropzone/upload: do 3 zdjęć, miniatury z możliwością usunięcia,
-  licznik "2/3".
-- Select: stan produktu (Nowy / Bardzo dobry / Dobry / Uszkodzony).
-- Input: koszt zakupu (PLN).
-- Input: koszt sprowadzenia towaru do siebie (PLN), domyślnie 0.
-- Input: koszt wysyłki do kupującego (PLN) — ta wartość, którą sprzedający
-  ustawi w formularzu Allegro; potrzebna, bo **od niej też liczy się
-  prowizja** (sekcja 5). Domyślnie 0 (np. "darmowa dostawa wliczona w
-  cenę").
-- Input: prowizja Allegro (%), bez domyślnej wartości — użytkownik wpisuje
-  świadomie za każdym razem (żeby nie wystawić po błędnej stawce).
-- Suwak/input: docelowa marża (%), domyślnie np. 30%.
-- Przycisk "Generuj ofertę" (disabled dopóki notatka + koszt zakupu nie są
-  wypełnione; zdjęcia opcjonalne, ale UI zachęca "dodaj zdjęcie dla
-  lepszego opisu").
-
-**Panel wyniku (prawa/dolna część), po wygenerowaniu:**
-- OrdlakMascot w pozie "thinking" podczas requestu → "happy" po sukcesie.
-- Pole tytułu: **edytowalne**, licznik znaków (X/75) kolorowany wg strefy:
-  czerwony <12 lub >75 (regulaminowy błąd), żółty 12–64 (poniżej celu
-  SEO), zielony 65–75 (cel osiągnięty); jeśli `title_below_target: true`,
-  dyskretna podpowiedź "dodaj więcej atrybutów produktu, żeby wykorzystać
-  limit znaków". Przycisk "Kopiuj".
-- Pole opisu: **edytowalne** (textarea z podglądem HTML obok albo pod
-  spodem), przycisk "Kopiuj".
-- Notatka AI o stanie produktu (`condition_notes`) — tylko do odczytu, info
-  pomocnicze.
-- Karta ceny: rozbicie koszt zakupu + sprowadzenie + wysyłka do kupującego
-  + prowizja (liczona od ceny + wysyłki!) + marża → cena sugerowana, z
-  suwakiem marży przeliczającym na żywo.
-- Przycisk "Generuj ponownie".
-
-**Historia** (dół ekranu lub osobna zakładka): lista poprzednich generacji
-(tytuł, data, cena), klik = podgląd read-only starego wyniku.
-
-## 8. Konfiguracja (`.env`)
-
-Wzorem istniejących sekcji w `backend/.env.example`:
+## 6. Konfiguracja (`.env`)
 
 ```
-# ============================================
-# ORDLAK - generator ofert AI (Anthropic API)
-# ============================================
-# WAŻNE: to NIE jest subskrypcja Claude Pro/Claude Code - osobny klucz
-# API z billingiem per-użycie, wygenerowany na console.anthropic.com.
-# Bez tego klucza ekran Ordlak zwróci czytelny błąd zamiast próby wywołania AI.
 ANTHROPIC_API_KEY=
 ANTHROPIC_MODEL=claude-sonnet-5
-# Maks. rozmiar pojedynczego zdjęcia wysyłanego do AI (większe są odrzucane
-# z czytelnym błędem zamiast próby wysyłki).
-ORDLAK_MAX_PHOTO_SIZE_MB=5
 ```
 
-## 9. Architektura (rozmieszczenie w repo)
+**To NIE jest subskrypcja Claude Pro/Claude Code** — osobny klucz API
+z billingiem per-użycie z `console.anthropic.com`. Bez klucza ekran działa
+i mówi o tym wprost, a `POST /ordlak/chat` zwraca 503.
 
-```
-backend/src/app/
-  services/ordlak_service.py               # prompt, wywołanie Anthropic API, kalkulacja ceny
-  api/endpoints/ordlak.py                  # POST /generate, POST /{id}/finalize, GET /history
-  api/schemas.py                           # + OrdlakGenerateRequest/Response, OrdlakHistoryItem
-  database/models/ordlak_generation_model.py
-  repositories/sqlite_ordlak_repository.py
-  domain/entities/ordlak_generation.py
-  core/config.py                           # + anthropic_api_key, anthropic_model, ordlak_max_photo_size_mb
-  container.py                             # spina OrdlakService z repo + config
+Model domyślny `claude-sonnet-5` to decyzja produktowa, nie przypadek.
 
-desktop/src/
-  main/ipc/ordlak.ts                       # IPC: generate, finalize, history
-  main/lib/apiClient.ts                    # + metody ordlak.*
-  preload/index.ts                         # + bridge.ordlak
-  types/ordly-bridge.d.ts                  # + typy Ordlak
-  renderer/src/screens/OrdlakScreen.tsx
-  renderer/src/components/OrdlakMascot.tsx
-  renderer/src/components/Sidebar.tsx      # + nowa pozycja menu "Ordlak"
-  renderer/src/assets/mascot_ordlak_idle.png
-  renderer/src/assets/mascot_ordlak_thinking.png
-  renderer/src/assets/mascot_ordlak_happy.png
-
-backend/docs/allegro_regulamin/
-  tytul-oferty.md                          # zasady tytułu (limit 12-75 znaków, blacklista fraz) - już pobrane
-  opis-oferty.md                           # zasady opisu (zakaz reklamy/kontaktu/wzmianek o wysyłce) - już pobrane
-```
-
-Migracja Alembic dla nowej tabeli `ordlak_generations` — wzorem istniejących
-w `backend/alembic/versions/`.
-
-## 10. Poza zakresem V1 (świadomie odłożone)
-
-- Automatyczne wystawianie oferty na Allegro przez API (osobny, duży
-  projekt — parametry kategorii, warianty, stany magazynowe).
-- Automatyczne pobieranie stawek prowizji Allegro per kategoria (V1: ręczne
-  pole %).
-- Rozpoznawanie kategorii Allegro ze zdjęcia/opisu.
-- Tryb "popraw z uwagami" (regeneracja z instrukcją tekstową) — V1 ma tylko
-  ręczną edycję pól i zwykłą regenerację.
-- Zapis zdjęć w historii (tylko metadane liczbowe/tekstowe — sekcja 3).
-- Wielojęzyczne oferty (tylko PL).
-
-## 11. Kolejność budowy (proponowana)
-
-1. Backend: model + migracja + repo + serwis kalkulacji ceny (bez AI,
-   testowalne od razu) + testy jednostkowe wzoru z sekcji 5.
-2. Backend: integracja Anthropic API (klucz z configu, prompt, tool_use,
-   walidacja limitu 3 zdjęć / rozmiaru).
-3. Backend: endpointy REST + rejestracja w routerze.
-4. Desktop: IPC + apiClient + typy bridge.
-5. Desktop: `OrdlakScreen.tsx` — najpierw formularz + wywołanie + wynik
-   statyczny (bez edycji/historii), żeby zobaczyć end-to-end.
-6. Desktop: edytowalne pola + kopiowanie do schowka.
-7. Desktop: panel historii.
-8. Grafiki maskotki Ordlaka (dostarcza użytkownik) + `OrdlakMascot.tsx`.
-
-Wszystkie 8 etapów wykonane 2026-08-09.
-
-## 12. Stan wdrożenia (2026-08-09)
-
-### Co powstało
+## 7. Architektura (rozmieszczenie w repo)
 
 | Warstwa | Pliki |
 |---|---|
-| Domena | `domain/entities/ordlak_generation.py`, `domain/interfaces/ordlak_repository.py` |
-| Baza | `database/models/ordlak_generation_model.py`, migracja `alembic/versions/0007_create_ordlak_generations.py` |
-| Repozytorium | `repositories/sqlite_ordlak_repository.py` |
-| Serwis | `services/ordlak_service.py` (kalkulacja + Anthropic API) |
-| API | `api/endpoints/ordlak.py`, schematy w `api/schemas.py`, rejestracja w `api/router.py` |
-| Config | `OrdlakSettings` w `core/config.py`, sekcja w `.env.example` |
-| Desktop (main) | `main/ipc/ordlak.ts`, `apiUpload()` w `main/lib/apiClient.ts` |
-| Desktop (UI) | `renderer/src/screens/OrdlakScreen.tsx`, `components/OrdlakMascot.tsx`, `lib/ordlakPrice.ts`, `lib/sanitizeHtml.ts`, `SparkIcon` |
+| Domena | `domain/sales_calendar.py`, `domain/entities/ordlak_conversation.py`, `domain/interfaces/ordlak_conversation_repository.py` |
+| Baza | `database/models/ordlak_conversation_model.py`, migracja `0010_create_ordlak_conversations.py` |
+| Repozytorium | `repositories/sqlite_ordlak_conversation_repository.py` |
+| Serwis | `services/ordlak_assistant_service.py` (pętla narzędzi, klient Anthropic, kalkulator ceny) |
+| API | `api/endpoints/ordlak.py`, schematy w `api/schemas.py` |
+| Config | `OrdlakSettings` w `core/config.py` |
+| Desktop (main) | `desktop/src/main/ipc/ordlak.ts` (czat + zapis odpowiedzi do pliku) |
+| Desktop (UI) | `desktop/src/renderer/src/screens/OrdlakScreen.tsx`, `components/OrdlakMascot.tsx`, `SparkIcon` |
+| Testy | `tests/unit/services/test_ordlak_assistant_service.py`, `tests/unit/domain/test_sales_calendar.py`, `tests/integration/api/test_ordlak_endpoints.py`, `tests/integration/repositories/test_sqlite_ordlak_conversation_repository.py`, `tests/fakes/fake_anthropic.py`, `tests/fakes/fake_ordlak_conversation_repository.py` |
 
-Endpointy (wszystkie za `require_api_token`):
-`GET /api/v1/ordlak/status`, `POST /api/v1/ordlak/generate` (multipart),
-`GET /api/v1/ordlak/history`, `POST /api/v1/ordlak/{id}/finalize`.
+## 8. Wdrożenie
 
-### Odstępstwa od specyfikacji (świadome)
+`git pull` + **`alembic upgrade head`** (migracja `0010` - tabele rozmów)
++ `sudo systemctl restart ordly`. Żadnych nowych zależności, `.env` bez
+zmian — asystent chodzi na tym samym `ANTHROPIC_API_KEY`, co dawny
+generator.
 
-- **Dodano `GET /api/v1/ordlak/status`** (nie było w sekcji 4). Powód ten sam,
-  co przy skrzynce: bez tego ekran nie umiałby odróżnić „brak klucza na Pi"
-  od „coś się zepsuło", a użytkownik dowiadywałby się o braku konfiguracji
-  dopiero po wypełnieniu całego formularza.
-- **Prefiks `/api/v1/`** zamiast gołego `/api/ordlak/` z sekcji 4 — cała
-  reszta ORDLY API żyje pod `/api/v1`, a token (`require_api_token`) jest
-  podpięty do tego routera.
-- **Bez `strict: true` na narzędziu** `submit_offer_draft`. Structured
-  outputs nie wspiera `minLength`/`maxLength`, a te są w schemacie z sekcji
-  6.2 — limity pilnuje walidacja w `ordlak_service.validate_title()`, tak jak
-  wymaga sekcja 6.1.
-- **Nowe zależności backendu:** `anthropic` (SDK) i `python-multipart`
-  (FastAPI wymaga jej do `Form`/`UploadFile`). Wymagają `uv sync` na Pi.
+## 9. Poza zakresem (świadomie odłożone)
 
-### Wdrożenie na Pi
-
-Konieczne kroki poza `git pull`: `uv sync` (nowe zależności),
-`alembic upgrade head` (tabela `ordlak_generations`) i wpisanie
-`ANTHROPIC_API_KEY` w `~/ordly/backend/.env`. Bez klucza ekran Ordlaka
-działa i pokazuje czytelny komunikat, ale generowanie zwraca 503.
+- **Asystent w aplikacji mobilnej.** Czat na telefonie to osobny ekran do
+  zaprojektowania; backend jest gotowy i nie wymaga zmian.
+- **Akcje zapisujące** — patrz sekcja 2.
+- **Powiadomienia z własnej inicjatywy** (poranny briefing, alert przed
+  brakiem). Świadoma decyzja użytkownika: Ordlak odzywa się wyłącznie
+  wtedy, gdy się go zapyta.
