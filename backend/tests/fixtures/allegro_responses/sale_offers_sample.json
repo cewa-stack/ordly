@@ -1,0 +1,56 @@
+{
+  "offers": [
+    {
+      "id": "12345678901",
+      "name": "Butelka szklana 60 ml oranżowa z kroplomierzem",
+      "category": { "id": "260049" },
+      "primaryImage": { "url": "https://a.allegroimg.com/original/11aabb/butelka60" },
+      "sellingMode": {
+        "format": "BUY_NOW",
+        "price": { "amount": "12.90", "currency": "PLN" }
+      },
+      "saleInfo": { "currentPrice": { "amount": "12.90", "currency": "PLN" } },
+      "stock": { "available": 48, "sold": 152 },
+      "stats": { "watchersCount": 7, "visitsCount": 940 },
+      "publication": {
+        "status": "ACTIVE",
+        "startingAt": "2026-01-04T09:00:00Z",
+        "endingAt": null,
+        "marketplaces": ["allegro-pl"]
+      },
+      "external": { "id": "BUT60-ORA" },
+      "b2b": { "buyableOnlyByBusiness": false },
+      "delivery": { "shippingRates": { "id": "8a2b1c3d" } }
+    },
+    {
+      "id": "22222222222",
+      "name": "Nakrętka czarna 18 mm do butelek aptecznych",
+      "category": { "id": "260049" },
+      "primaryImage": { "url": "https://a.allegroimg.com/original/22ccdd/nakretka18" },
+      "sellingMode": {
+        "format": "BUY_NOW",
+        "price": { "amount": "0.80", "currency": "PLN" }
+      },
+      "stock": { "available": 310, "sold": 41 },
+      "publication": {
+        "status": "ACTIVE",
+        "startingAt": "2026-02-11T11:30:00Z",
+        "endingAt": null,
+        "marketplaces": ["allegro-pl"]
+      },
+      "external": { "id": "" }
+    },
+    {
+      "id": "33333333333",
+      "name": "Zestaw startowy - butelka 30 ml + kroplomierz + nakrętka",
+      "sellingMode": {
+        "format": "BUY_NOW",
+        "price": { "amount": "24.50", "currency": "PLN" }
+      },
+      "stock": { "available": 0, "sold": 88 },
+      "publication": { "status": "ENDED" }
+    }
+  ],
+  "count": 3,
+  "totalCount": 3
+}

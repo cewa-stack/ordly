@@ -10,6 +10,7 @@ from app.database.models.event_model import EventModel
 from app.database.models.inventory_item_model import InventoryItemModel
 from app.database.models.inventory_movement_model import InventoryMovementModel
 from app.database.models.mail_message_model import MailMessageModel
+from app.database.models.marketplace_offer_model import MarketplaceOfferModel
 from app.database.models.offer_link_model import OfferLinkModel
 from app.database.models.order_model import OrderModel
 from app.database.models.ordlak_conversation_model import (
@@ -31,6 +32,7 @@ __all__ = [
     "InventoryItemModel",
     "InventoryMovementModel",
     "MailMessageModel",
+    "MarketplaceOfferModel",
     "OfferLinkModel",
     "OrdlakConversationModel",
     "OrdlakMessageModel",

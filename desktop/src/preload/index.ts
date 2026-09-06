@@ -26,6 +26,12 @@ const ordly = {
     setParent: (sku: string, parentSku: string | null) =>
       ipcRenderer.invoke("ordly:stock:setParent", sku, parentSku),
     recipes: () => ipcRenderer.invoke("ordly:stock:recipes"),
+    catalog: (onlyUnlinked?: boolean) =>
+      ipcRenderer.invoke("ordly:stock:catalog", onlyUnlinked),
+    syncCatalog: () => ipcRenderer.invoke("ordly:stock:syncCatalog"),
+    relinkCatalog: () => ipcRenderer.invoke("ordly:stock:relinkCatalog"),
+    importOffers: (externalIds: string[]) =>
+      ipcRenderer.invoke("ordly:stock:importOffers", externalIds),
     unmappedOffers: () => ipcRenderer.invoke("ordly:stock:unmappedOffers"),
     setRecipe: (
       offer: { marketplace: string; externalProductId: string },

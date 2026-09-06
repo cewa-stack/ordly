@@ -34,7 +34,8 @@ import type {
   UnmappedOffer,
 } from "../types/api";
 
-interface OfferTarget {
+/** Oferta otwarta w edytorze receptury (z widoku powiązań lub katalogu). */
+export interface OfferTarget {
   marketplace: string;
   externalProductId: string;
   offerName: string | null;
@@ -51,7 +52,7 @@ function toRef(target: OfferTarget | OfferRecipe | UnmappedOffer): OfferRef {
 
 // ------------------------------------------------------------ Edytor receptury
 
-function RecipeModal({
+export function RecipeModal({
   target,
   stock,
   onClose,

@@ -13,6 +13,7 @@ from typing import Any
 
 from app.domain.entities.customer import Customer
 from app.domain.entities.issue import Issue, IssueMessage
+from app.domain.entities.marketplace_offer import MarketplaceOffer
 from app.domain.entities.order import Order
 from app.domain.entities.order_return import OrderReturn
 from app.domain.entities.product import Product
@@ -248,3 +249,41 @@ def _parse_datetime(value: str | None) -> datetime:
     if parsed.tzinfo is not None:
         parsed = parsed.astimezone(UTC).replace(tzinfo=None)
     return parsed
+
+
+def map_offer_to_domain(
+    raw: dict[str, Any], marketplace: str, synced_at: datetime
+) -> MarketplaceOffer:
+    """
+    Mapuje jedną ofertę z GET /sale/offers na encję katalogu.
+
+    Args:
+        raw: Surowy słownik jednej oferty z listy `offers`.
+        marketplace: Kod marketplace, do którego należy oferta.
+        synced_at: Znacznik tej synchronizacji, wspólny dla całej strony.
+
+    Returns:
+        Encja domenowa MarketplaceOffer.
+
+    `external.id` to "sygnatura" - pole, w które sprzedawca wpisuje
+    własne oznaczenie towaru. Allegro pozwala je zostawić puste, więc
+    pusty string sprowadzamy do None: automatyczne dopasowanie po
+    sygnaturze nie może uznać, że dwie oferty bez sygnatury to ten sam
+    produkt magazynowy.
+    """
+    signature = (raw.get("external") or {}).get("id") or None
+    stock = raw.get("stock") or {}
+    price_raw = ((raw.get("sellingMode") or {}).get("price") or {}).get("amount")
+
+    return MarketplaceOffer(
+        marketplace=marketplace,
+        external_id=str(raw.get("id", "")),
+        name=raw.get("name") or "oferta bez nazwy",
+        signature=signature,
+        status=(raw.get("publication") or {}).get("status") or "ACTIVE",
+        available_stock=int(stock.get("available") or 0),
+        sold_count=int(stock.get("sold") or 0),
+        price=Decimal(str(price_raw)) if price_raw is not None else None,
+        image_url=(raw.get("primaryImage") or {}).get("url"),
+        synced_at=synced_at,
+    )

@@ -8,15 +8,14 @@ i mapper.py w jedną spójną całość zgodną z kontraktem domenowym.
 from __future__ import annotations
 
 from datetime import timedelta
-from decimal import Decimal
 
 from loguru import logger
 
 from app.domain.entities.customer import Customer
 from app.domain.entities.issue import Issue, IssueMessage
+from app.domain.entities.marketplace_offer import MarketplaceOffer
 from app.domain.entities.order import Order
 from app.domain.entities.order_return import OrderReturn
-from app.domain.entities.product import Product
 from app.domain.entities.shipment import Shipment
 from app.domain.exceptions.domain_exceptions import TokenExpiredError
 from app.domain.interfaces.marketplace_plugin import MarketplacePlugin
@@ -33,6 +32,7 @@ from app.infrastructure.plugins.allegro.mapper import (
     map_customer_return_to_domain,
     map_issue_message_to_domain,
     map_issue_to_domain,
+    map_offer_to_domain,
     map_shipments_list_to_domain,
 )
 from app.utils.time import utc_now
@@ -45,6 +45,13 @@ _TOKEN_REFRESH_MARGIN = timedelta(minutes=5)
 # oraz /order/customer-returns (potwierdzone w oficjalnym swagger.yaml -
 # oznaczone tam "[BETA]"), stąd 406 Not Acceptable przy domyślnym public.v1.
 _BETA_ACCEPT_HEADER = "application/vnd.allegro.beta.v1+json"
+
+# `GET /sale/offers` przyjmuje limit do 1000, ale strony po 100 są
+# odporniejsze na timeouty przy wolnym łączu Pi, a asortyment i tak
+# schodzi w kilku żądaniach. `_OFFERS_MAX_TOTAL` to bezpiecznik: bez
+# niego błąd stronicowania po stronie API zapętliłby synchronizację.
+_OFFERS_PAGE_SIZE = 100
+_OFFERS_MAX_TOTAL = 10_000
 
 
 class AllegroPlugin(MarketplacePlugin):
@@ -256,23 +263,44 @@ class AllegroPlugin(MarketplacePlugin):
             json_body={"status": status},
         )
 
-    async def get_products(self) -> list[Product]:
-        """Pobiera listę ofert (produktów) sprzedawcy."""
+    async def get_offers(self) -> list[MarketplaceOffer]:
+        """
+        Pobiera cały asortyment sprzedawcy z `GET /sale/offers`.
+
+        Allegro stronicuje tę listę i oddaje maksymalnie `_OFFERS_PAGE_SIZE`
+        pozycji naraz, więc jedno zapytanie wystarcza tylko sprzedawcy
+        z krótkim asortymentem. Pętla chodzi po `offset`, aż zbierze
+        `totalCount` pozycji albo aż strona wróci pusta - ten drugi
+        warunek jest zabezpieczeniem przed pętlą nieskończoną, gdyby
+        `totalCount` skłamał lub oferta zniknęła w trakcie chodzenia
+        po stronach.
+        """
         access_token = await self._get_valid_access_token()
-        response = await self._api_client.get(
-            "/sale/offers", access_token, params={"limit": "100"}
-        )
-        return [
-            Product(
-                external_id=item.get("id", ""),
-                name=item.get("name", "nieznany produkt"),
-                quantity=int(item.get("stock", {}).get("available", 0)),
-                unit_price=Decimal(
-                    str(item.get("sellingMode", {}).get("price", {}).get("amount", "0.00"))
-                ),
+        synced_at = utc_now()
+
+        offers: list[MarketplaceOffer] = []
+        offset = 0
+        while offset < _OFFERS_MAX_TOTAL:
+            response = await self._api_client.get(
+                "/sale/offers",
+                access_token,
+                params={"limit": str(_OFFERS_PAGE_SIZE), "offset": str(offset)},
             )
-            for item in response.get("offers", [])
-        ]
+            page = response.get("offers", [])
+            if not page:
+                break
+
+            offers.extend(
+                map_offer_to_domain(item, self.marketplace_code, synced_at) for item in page
+            )
+
+            total = int(response.get("totalCount", 0))
+            offset += len(page)
+            if total and offset >= total:
+                break
+
+        logger.info("Pobrano {} ofert z Allegro", len(offers))
+        return offers
 
     async def get_customer(self, external_id: str) -> Customer:
         """

@@ -4,9 +4,9 @@ from __future__ import annotations
 
 from app.domain.entities.customer import Customer
 from app.domain.entities.issue import Issue, IssueMessage
+from app.domain.entities.marketplace_offer import MarketplaceOffer
 from app.domain.entities.order import Order
 from app.domain.entities.order_return import OrderReturn
-from app.domain.entities.product import Product
 from app.domain.entities.shipment import Shipment
 from app.domain.interfaces.marketplace_plugin import MarketplacePlugin
 from app.infrastructure.plugins.allegro.exceptions import AllegroApiError
@@ -25,6 +25,8 @@ class FakeMarketplacePlugin(MarketplacePlugin):
         self.issue_messages_to_return: list[IssueMessage] = []
         self.reply_calls: list[tuple[str, str]] = []
         self.fulfillment_calls: list[tuple[str, str]] = []
+        self.offers: list[MarketplaceOffer] = []
+        self.should_raise_offers_api_error: bool = False
         self.should_raise_fulfillment_api_error: bool = False
         self.should_raise_api_error: bool = False
         self.should_raise_returns_api_error: bool = False
@@ -90,8 +92,10 @@ class FakeMarketplacePlugin(MarketplacePlugin):
     async def get_all_trackings(self, external_id: str) -> list[Shipment]:
         return [await self.get_tracking(external_id)]
 
-    async def get_products(self) -> list[Product]:
-        return []
+    async def get_offers(self) -> list[MarketplaceOffer]:
+        if self.should_raise_offers_api_error:
+            raise AllegroApiError(503, "Allegro niedostępne")
+        return list(self.offers)
 
     async def get_customer(self, external_id: str) -> Customer:
         order = await self.get_order(external_id)

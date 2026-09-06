@@ -306,6 +306,45 @@ export interface UnmappedOffer {
   last_sold_at: string;
 }
 
+/**
+ * Sposób, w jaki oferta trafia w magazyn.
+ *
+ * `recipe` i `sku` naprawdę zdejmują stan. `signature` to sama
+ * podpowiedź - sygnatura oferty pasuje do istniejącego SKU, ale
+ * receptury jeszcze nie ma, więc sprzedaż nadal przechodzi obok
+ * magazynu. `none` to oferta bez żadnego powiązania.
+ */
+export type OfferLinkType = "recipe" | "sku" | "signature" | "none";
+
+export interface CatalogOffer {
+  marketplace: string;
+  external_id: string;
+  name: string;
+  signature: string | null;
+  status: string;
+  available_stock: number;
+  sold_count: number;
+  price: number | null;
+  image_url: string | null;
+  link_type: OfferLinkType;
+  is_linked: boolean;
+  components: RecipeComponent[];
+}
+
+export interface CatalogSyncResult {
+  marketplace: string;
+  fetched: number;
+  auto_linked: number;
+  unlinked: number;
+  synced_at: string;
+}
+
+export interface OfferImportResult {
+  created: string[];
+  linked: string[];
+  skipped: { external_id: string; reason: string }[];
+}
+
 export interface OfferRecipePayload {
   components: { sku: string; quantity: number }[];
 }
