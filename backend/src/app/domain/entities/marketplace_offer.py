@@ -6,10 +6,18 @@ from dataclasses import dataclass
 from datetime import datetime
 from decimal import Decimal
 
-#: Statusy publikacji, w których oferta może jeszcze zebrać zamówienie.
-#: `ENDED` zostaje w katalogu, bo sprzedaż sprzed zakończenia nadal
-#: wymaga receptury do korekty wstecznej.
-ACTIVE_STATUSES = frozenset({"ACTIVE", "ACTIVATING"})
+#: Statusy publikacji, w których oferta może jeszcze zebrać zamówienie -
+#: i jedyne, jakie trafiają do katalogu.
+#:
+#: `ACTIVATING` jest tu razem z `ACTIVE` celowo: to oferta w trakcie
+#: wystawiania, która za chwilę zacznie sprzedawać. Pominięcie jej
+#: cofnęłoby nas do problemu, który katalog rozwiązuje - powiązanie
+#: dałoby się zrobić dopiero po pierwszej sprzedaży, czyli po tej, która
+#: magazynu nie ruszyła.
+#:
+#: Krotka, nie zbiór, bo kolejność trafia wprost do query stringa
+#: zapytania do Allegro i ma być powtarzalna.
+ACTIVE_STATUSES: tuple[str, ...] = ("ACTIVE", "ACTIVATING")
 
 
 @dataclass(frozen=True, slots=True)
@@ -37,8 +45,3 @@ class MarketplaceOffer:
     price: Decimal | None = None
     image_url: str | None = None
     synced_at: datetime | None = None
-
-    @property
-    def is_active(self) -> bool:
-        """Mówi, czy oferta jest opublikowana i może jeszcze sprzedawać."""
-        return self.status in ACTIVE_STATUSES
