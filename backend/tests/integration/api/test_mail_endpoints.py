@@ -174,3 +174,34 @@ class TestGetMailBody:
             ).status_code
             == 204
         )
+
+    def test_message_id_z_ukosnikiem_dociera_bez_zmian(self):
+        """
+        Ukośnik w Message-ID jest legalny (`<abc/def@host>`), a w URL-u
+        staje się `%2F`, które serwer ASGI dekoduje PRZED dopasowaniem
+        trasy. Przy zwykłym `{message_id}` taka wiadomość rozpadała się
+        na dwa segmenty ścieżki, nie trafiała w żadną trasę i spadała do
+        plików statycznych - podgląd treści kończył się wtedy na 404,
+        a oznaczenie jako przeczytanej na 405.
+        """
+        message_id = "<CAF=q1/r2+s3@mail.allegro.pl>"
+        watcher = _StubWatcher(bodies=MailBodies(html=None, text="tresc"))
+        received: list[str] = []
+
+        original = watcher.fetch_bodies_by_message_id
+
+        async def spy(message_id: str):
+            received.append(message_id)
+            return await original(message_id)
+
+        watcher.fetch_bodies_by_message_id = spy  # type: ignore[method-assign]
+
+        for test_client in _client(_StubContainer(watcher)):
+            response = test_client.get(_body_url(message_id))
+            assert response.status_code == 200
+            assert received == [message_id]
+
+            marked = test_client.post(
+                f"/api/v1/mail/messages/{quote(message_id, safe='')}/mark-read"
+            )
+            assert marked.status_code == 204

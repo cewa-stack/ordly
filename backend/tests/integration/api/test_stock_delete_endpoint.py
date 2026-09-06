@@ -44,9 +44,7 @@ def container() -> _StubContainer:
         ("NAK10", "Nakrętka 10 ml"),
         ("KARTON", "Karton zbiorczy"),
     ]:
-        stub.inventory.items[sku] = InventoryItem(
-            sku=sku, name=name, stock=120, min_stock=50
-        )
+        stub.inventory.items[sku] = InventoryItem(sku=sku, name=name, stock=120, min_stock=50)
     return stub
 
 
@@ -81,9 +79,7 @@ class TestUsuwaniePozycji:
 
         assert skus == ["KARTON", "NAK10"]
 
-    def test_podsumowanie_wymienia_odwiazane_podprodukty(
-        self, client: TestClient
-    ) -> None:
+    def test_podsumowanie_wymienia_odwiazane_podprodukty(self, client: TestClient) -> None:
         client.put("/api/v1/stock/NAK10/parent", json={"parent_sku": "BUT10"})
 
         response = client.delete("/api/v1/stock/BUT10")

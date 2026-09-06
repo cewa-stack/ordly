@@ -1,4 +1,15 @@
-"""Endpointy HTTP /api/v1/mail/* - wysyłka do hurtowni (SMTP) i skrzynka (IMAP)."""
+"""
+Endpointy HTTP /api/v1/mail/* - wysyłka do hurtowni (SMTP) i skrzynka (IMAP).
+
+`{message_id:path}` zamiast `{message_id}` z tego samego powodu co
+w `stock.py`: identyfikator wiadomości to surowy nagłówek `Message-ID`,
+a w nim wolno stać ukośnikowi. Serwer ASGI dekoduje `%2F` przed
+dopasowaniem trasy, więc taka wiadomość nie trafiłaby w żadną trasę
+i spadła do `StaticFiles("/")` - z odpowiedzią „404" na podgląd treści
+i „405 Method Not Allowed" na oznaczenie jako przeczytanej. Obie trasy
+kończą się literałem (`/body`, `/mark-read`), więc `.*` niczego tu nie
+połyka i kolejność deklaracji może zostać bez zmian.
+"""
 
 from __future__ import annotations
 
@@ -103,7 +114,7 @@ async def sync_mailbox(
     return MailSyncResultOut(new_count=len(saved), configured=True)
 
 
-@router.get("/mail/messages/{message_id}/body", response_model=MailBodyOut)
+@router.get("/mail/messages/{message_id:path}/body", response_model=MailBodyOut)
 async def get_mail_message_body(
     container: Annotated[Container, Depends(get_container)],
     session: Annotated[AsyncSession, Depends(get_session)],
@@ -125,7 +136,9 @@ async def get_mail_message_body(
     return mail_body_out(bodies)
 
 
-@router.post("/mail/messages/{message_id}/mark-read", status_code=204, response_model=None)
+@router.post(
+    "/mail/messages/{message_id:path}/mark-read", status_code=204, response_model=None
+)
 async def mark_mail_message_read(
     container: Annotated[Container, Depends(get_container)],
     session: Annotated[AsyncSession, Depends(get_session)],
