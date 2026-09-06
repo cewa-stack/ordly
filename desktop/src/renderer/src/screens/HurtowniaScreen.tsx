@@ -5,6 +5,10 @@
  * Koncepcja pokazuje na karcie "czas dostawy" - ORDLY tego nie ma
  * w danych, wiec zamiast wymyslonej liczby dni karta pokazuje realny
  * fakt: ile powiazanych produktow jest teraz ponizej progu.
+ *
+ * Licznik "ponizej progu" NIE jest warunkiem wyslania maila - to tylko
+ * informacja. Zamowienie da sie napisac zawsze, bo do hurtowni pisze sie
+ * tez wtedy, gdy magazyn jest pelny.
  */
 import * as React from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
@@ -110,7 +114,8 @@ function WholesalerFormModal({
             className={`${inputClass} o-mono`}
           />
           <span className="text-[11px] text-slate-dim">
-            Na tej podstawie ORDLY wypełnia zamówienie produktami poniżej progu.
+            To asortyment tej hurtowni. Pozycje poniżej progu ORDLY zaznaczy w mailu
+            sam, resztę dodasz jednym kliknięciem.
           </span>
         </label>
       </div>
@@ -153,13 +158,50 @@ export function HurtowniaScreen() {
     },
   });
 
-  const lowStock = (stockQuery.data ?? []).filter((item) => item.is_low_stock);
+  const stock = React.useMemo(() => stockQuery.data ?? [], [stockQuery.data]);
 
-  /** Produkty ponizej progu powiazane z dana hurtownia (albo wszystkie, gdy brak powiazan). */
-  function itemsFor(wholesaler: Wholesaler): StockItem[] {
-    if (wholesaler.linkedSkus.length === 0) return lowStock;
-    return lowStock.filter((item) => wholesaler.linkedSkus.includes(item.sku));
+  /**
+   * Asortyment hurtowni: produkty powiazane z nia przez SKU. Bez powiazan
+   * hurtownia nie ma wlasnego asortymentu, wiec kandydatami sa wszystkie
+   * pozycje magazynu - uzytkownik zaznacza w mailu to, czego potrzebuje.
+   *
+   * Ponizej progu na gorze listy, bo to one sa powodem zamowienia.
+   */
+  function catalogFor(wholesaler: Wholesaler): StockItem[] {
+    const pool =
+      wholesaler.linkedSkus.length === 0
+        ? stock
+        : stock.filter((item) => wholesaler.linkedSkus.includes(item.sku));
+    return [...pool].sort(
+      (a, b) =>
+        Number(b.is_low_stock) - Number(a.is_low_stock) || a.name.localeCompare(b.name, "pl")
+    );
   }
+
+  /** Produkty ponizej progu w asortymencie hurtowni - licznik na karcie. */
+  function lowStockFor(wholesaler: Wholesaler): StockItem[] {
+    return catalogFor(wholesaler).filter((item) => item.is_low_stock);
+  }
+
+  const orderingCatalog = React.useMemo(
+    () => (ordering ? catalogFor(ordering) : []),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [ordering, stock]
+  );
+
+  /**
+   * Co zaznaczyc od razu: braki. Gdy nic nie brakuje, a hurtownia ma jawnie
+   * powiazane SKU - zaznaczamy caly jej asortyment (to jest jej lista
+   * zakupowa). Przy braku powiazan pula to caly magazyn, wiec zaznaczanie
+   * wszystkiego byloby bez sensu i uzytkownik wybiera sam.
+   */
+  const orderingSelection = React.useMemo(() => {
+    if (!ordering) return [];
+    const low = orderingCatalog.filter((item) => item.is_low_stock);
+    if (low.length > 0) return low.map((item) => item.sku);
+    if (ordering.linkedSkus.length > 0) return orderingCatalog.map((item) => item.sku);
+    return [];
+  }, [ordering, orderingCatalog]);
 
   return (
     <div className="flex min-h-0 flex-1 flex-col gap-3.5 overflow-y-auto p-[22px]">
@@ -185,7 +227,7 @@ export function HurtowniaScreen() {
 
       <div className="grid grid-cols-3 gap-3 max-[1100px]:grid-cols-2 max-[940px]:grid-cols-1">
         {(wholesalersQuery.data ?? []).map((wholesaler) => {
-          const items = itemsFor(wholesaler);
+          const missing = lowStockFor(wholesaler);
           return (
             <div
               key={wholesaler.id}
@@ -216,14 +258,16 @@ export function HurtowniaScreen() {
               <p className="o-mono truncate text-[10.5px] text-slate-dim">{wholesaler.email}</p>
               <p className="o-mono text-[10.5px] text-slate-dim">
                 {wholesaler.linkedSkus.length} powiązanych SKU ·{" "}
-                <span className={items.length > 0 ? "text-coral" : ""}>
-                  {items.length} poniżej progu
+                <span className={missing.length > 0 ? "text-coral" : ""}>
+                  {missing.length} poniżej progu
                 </span>
               </p>
+              {/* Przycisk jest zawsze aktywny - pelny magazyn nie jest powodem,
+                  zeby nie dalo sie napisac do hurtowni (zapytanie o cennik,
+                  termin, nowy produkt). Pozycje wybiera sie w modalu. */}
               <Button
                 className="mt-1 !px-3 !py-2 !text-[11.5px]"
                 onClick={() => setOrdering(wholesaler)}
-                disabled={items.length === 0}
                 icon={<MailIcon size={13} />}
               >
                 Napisz zamówienie
@@ -267,7 +311,8 @@ export function HurtowniaScreen() {
       <WholesalerOrderModal
         open={ordering !== null}
         onClose={() => setOrdering(null)}
-        items={ordering ? itemsFor(ordering) : []}
+        items={orderingCatalog}
+        initialSelection={orderingSelection}
         preselected={ordering}
       />
 

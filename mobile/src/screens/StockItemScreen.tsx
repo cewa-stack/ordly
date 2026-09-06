@@ -114,7 +114,10 @@ export function StockItemScreen() {
         <View style={styles.bar}>
           <View style={[styles.barFill, { width: barWidth, backgroundColor: barColor }]} />
         </View>
-        {data.stock_value ? (
+        {/* Zero znaczy "brak ceny zakupu" - wiersz z 0,00 zl nic by nie wnosil.
+            Warunek jest jawny, bo kwoty przychodza teraz jako liczby: samo
+            `data.stock_value ?` chowaloby tez uczciwe zero. */}
+        {Number(data.stock_value) > 0 ? (
           <Text style={styles.value}>Wartość pozycji: {formatMoney(data.stock_value)}</Text>
         ) : null}
       </View>

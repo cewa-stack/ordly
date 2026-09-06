@@ -8,6 +8,14 @@
  * Kazde wydarzenie ma date szczytu sprzedazy oraz `leadDays` - ile dni
  * wczesniej warto wystawic oferte, zeby zdazyc z widocznoscia przed
  * szczytem popytu (sekcja "kiedy co wystawiac").
+ *
+ * BLIZNIAK: `backend/src/app/domain/sales_calendar.py` trzyma te same
+ * wydarzenia dla asystenta Ordlaka (odpowiada po stronie Pi, wiec musi
+ * znac te daty bez pytania aplikacji). Kazde dodane/zmienione wydarzenie
+ * trzeba naniesc w OBU plikach.
+ *
+ * Uwaga na konwencje dnia tygodnia: tutaj `Date.getDay()` (0 = niedziela),
+ * w Pythonie `date.weekday()` (0 = poniedzialek).
  */
 
 export type EventCategory = "swieto" | "sprzedaz";

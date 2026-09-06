@@ -13,9 +13,9 @@ import type {
   OfferRecipePayload,
   OfferRef,
   OlxOffer,
-  OrdlakGeneratePayload,
-  OrdlakGeneration,
-  OrdlakHistoryItem,
+  OrdlakChatReply,
+  OrdlakConversation,
+  OrdlakSaveResult,
   OrdlakStatus,
   Order,
   ReturnItem,
@@ -109,13 +109,17 @@ export interface OrdlyBridge {
   };
   ordlak: {
     status: () => Promise<BridgeResult<OrdlakStatus>>;
-    generate: (payload: OrdlakGeneratePayload) => Promise<BridgeResult<OrdlakGeneration>>;
-    history: (limit?: number) => Promise<BridgeResult<OrdlakHistoryItem[]>>;
-    finalize: (input: {
-      id: number;
-      finalTitle: string;
-      finalDescriptionHtml: string;
-    }) => Promise<BridgeResult<OrdlakHistoryItem>>;
+    ask: (input: {
+      message: string;
+      conversationId?: number | null;
+    }) => Promise<BridgeResult<OrdlakChatReply>>;
+    conversations: () => Promise<BridgeResult<OrdlakConversation[]>>;
+    conversation: (id: number) => Promise<BridgeResult<OrdlakConversation>>;
+    deleteConversation: (id: number) => Promise<BridgeResult<null>>;
+    saveReply: (input: {
+      suggestedName: string;
+      content: string;
+    }) => Promise<BridgeResult<OrdlakSaveResult>>;
   };
   wholesalers: {
     list: () => Promise<Wholesaler[]>;

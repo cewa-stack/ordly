@@ -363,12 +363,12 @@ class MailWatchSettings(BaseSettings):
 
 class OrdlakSettings(BaseSettings):
     """
-    Konfiguracja Ordlaka - generatora ofert Allegro opartego o Anthropic API.
+    Konfiguracja Ordlaka - asystenta ORDLY opartego o Anthropic API.
 
     WAŻNE: `ANTHROPIC_API_KEY` to osobny klucz API z billingiem per-użycie
     (console.anthropic.com), a NIE subskrypcja Claude Pro/Claude Code.
-    Pusty klucz = ekran Ordlak działa, ale generowanie zwraca czytelny błąd
-    zamiast próbować wywołać AI.
+    Pusty klucz = ekran Ordlak działa, ale mówi wprost, że asystent jest
+    wyłączony, zamiast próbować wywołać AI.
     """
 
     model_config = SettingsConfigDict(
@@ -379,7 +379,6 @@ class OrdlakSettings(BaseSettings):
 
     api_key: SecretStr = Field(default=SecretStr(""), alias="ANTHROPIC_API_KEY")
     model: str = Field(default="claude-sonnet-5", alias="ANTHROPIC_MODEL")
-    max_photo_size_mb: int = Field(default=5, alias="ORDLAK_MAX_PHOTO_SIZE_MB", ge=1)
 
     @property
     def enabled(self) -> bool:

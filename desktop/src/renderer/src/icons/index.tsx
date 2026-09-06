@@ -225,14 +225,6 @@ export function PencilIcon(props: IconProps) {
   );
 }
 
-export function ClipIcon(props: IconProps) {
-  return (
-    <svg {...base(props)}>
-      <path d="M20 11.5 12.3 19a4.6 4.6 0 0 1-6.5-6.5l7.7-7.7a3 3 0 0 1 4.3 4.3l-7.7 7.7a1.5 1.5 0 0 1-2.1-2.1l7-7" />
-    </svg>
-  );
-}
-
 export function LinkIcon(props: IconProps) {
   return (
     <svg {...base(props)}>

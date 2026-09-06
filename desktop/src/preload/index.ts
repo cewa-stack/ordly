@@ -92,19 +92,14 @@ const ordly = {
   },
   ordlak: {
     status: () => ipcRenderer.invoke("ordly:ordlak:status"),
-    generate: (input: {
-      note: string;
-      condition: string;
-      purchaseCost: number;
-      inboundShippingCost: number;
-      buyerShippingCost: number;
-      commissionPercent: number;
-      targetMarginPercent: number;
-      photos?: { fileName: string; mimeType: string; bytes: Uint8Array }[];
-    }) => ipcRenderer.invoke("ordly:ordlak:generate", input),
-    history: (limit?: number) => ipcRenderer.invoke("ordly:ordlak:history", limit),
-    finalize: (input: { id: number; finalTitle: string; finalDescriptionHtml: string }) =>
-      ipcRenderer.invoke("ordly:ordlak:finalize", input),
+    ask: (input: { message: string; conversationId?: number | null }) =>
+      ipcRenderer.invoke("ordly:ordlak:ask", input),
+    conversations: () => ipcRenderer.invoke("ordly:ordlak:conversations"),
+    conversation: (id: number) => ipcRenderer.invoke("ordly:ordlak:conversation", id),
+    deleteConversation: (id: number) =>
+      ipcRenderer.invoke("ordly:ordlak:deleteConversation", id),
+    saveReply: (input: { suggestedName: string; content: string }) =>
+      ipcRenderer.invoke("ordly:ordlak:saveReply", input),
   },
   wholesalers: {
     list: () => ipcRenderer.invoke("ordly:wholesalers:list"),

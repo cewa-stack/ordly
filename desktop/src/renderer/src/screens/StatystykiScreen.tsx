@@ -11,7 +11,7 @@
 import * as React from "react";
 import { useQuery } from "@tanstack/react-query";
 import { EmptyState, ErrorState } from "../components/ui";
-import { formatCurrency } from "../lib/format";
+import { formatCurrency, toAmount } from "../lib/format";
 import type { Order } from "../types/api";
 
 const DAY_LABELS = ["pon", "wt", "śr", "czw", "pt", "sob", "ndz"];
@@ -189,7 +189,7 @@ export function StatystykiScreen() {
           const key = product.name;
           const existing = acc[key] ?? { name: key, quantity: 0, revenue: 0 };
           existing.quantity += product.quantity;
-          existing.revenue += product.total_price;
+          existing.revenue += toAmount(product.total_price);
           acc[key] = existing;
           return acc;
         },

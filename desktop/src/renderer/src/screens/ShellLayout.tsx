@@ -222,7 +222,7 @@ export function ShellLayout() {
       : "Wczytuję stan magazynu…",
     poczta: "Skrzynka główna · IMAP",
     zwroty: "Ostatnie 30 dni",
-    ordlak: "Generator ofert Allegro",
+    ordlak: "Asystent sprzedaży",
     hurtownie: "Dostawcy i zamówienia",
     olx: "Oferty prowadzone ręcznie",
     statystyki: "Ostatnie 7 dni",

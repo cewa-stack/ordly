@@ -1,36 +1,35 @@
 /**
  * Minimalna sanityzacja HTML przed wyswietleniem go w rendererze.
  *
- * Dwa zastosowania, dwa zestawy dozwolonych znacznikow:
+ * `sanitizeMessageHtml` - tresc wiadomosci w dyskusji/reklamacji. Allegro
+ * oddaje ja jako HTML (`<br>`, `<strong>`, `<a href>`, zwlaszcza
+ * w komunikatach systemowych typu "Dyskusja trwa juz 14 dni"), wiec
+ * renderowanie jej jako zwyklego tekstu pokazywalo uzytkownikowi surowe
+ * znaczniki. CSP renderera (`script-src 'self'`) blokuje skrypty inline,
+ * ale nie powstrzymuje np. `<iframe>` ani nie chroni przed rozjechaniem
+ * layoutu przez losowe znaczniki - stad wlasna lista dozwolonych tagow.
  *
- * 1. `sanitizeOfferHtml` - podglad opisu oferty. Opis pochodzi z modelu
- *    AI, a ten z kolei czyta notatke wpisana przez uzytkownika - czyli
- *    tresc, ktora moglaby probowac wstrzyknac znaczniki. CSP renderera
- *    (`script-src 'self'`) blokuje skrypty inline, ale nie powstrzymuje
- *    np. `<iframe>` ani nie chroni przed rozjechaniem layoutu przez
- *    losowe znaczniki. Podglad ma pokazywac dokladnie to, co Allegro
- *    przyjmie w opisie, wiec przepuszczamy wylacznie te znaczniki, ktore
- *    generuje prompt (patrz `ordlak_service.py`).
- *
- * 2. `sanitizeMessageHtml` - tresc wiadomosci w dyskusji/reklamacji.
- *    Allegro oddaje ja jako HTML (`<br>`, `<strong>`, `<a href>`,
- *    zwlaszcza w komunikatach systemowych typu "Dyskusja trwa juz 14
- *    dni"), wiec renderowanie jej jako zwyklego tekstu pokazywalo
- *    uzytkownikowi surowe znaczniki. Tu dodatkowo przepuszczamy `<a>`,
- *    ale wylacznie z bezpiecznym protokolem i zawsze z `target="_blank"`,
- *    zeby klikniecie oddalo link systemowej przegladarce
- *    (`setWindowOpenHandler` w procesie glownym) zamiast wyprowadzic
- *    renderer z aplikacji.
+ * `<a>` przechodzi wylacznie z bezpiecznym protokolem i zawsze
+ * z `target="_blank"`, zeby klikniecie oddalo link systemowej
+ * przegladarce (`setWindowOpenHandler` w procesie glownym) zamiast
+ * wyprowadzic renderer z aplikacji.
  *
  * Dlaczego wlasny scrubber, a nie `dompurify`: to te same 3 funkcje na
  * DOM-ie, ktory i tak mamy w Chromium, bez kolejnej zaleznosci w bundlu
  * i bez ryzyka, ze biblioteka zacznie sie prosic o `unsafe-eval` w CSP.
- *
- * Uwaga: to sanityzacja WYSWIETLANIA. Do schowka kopiowany jest surowy
- * tekst z pola edycji - tam uzytkownik widzi dokladnie to, co wklei.
  */
-const OFFER_TAGS = new Set(["P", "UL", "OL", "LI", "STRONG", "B", "EM", "I", "BR"]);
-const MESSAGE_TAGS = new Set([...OFFER_TAGS, "A"]);
+const MESSAGE_TAGS = new Set([
+  "P",
+  "UL",
+  "OL",
+  "LI",
+  "STRONG",
+  "B",
+  "EM",
+  "I",
+  "BR",
+  "A",
+]);
 
 /**
  * Protokoly, ktore wolno zostawic w `href`. Odsiewa `javascript:` i
@@ -38,19 +37,11 @@ const MESSAGE_TAGS = new Set([...OFFER_TAGS, "A"]);
  */
 const SAFE_LINK_PROTOCOLS = new Set(["http:", "https:", "mailto:"]);
 
-interface ScrubOptions {
-  /** Znaczniki, ktore przetrwaja. Reszta traci tag, ale zachowuje tekst. */
-  allowed: Set<string>;
-  /** Czy zachowac `href` na `<a>` (po weryfikacji protokolu). */
-  keepLinks: boolean;
-}
-
-export function sanitizeOfferHtml(html: string): string {
-  return sanitize(html, { allowed: OFFER_TAGS, keepLinks: false });
-}
-
 export function sanitizeMessageHtml(html: string): string {
-  return sanitize(html, { allowed: MESSAGE_TAGS, keepLinks: true });
+  const template = document.createElement("template");
+  template.innerHTML = html;
+  scrub(template.content);
+  return template.innerHTML;
 }
 
 /**
@@ -98,14 +89,7 @@ export function htmlToPlainText(html: string): string {
   return (template.content.textContent ?? "").replace(/\n{3,}/g, "\n\n").trim();
 }
 
-function sanitize(html: string, options: ScrubOptions): string {
-  const template = document.createElement("template");
-  template.innerHTML = html;
-  scrub(template.content, options);
-  return template.innerHTML;
-}
-
-function scrub(node: ParentNode, options: ScrubOptions): void {
+function scrub(node: ParentNode): void {
   for (const child of Array.from(node.childNodes)) {
     if (child.nodeType === Node.TEXT_NODE) continue;
 
@@ -123,7 +107,7 @@ function scrub(node: ParentNode, options: ScrubOptions): void {
       element.remove();
       continue;
     }
-    if (!options.allowed.has(element.tagName)) {
+    if (!MESSAGE_TAGS.has(element.tagName)) {
       // Znacznik odrzucony, ale jego tekst zostaje - uzytkownik ma
       // zobaczyc calosc opisu, a nie dziure po `<div>`.
       element.replaceWith(...Array.from(element.childNodes));
@@ -131,9 +115,7 @@ function scrub(node: ParentNode, options: ScrubOptions): void {
     }
 
     const href =
-      options.keepLinks && element.tagName === "A"
-        ? safeHref(element.getAttribute("href"))
-        : null;
+      element.tagName === "A" ? safeHref(element.getAttribute("href")) : null;
 
     for (const attribute of Array.from(element.attributes)) {
       element.removeAttribute(attribute.name);
@@ -151,7 +133,7 @@ function scrub(node: ParentNode, options: ScrubOptions): void {
       element.setAttribute("rel", "noreferrer noopener");
     }
 
-    scrub(element, options);
+    scrub(element);
   }
 }
 

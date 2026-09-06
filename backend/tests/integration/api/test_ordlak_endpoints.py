@@ -1,10 +1,10 @@
 """
 Testy HTTP endpointów `/api/v1/ordlak/*`.
 
-To jest kontrakt między backendem a aplikacją desktopową: nazwy pól
-`multipart/form-data`, kształt JSON-a i kody błędów. Testy serwisu nie
-złapałyby literówki w nazwie pola formularza ani złego kodu HTTP, bo
-omijają warstwę HTTP - a właśnie tam rozjeżdżają się dwie strony.
+To jest kontrakt między backendem a aplikacją desktopową: kształt JSON-a
+i kody błędów. Testy serwisu nie złapałyby literówki w nazwie pola ani
+złego kodu HTTP, bo omijają warstwę HTTP - a właśnie tam rozjeżdżają się
+dwie strony.
 """
 
 from __future__ import annotations
@@ -18,87 +18,84 @@ from pydantic import SecretStr
 
 from app.api.dependencies import get_container, get_session
 from app.api.endpoints import ordlak as ordlak_endpoints
-from app.core.config import OrdlakSettings
-from app.services.ordlak_service import OrdlakService
-from tests.fakes.fake_ordlak_repository import FakeOrdlakRepository
-
-TYTUL = "Kubek ceramiczny biały 350 ml porcelana matowa do kawy herbaty prezent"
-OPIS = "<p>Kubek ceramiczny 350 ml.</p>"
-
-
-class _Block:
-    type = "tool_use"
-
-    def __init__(self, payload: dict) -> None:
-        self.input = payload
-
-
-class _Response:
-    stop_reason = "tool_use"
-
-    def __init__(self, payload: dict) -> None:
-        self.content = [_Block(payload)]
-
-
-class _Messages:
-    def __init__(self, owner: _FakeAnthropic) -> None:
-        self._owner = owner
-
-    async def create(self, **kwargs):
-        self._owner.calls.append(kwargs)
-        return _Response(
-            {
-                "title": TYTUL,
-                "description_html": OPIS,
-                "condition_notes": "Bez rys." if self._owner.saw_images(kwargs) else "",
-            }
-        )
-
-
-class _FakeAnthropic:
-    def __init__(self) -> None:
-        self.calls: list[dict] = []
-        self.messages = _Messages(self)
-
-    @staticmethod
-    def saw_images(kwargs: dict) -> bool:
-        content = kwargs["messages"][0]["content"]
-        return any(block.get("type") == "image" for block in content)
+from app.core.config import MailWatchSettings, OrdlakSettings
+from app.services.dashboard_service import DashboardService
+from app.services.inventory_service import InventoryService
+from app.services.issues_service import IssuesService
+from app.services.mailbox_service import MailboxService
+from app.services.ordlak_assistant_service import OrdlakAssistantService
+from app.services.returns_service import ReturnsService
+from app.services.search_service import SearchService
+from tests.fakes.fake_anthropic import (
+    FakeAnthropic,
+    FakeResponse,
+    StubHealthService,
+    TextBlock,
+    ToolUseBlock,
+)
+from tests.fakes.fake_inventory_repository import FakeInventoryRepository
+from tests.fakes.fake_mail_repository import FakeMailRepository
+from tests.fakes.fake_marketplace_plugin import FakeMarketplacePlugin
+from tests.fakes.fake_order_repository import FakeOrderRepository
+from tests.fakes.fake_ordlak_conversation_repository import (
+    FakeOrdlakConversationRepository,
+)
+from tests.fakes.fake_return_repository import FakeReturnRepository
 
 
 class _StubContainer:
     """
-    Kontener podstawiany zamiast prawdziwego - trzyma jedno repozytorium
-    w pamięci, żeby `generate` i `history` widziały te same dane.
+    Kontener podstawiany zamiast prawdziwego - trzyma repozytoria
+    w pamięci, żeby narzędzia asystenta miały co czytać.
     """
 
     def __init__(self, configured: bool = True) -> None:
-        self.repository = FakeOrdlakRepository()
-        self.client = _FakeAnthropic()
+        self.orders = FakeOrderRepository()
+        self.inventory = FakeInventoryRepository()
+        self.returns = FakeReturnRepository()
+        self.plugin = FakeMarketplacePlugin()
+        self.mail = FakeMailRepository()
+        # Jedno repozytorium rozmow na kontener - endpoint czatu i lista
+        # rozmow musza widziec te same watki, mimo osobnych sesji.
+        self.conversations = FakeOrdlakConversationRepository()
+        self.client = FakeAnthropic([FakeResponse([TextBlock("Dziś 2 zamówienia.")])])
         self.settings = OrdlakSettings(
             _env_file=None,
             ANTHROPIC_API_KEY=SecretStr("sk-test" if configured else ""),
             ANTHROPIC_MODEL="claude-sonnet-5",
-            ORDLAK_MAX_PHOTO_SIZE_MB=5,
         )
 
     def ordlak_settings(self) -> OrdlakSettings:
         return self.settings
 
-    def ordlak_service(self, _session=None) -> OrdlakService:
-        return OrdlakService(
-            repository=self.repository,
+    def session_scope(self):
+        return _NullSessionScope()
+
+    def ordlak_assistant_service(self, _session=None) -> OrdlakAssistantService:
+        return OrdlakAssistantService(
             settings=self.settings,
+            order_repository=self.orders,
+            inventory_service=InventoryService(self.inventory),
+            returns_service=ReturnsService(self.returns),
+            dashboard_service=DashboardService(self.orders, self.inventory),
+            health_service=StubHealthService(),
+            search_service=SearchService(self.orders),
+            issues_service=IssuesService(self.plugin),
+            mailbox_service=MailboxService(
+                self.mail,
+                MailWatchSettings(_env_file=None, IMAP_USER="", IMAP_PASS=SecretStr("")),
+                watcher_factory=lambda: None,
+            ),
+            conversation_repository=self.conversations,
             # Brak klucza = brak fabryki, więc serwis idzie ścieżką
             # "nie skonfigurowano" dokładnie jak na prawdziwym Pi.
             client_factory=(lambda: self.client) if self.settings.enabled else None,
         )
 
-    def session_scope(self):
-        return _NullSessionScope()
-
 
 class _NullSessionScope:
+    """Endpointy zapisujace otwieraja wlasny zakres sesji - tu nie ma bazy."""
+
     async def __aenter__(self):
         return None
 
@@ -125,30 +122,12 @@ def client(container: _StubContainer) -> Iterator[TestClient]:
         yield test_client
 
 
-def _form(**overrides) -> dict[str, str]:
-    data = {
-        "note": "Biały kubek ceramiczny 350 ml",
-        "condition": "new",
-        "purchase_cost": "25.0",
-        "inbound_shipping_cost": "8.0",
-        "buyer_shipping_cost": "12.0",
-        "commission_percent": "10.0",
-        "target_margin_percent": "30.0",
-    }
-    data.update({key: str(value) for key, value in overrides.items()})
-    return data
-
-
 class TestStatus:
-    def test_zwraca_limity_i_model(self, client: TestClient):
+    def test_zwraca_model_i_informacje_o_kluczu(self, client: TestClient):
         response = client.get("/api/v1/ordlak/status")
 
         assert response.status_code == 200
-        body = response.json()
-        assert body["configured"] is True
-        assert body["model"] == "claude-sonnet-5"
-        assert body["max_photos"] == 3
-        assert body["max_photo_size_mb"] == 5
+        assert response.json() == {"configured": True, "model": "claude-sonnet-5"}
 
     def test_bez_klucza_zglasza_brak_konfiguracji(self):
         with _build_client(_StubContainer(configured=False)) as test_client:
@@ -157,125 +136,99 @@ class TestStatus:
         assert response.json()["configured"] is False
 
 
-class TestGenerate:
-    def test_zwraca_pelny_wynik(self, client: TestClient):
-        response = client.post("/api/v1/ordlak/generate", data=_form())
-
-        assert response.status_code == 200
-        body = response.json()
-        assert body["title"] == TYTUL
-        assert body["description_html"] == OPIS
-        assert body["condition"] == "new"
-        assert body["photo_count"] == 0
-        assert body["title_below_target"] is False
-        assert body["price_breakdown"]["suggested_price"] == 57.0
-        assert body["price_breakdown"]["commission_amount"] == 6.9
-        assert body["id"] > 0
-
-    def test_przyjmuje_zdjecia_jako_multipart(
+class TestChat:
+    def test_zwraca_odpowiedz_numer_watku_i_uzyte_narzedzia(
         self, client: TestClient, container: _StubContainer
     ):
-        files = [
-            ("photos", ("a.jpg", b"\xff\xd8fake", "image/jpeg")),
-            ("photos", ("b.png", b"\x89PNGfake", "image/png")),
+        container.client.responses = [
+            FakeResponse([ToolUseBlock("stan_systemu")], stop_reason="tool_use"),
+            FakeResponse([TextBlock("Wszystko działa.")]),
         ]
 
-        response = client.post("/api/v1/ordlak/generate", data=_form(), files=files)
-
-        assert response.status_code == 200
-        assert response.json()["photo_count"] == 2
-        assert container.client.saw_images(container.client.calls[0]) is True
-
-    def test_koszty_wysylki_maja_wartosci_domyslne(self, client: TestClient):
-        """Desktop wysyła te pola zawsze, ale API nie może ich wymagać."""
-        minimalny = {
-            "note": "Kubek",
-            "condition": "new",
-            "purchase_cost": "25.0",
-            "commission_percent": "10.0",
-            "target_margin_percent": "30.0",
-        }
-
-        response = client.post("/api/v1/ordlak/generate", data=minimalny)
-
-        assert response.status_code == 200
-        breakdown = response.json()["price_breakdown"]
-        assert breakdown["inbound_shipping_cost"] == 0.0
-        assert breakdown["buyer_shipping_cost"] == 0.0
-
-    def test_zla_prowizja_daje_422_z_komunikatem_po_polsku(self, client: TestClient):
-        response = client.post(
-            "/api/v1/ordlak/generate",
-            data=_form(commission_percent=70.0, target_margin_percent=40.0),
-        )
-
-        assert response.status_code == 422
-        assert "100%" in response.json()["detail"]
-
-    def test_cztery_zdjecia_daja_422(self, client: TestClient):
-        files = [("photos", (f"{i}.jpg", b"\xff\xd8fake", "image/jpeg")) for i in range(4)]
-
-        response = client.post("/api/v1/ordlak/generate", data=_form(), files=files)
-
-        assert response.status_code == 422
-        assert "Maksymalnie 3" in response.json()["detail"]
-
-    def test_nieznany_stan_daje_422(self, client: TestClient):
-        response = client.post("/api/v1/ordlak/generate", data=_form(condition="zepsuty"))
-
-        assert response.status_code == 422
-
-    def test_brak_klucza_api_daje_503(self):
-        with _build_client(_StubContainer(configured=False)) as test_client:
-            response = test_client.post("/api/v1/ordlak/generate", data=_form())
-
-        assert response.status_code == 503
-        assert "ANTHROPIC_API_KEY" in response.json()["detail"]
-
-
-class TestHistoriaIFinalize:
-    def test_historia_zawiera_wygenerowana_oferte(self, client: TestClient):
-        client.post("/api/v1/ordlak/generate", data=_form())
-
-        response = client.get("/api/v1/ordlak/history")
-
-        assert response.status_code == 200
-        items = response.json()
-        assert len(items) == 1
-        assert items[0]["title"] == TYTUL
-        assert items[0]["is_edited"] is False
-        assert items[0]["price_breakdown"]["suggested_price"] == 57.0
-
-    def test_finalize_zapisuje_poprawki(self, client: TestClient):
-        generation_id = client.post("/api/v1/ordlak/generate", data=_form()).json()["id"]
-
-        response = client.post(
-            f"/api/v1/ordlak/{generation_id}/finalize",
-            json={
-                "final_title": "Poprawiony tytuł oferty na Allegro",
-                "final_description_html": "<p>Poprawiony opis</p>",
-            },
-        )
+        response = client.post("/api/v1/ordlak/chat", json={"message": "Jak leci?"})
 
         assert response.status_code == 200
         body = response.json()
-        assert body["title"] == "Poprawiony tytuł oferty na Allegro"
-        assert body["is_edited"] is True
+        assert body["reply"] == "Wszystko działa."
+        assert body["used_tools"] == ["stan_systemu"]
+        assert body["conversation_id"] > 0
 
-    def test_finalize_nieistniejacej_generacji_daje_404(self, client: TestClient):
+    def test_kolejne_pytanie_trafia_do_tego_samego_watku(self, client: TestClient):
+        first = client.post("/api/v1/ordlak/chat", json={"message": "Ile sprzedałem?"})
+        thread_id = first.json()["conversation_id"]
+
+        second = client.post(
+            "/api/v1/ordlak/chat",
+            json={"message": "A wczoraj?", "conversation_id": thread_id},
+        )
+
+        assert second.json()["conversation_id"] == thread_id
+
+    def test_puste_pytanie_odrzucone(self, client: TestClient):
+        response = client.post("/api/v1/ordlak/chat", json={"message": ""})
+
+        assert response.status_code == 422
+
+    def test_nieistniejacy_watek_daje_404(self, client: TestClient):
         response = client.post(
-            "/api/v1/ordlak/999/finalize",
-            json={"final_title": "tytuł", "final_description_html": "<p>opis</p>"},
+            "/api/v1/ordlak/chat",
+            json={"message": "Jak leci?", "conversation_id": 999},
         )
 
         assert response.status_code == 404
 
-    def test_finalize_pustego_tytulu_odrzucony(self, client: TestClient):
-        generation_id = client.post("/api/v1/ordlak/generate", data=_form()).json()["id"]
+    def test_brak_klucza_api_daje_503(self):
+        with _build_client(_StubContainer(configured=False)) as test_client:
+            response = test_client.post("/api/v1/ordlak/chat", json={"message": "Jak leci?"})
 
-        response = client.post(
-            f"/api/v1/ordlak/{generation_id}/finalize",
-            json={"final_title": "", "final_description_html": "<p>opis</p>"},
-        )
+        assert response.status_code == 503
+        assert "ANTHROPIC_API_KEY" in response.json()["detail"]
+
+    def test_blad_modelu_daje_422_z_komunikatem_po_polsku(
+        self, client: TestClient, container: _StubContainer
+    ):
+        blad = Exception("boom")
+        blad.status_code = 429
+        container.client.raise_error = blad
+
+        response = client.post("/api/v1/ordlak/chat", json={"message": "Jak leci?"})
 
         assert response.status_code == 422
+        assert "429" in response.json()["detail"]
+
+
+class TestRozmowy:
+    def test_lista_pokazuje_tytul_i_licznik_bez_tresci(self, client: TestClient):
+        client.post("/api/v1/ordlak/chat", json={"message": "Ile sprzedałem w tym tygodniu?"})
+
+        response = client.get("/api/v1/ordlak/conversations")
+
+        assert response.status_code == 200
+        watek = response.json()[0]
+        assert watek["title"] == "Ile sprzedałem w tym tygodniu?"
+        assert watek["message_count"] == 2
+        assert watek["messages"] == []
+
+    def test_pojedynczy_watek_oddaje_pelna_historie(self, client: TestClient):
+        thread_id = client.post(
+            "/api/v1/ordlak/chat", json={"message": "Ile sprzedałem?"}
+        ).json()["conversation_id"]
+
+        response = client.get(f"/api/v1/ordlak/conversations/{thread_id}")
+
+        assert response.status_code == 200
+        wiadomosci = response.json()["messages"]
+        assert [m["role"] for m in wiadomosci] == ["user", "assistant"]
+        assert wiadomosci[0]["content"] == "Ile sprzedałem?"
+
+    def test_nieistniejacy_watek_daje_404(self, client: TestClient):
+        assert client.get("/api/v1/ordlak/conversations/999").status_code == 404
+
+    def test_usuwanie_zwraca_204_a_potem_404(self, client: TestClient):
+        thread_id = client.post(
+            "/api/v1/ordlak/chat", json={"message": "Do skasowania"}
+        ).json()["conversation_id"]
+
+        assert client.delete(f"/api/v1/ordlak/conversations/{thread_id}").status_code == 204
+        assert client.delete(f"/api/v1/ordlak/conversations/{thread_id}").status_code == 404
+        assert client.get(f"/api/v1/ordlak/conversations/{thread_id}").status_code == 404

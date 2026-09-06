@@ -210,72 +210,43 @@ export interface MailSyncResult {
   configured: boolean;
 }
 
-/** Stan produktu w formularzu Ordlaka - te same kody co w backendzie. */
-export type OrdlakCondition = "new" | "very_good" | "good" | "damaged";
+export interface OrdlakChatReply {
+  conversation_id: number;
+  reply: string;
+  /** Narzedzia, z ktorych model odczytal dane - pokazywane pod odpowiedzia. */
+  used_tools: string[];
+}
+
+/** Zapisana wypowiedz w watku (`GET /ordlak/conversations/{id}`). */
+export interface OrdlakStoredMessage {
+  role: "user" | "assistant";
+  content: string;
+  created_at: string;
+  used_tools: string[];
+}
 
 /**
- * Rozbicie kalkulacji ceny. Prowizja Allegro liczy sie od sumy
- * `suggested_price + buyer_shipping_cost`, nie od samej ceny - dlatego
- * `commission_amount` przychodzi z backendu gotowe, a nie jest liczone w UI.
+ * Watek rozmowy. Na LISCIE `messages` jest puste - pelna historie oddaje
+ * dopiero pobranie pojedynczego watku.
  */
-export interface OrdlakPriceBreakdown {
-  purchase_cost: number;
-  inbound_shipping_cost: number;
-  buyer_shipping_cost: number;
-  commission_percent: number;
-  target_margin_percent: number;
-  commission_amount: number;
-  suggested_price: number;
+export interface OrdlakConversation {
+  id: number;
+  title: string;
+  created_at: string;
+  updated_at: string;
+  message_count: number;
+  messages: OrdlakStoredMessage[];
 }
 
-export interface OrdlakGeneration {
-  id: number;
-  created_at: string;
-  title: string;
-  description_html: string;
-  condition_notes: string | null;
-  condition: OrdlakCondition;
-  photo_count: number;
-  /** true = tytul jest regulaminowo poprawny, ale ponizej celu SEO (65+ znakow). */
-  title_below_target: boolean;
-  price_breakdown: OrdlakPriceBreakdown;
-}
-
-export interface OrdlakHistoryItem {
-  id: number;
-  created_at: string;
-  title: string;
-  description_html: string;
-  condition_notes: string | null;
-  condition: OrdlakCondition;
-  photo_count: number;
-  user_note: string;
-  is_edited: boolean;
-  price_breakdown: OrdlakPriceBreakdown;
+/** Wynik zapisu odpowiedzi do pliku. `saved: false` = uzytkownik anulowal. */
+export interface OrdlakSaveResult {
+  saved: boolean;
+  path: string | null;
 }
 
 export interface OrdlakStatus {
   configured: boolean;
   model: string;
-  max_photos: number;
-  max_photo_size_mb: number;
-}
-
-export interface OrdlakPhotoPayload {
-  fileName: string;
-  mimeType: string;
-  bytes: Uint8Array;
-}
-
-export interface OrdlakGeneratePayload {
-  note: string;
-  condition: OrdlakCondition;
-  purchaseCost: number;
-  inboundShippingCost: number;
-  buyerShippingCost: number;
-  commissionPercent: number;
-  targetMarginPercent: number;
-  photos?: OrdlakPhotoPayload[];
 }
 
 export interface DashboardSummary {
