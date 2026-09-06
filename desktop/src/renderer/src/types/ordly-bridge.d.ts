@@ -1,6 +1,8 @@
 import type {
   BackfillPlan,
   BridgeResult,
+  CatalogOffer,
+  CatalogSyncResult,
   DashboardSummary,
   HealthStatus,
   Issue,
@@ -9,6 +11,7 @@ import type {
   MailboxStatus,
   MailMessage,
   MailSyncResult,
+  OfferImportResult,
   OfferRecipe,
   OfferRecipePayload,
   OfferRef,
@@ -55,6 +58,10 @@ export interface OrdlyBridge {
     subItems: (sku: string) => Promise<BridgeResult<StockItem[]>>;
     setParent: (sku: string, parentSku: string | null) => Promise<BridgeResult<StockItem>>;
     recipes: () => Promise<BridgeResult<OfferRecipe[]>>;
+    catalog: (onlyUnlinked?: boolean) => Promise<BridgeResult<CatalogOffer[]>>;
+    syncCatalog: () => Promise<BridgeResult<CatalogSyncResult>>;
+    relinkCatalog: () => Promise<BridgeResult<{ linked: number }>>;
+    importOffers: (externalIds: string[]) => Promise<BridgeResult<OfferImportResult>>;
     unmappedOffers: () => Promise<BridgeResult<UnmappedOffer[]>>;
     setRecipe: (
       offer: OfferRef,

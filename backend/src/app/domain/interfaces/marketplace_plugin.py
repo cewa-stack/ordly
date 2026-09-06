@@ -13,9 +13,9 @@ from abc import ABC, abstractmethod
 
 from app.domain.entities.customer import Customer
 from app.domain.entities.issue import Issue, IssueMessage
+from app.domain.entities.marketplace_offer import MarketplaceOffer
 from app.domain.entities.order import Order
 from app.domain.entities.order_return import OrderReturn
-from app.domain.entities.product import Product
 from app.domain.entities.shipment import Shipment
 
 
@@ -121,8 +121,19 @@ class MarketplacePlugin(ABC):
         raise NotImplementedError
 
     @abstractmethod
-    async def get_products(self) -> list[Product]:
-        """Pobiera listę produktów sprzedawcy dostępnych w marketplace."""
+    async def get_offers(self) -> list[MarketplaceOffer]:
+        """
+        Pobiera cały asortyment sprzedawcy wystawiony na marketplace.
+
+        To źródło identyfikatorów ofert dla powiązań magazynowych.
+        Poprzednik tej metody (`get_products`) zwracał `Product`, czyli
+        encję POZYCJI ZAMÓWIENIA - kształt bez ceny katalogowej, statusu
+        publikacji i sygnatury sprzedawcy, więc do wiązania magazynu
+        nie nadawał się i nikt go nie wołał.
+
+        Implementacja musi przejść przez wszystkie strony wyników -
+        sprzedawca z 300 ofertami nie może dostać pierwszych 100.
+        """
         raise NotImplementedError
 
     @abstractmethod

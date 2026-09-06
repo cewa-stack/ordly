@@ -35,6 +35,10 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.api.dependencies import get_container, get_session
 from app.api.schemas import (
     BackfillPlanOut,
+    CatalogOfferOut,
+    CatalogSyncOut,
+    OfferImportIn,
+    OfferImportOut,
     OfferRecipeIn,
     OfferRecipeOut,
     StockAdjustIn,
@@ -47,6 +51,9 @@ from app.api.schemas import (
     StockSetParentIn,
     UnmappedOfferOut,
     backfill_plan_out,
+    catalog_offer_out,
+    catalog_sync_out,
+    offer_import_out,
     offer_recipe_out,
     stock_delete_out,
     stock_item_out,
@@ -134,6 +141,60 @@ async def list_unmapped_offers(
     service = container.offer_mapping_service(session)
     offers = await service.get_unmapped_offers(days)
     return [unmapped_offer_out(o) for o in offers]
+
+
+@router.get("/stock/catalog", response_model=list[CatalogOfferOut])
+async def list_catalog_offers(
+    container: Annotated[Container, Depends(get_container)],
+    session: Annotated[AsyncSession, Depends(get_session)],
+    only_unlinked: Annotated[bool, Query()] = False,
+) -> list[CatalogOfferOut]:
+    """Asortyment pobrany z marketplace wraz ze stanem powiązania z magazynem."""
+    service = container.offer_catalog_service(session)
+    offers = await service.get_catalog(only_unlinked=only_unlinked)
+    return [catalog_offer_out(o) for o in offers]
+
+
+@router.post("/stock/catalog/sync", response_model=CatalogSyncOut)
+async def sync_catalog(
+    container: Annotated[Container, Depends(get_container)],
+    session: Annotated[AsyncSession, Depends(get_session)],
+) -> CatalogSyncOut:
+    """
+    Pobiera asortyment z marketplace i odświeża katalog ofert.
+
+    Przy okazji zakłada receptury tam, gdzie sygnatura oferty wskazuje
+    istniejące SKU - patrz `OfferCatalogService._auto_link`.
+    """
+    service = container.offer_catalog_service(session)
+    return catalog_sync_out(await service.sync())
+
+
+@router.post("/stock/catalog/relink", response_model=dict)
+async def relink_catalog(
+    container: Annotated[Container, Depends(get_container)],
+    session: Annotated[AsyncSession, Depends(get_session)],
+) -> dict[str, int]:
+    """
+    Dowiązuje oferty z katalogu po sygnaturze, bez odpytywania marketplace.
+
+    Przydatne po założeniu nowych produktów magazynowych: sygnatura ma
+    wtedy w co trafić, a ponowne ściąganie całego asortymentu jest
+    niepotrzebne.
+    """
+    service = container.offer_catalog_service(session)
+    return {"linked": await service.relink()}
+
+
+@router.post("/stock/catalog/import", response_model=OfferImportOut)
+async def import_catalog_offers(
+    container: Annotated[Container, Depends(get_container)],
+    session: Annotated[AsyncSession, Depends(get_session)],
+    payload: OfferImportIn,
+) -> OfferImportOut:
+    """Zakłada produkty magazynowe ze wskazanych ofert i wiąże je 1:1."""
+    service = container.offer_catalog_service(session)
+    return offer_import_out(await service.import_to_stock(payload.external_ids))
 
 
 @router.get(

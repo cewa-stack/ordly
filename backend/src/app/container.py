@@ -30,6 +30,7 @@ from app.infrastructure.webpush.web_push_notifier import WebPushNotifier
 from app.repositories.sqlite_event_repository import SqliteEventRepository
 from app.repositories.sqlite_inventory_repository import SqliteInventoryRepository
 from app.repositories.sqlite_mail_repository import SqliteMailRepository
+from app.repositories.sqlite_offer_catalog_repository import SqliteOfferCatalogRepository
 from app.repositories.sqlite_order_repository import SqliteOrderRepository
 from app.repositories.sqlite_ordlak_conversation_repository import (
     SqliteOrdlakConversationRepository,
@@ -55,6 +56,7 @@ from app.services.inventory_service import InventoryService
 from app.services.issues_service import IssuesService
 from app.services.mail_service import MailService
 from app.services.mailbox_service import MailboxService
+from app.services.offer_catalog_service import OfferCatalogService
 from app.services.offer_mapping_service import OfferMappingService
 from app.services.ordlak_assistant_service import OrdlakAssistantService
 from app.services.returns_service import ReturnsService
@@ -242,6 +244,14 @@ class Container:
         return OfferMappingService(
             inventory_repository=SqliteInventoryRepository(session),
             order_repository=SqliteOrderRepository(session),
+        )
+
+    def offer_catalog_service(self, session: AsyncSession) -> OfferCatalogService:
+        """Buduje OfferCatalogService dla /api/v1/stock/catalog/* (asortyment)."""
+        return OfferCatalogService(
+            plugin=self.build_plugin(session),
+            catalog_repository=SqliteOfferCatalogRepository(session),
+            inventory_repository=SqliteInventoryRepository(session),
         )
 
     def stock_sync_service(self, session: AsyncSession) -> StockSyncService:

@@ -32,6 +32,11 @@ from app.shared.dto.inventory_dto import (
     InventoryReport,
     ItemForecast,
 )
+from app.shared.dto.offer_catalog_dto import (
+    CatalogOffer,
+    CatalogSyncResult,
+    OfferImportResult,
+)
 from app.shared.dto.offer_mapping_dto import BackfillPlan, OfferRecipe, SoldOffer
 from app.shared.dto.stats_dto import HealthStatus, StatsSummary, SyncResult
 
@@ -738,6 +743,107 @@ def unmapped_offer_out(offer: SoldOffer) -> UnmappedOfferOut:
         sold_quantity=offer.sold_quantity,
         orders_count=offer.orders_count,
         last_sold_at=offer.last_sold_at,
+    )
+
+
+class CatalogOfferOut(BaseModel):
+    """
+    Oferta z katalogu asortymentu zwracana przez `/api/v1/stock/catalog`.
+
+    `link_type` niesie CZTERY stany, nie dwa: `recipe` i `sku` znaczą, że
+    sprzedaż realnie zdejmuje stan, `signature` to sama podpowiedź
+    (sygnatura trafia w istniejące SKU, ale receptury jeszcze nie ma),
+    a `none` to oferta przechodząca obok magazynu. `is_linked` mówi
+    wprost, które z nich naprawdę działają - interfejs nie musi tej
+    reguły powtarzać.
+    """
+
+    marketplace: str
+    external_id: str
+    name: str
+    signature: str | None
+    status: str
+    available_stock: int
+    sold_count: int
+    price: Money | None
+    image_url: str | None
+    link_type: str
+    is_linked: bool
+    components: list[RecipeComponentOut]
+
+
+def catalog_offer_out(offer: CatalogOffer) -> CatalogOfferOut:
+    """Mapuje `CatalogOffer` na schemat odpowiedzi API."""
+    return CatalogOfferOut(
+        marketplace=offer.marketplace,
+        external_id=offer.external_id,
+        name=offer.name,
+        signature=offer.signature,
+        status=offer.status,
+        available_stock=offer.available_stock,
+        sold_count=offer.sold_count,
+        price=offer.price,
+        image_url=offer.image_url,
+        link_type=offer.link_type,
+        is_linked=offer.is_linked,
+        components=[
+            RecipeComponentOut(sku=c.sku, name=c.name, quantity=c.quantity)
+            for c in offer.components
+        ],
+    )
+
+
+class CatalogSyncOut(BaseModel):
+    """Podsumowanie pobrania asortymentu z marketplace."""
+
+    marketplace: str
+    fetched: int
+    auto_linked: int
+    unlinked: int
+    synced_at: datetime
+
+
+def catalog_sync_out(result: CatalogSyncResult) -> CatalogSyncOut:
+    """Mapuje `CatalogSyncResult` na schemat odpowiedzi API."""
+    return CatalogSyncOut(
+        marketplace=result.marketplace,
+        fetched=result.fetched,
+        auto_linked=result.auto_linked,
+        unlinked=result.unlinked,
+        synced_at=result.synced_at,
+    )
+
+
+class OfferImportIn(BaseModel):
+    """Żądanie założenia produktów magazynowych z ofert katalogu."""
+
+    external_ids: list[str] = Field(..., min_length=1)
+
+
+class OfferImportSkipOut(BaseModel):
+    """Oferta pominięta przy imporcie wraz z powodem."""
+
+    external_id: str
+    reason: str
+
+
+class OfferImportOut(BaseModel):
+    """Skutek importu ofert do magazynu."""
+
+    created: list[str]
+    linked: list[str]
+    skipped: list[OfferImportSkipOut]
+
+
+def offer_import_out(result: OfferImportResult) -> OfferImportOut:
+    """Mapuje `OfferImportResult` na schemat odpowiedzi API."""
+    return OfferImportOut(
+        created=list(result.created),
+        linked=list(result.linked),
+        skipped=[
+            OfferImportSkipOut(external_id=external_id, reason=reason)
+            for external_id, reason in result.skipped
+        ],
     )
 
 

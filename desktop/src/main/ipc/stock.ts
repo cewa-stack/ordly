@@ -111,6 +111,42 @@ export function registerStockIpc(): void {
       })
   );
 
+  ipcMain.handle("ordly:stock:catalog", async (_event, onlyUnlinked?: boolean) =>
+    toResult(async () => {
+      const session = requireSession();
+      const query = onlyUnlinked ? "?only_unlinked=true" : "";
+      return apiRequest(session.baseUrl, session.token, `/api/v1/stock/catalog${query}`);
+    })
+  );
+
+  ipcMain.handle("ordly:stock:syncCatalog", async () =>
+    toResult(async () => {
+      const session = requireSession();
+      return apiRequest(session.baseUrl, session.token, "/api/v1/stock/catalog/sync", {
+        method: "POST",
+      });
+    })
+  );
+
+  ipcMain.handle("ordly:stock:relinkCatalog", async () =>
+    toResult(async () => {
+      const session = requireSession();
+      return apiRequest(session.baseUrl, session.token, "/api/v1/stock/catalog/relink", {
+        method: "POST",
+      });
+    })
+  );
+
+  ipcMain.handle("ordly:stock:importOffers", async (_event, externalIds: string[]) =>
+    toResult(async () => {
+      const session = requireSession();
+      return apiRequest(session.baseUrl, session.token, "/api/v1/stock/catalog/import", {
+        method: "POST",
+        body: { external_ids: externalIds },
+      });
+    })
+  );
+
   ipcMain.handle("ordly:stock:recipes", async () =>
     toResult(async () => {
       const session = requireSession();

@@ -39,13 +39,14 @@ import {
 } from "../components/ui";
 import { ConfirmDialog, Modal } from "../components/Modal";
 import { Mascot } from "../components/Mascot";
-import { PowiazaniaOfertView } from "./PowiazaniaOfertView";
+import { PowiazaniaOfertView, RecipeModal, type OfferTarget } from "./PowiazaniaOfertView";
+import { KatalogAllegroView } from "./KatalogAllegroView";
 import { useToast } from "../lib/toast";
 import { formatDateTime, formatPlural, formatStock } from "../lib/format";
-import type { StockItem } from "../types/api";
+import type { CatalogOffer, StockItem } from "../types/api";
 
 type StockFilter = "all" | "low" | "zero";
-type MagazynTab = "items" | "links";
+type MagazynTab = "items" | "links" | "catalog";
 
 const STOCK_FILTER_LABEL: Record<StockFilter, string> = {
   all: "Wszystkie",
@@ -742,6 +743,9 @@ function TabBar({
           </span>
         )}
       </Chip>
+      <Chip active={tab === "catalog"} onClick={() => onChange("catalog")}>
+        Asortyment Allegro
+      </Chip>
     </div>
   );
 }
@@ -750,6 +754,7 @@ export function MagazynScreen({ focusSku, onFocusHandled }: MagazynScreenProps) 
   const queryClient = useQueryClient();
   const toast = useToast();
   const [tab, setTab] = React.useState<MagazynTab>("items");
+  const [catalogEditing, setCatalogEditing] = React.useState<OfferTarget | null>(null);
   const [filter, setFilter] = React.useState<StockFilter>("all");
   const [newOpen, setNewOpen] = React.useState(false);
   const [historySku, setHistorySku] = React.useState<string | null>(null);
@@ -865,6 +870,35 @@ export function MagazynScreen({ focusSku, onFocusHandled }: MagazynScreenProps) 
       <div className="flex min-h-0 flex-1 flex-col">
         <TabBar tab={tab} onChange={setTab} unmappedCount={unmappedCount} />
         <PowiazaniaOfertView />
+      </div>
+    );
+  }
+
+  if (tab === "catalog") {
+    // Edytor receptury zywi sie lista produktow magazynowych, ktora ten
+    // ekran i tak juz ma - dlatego modal stoi tutaj, a nie w widoku
+    // katalogu, ktory musialby pobrac ja drugi raz.
+    return (
+      <div className="flex min-h-0 flex-1 flex-col">
+        <TabBar tab={tab} onChange={setTab} unmappedCount={unmappedCount} />
+        <KatalogAllegroView
+          onLinkOffer={(offer: CatalogOffer) =>
+            setCatalogEditing({
+              marketplace: offer.marketplace,
+              externalProductId: offer.external_id,
+              offerName: offer.name,
+              components: offer.components.map((component) => ({
+                sku: component.sku,
+                quantity: component.quantity,
+              })),
+            })
+          }
+        />
+        <RecipeModal
+          target={catalogEditing}
+          stock={items}
+          onClose={() => setCatalogEditing(null)}
+        />
       </div>
     );
   }
