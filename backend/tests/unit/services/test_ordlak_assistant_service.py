@@ -42,7 +42,7 @@ from app.services.ordlak_assistant_service import (
 )
 from app.services.returns_service import ReturnsService
 from app.services.search_service import SearchService
-from app.utils.time import utc_now
+from app.utils.time import local_now, utc_now
 from tests.fakes.fake_anthropic import (
     FakeAnthropic,
     FakeResponse,
@@ -123,9 +123,7 @@ def _build(
         # "nie skonfigurowano" dokładnie jak na prawdziwym Pi.
         client_factory=(lambda: anthropic) if configured else None,
     )
-    return Harness(
-        service, anthropic, orders, inventory, returns, plugin, mail, conversations
-    )
+    return Harness(service, anthropic, orders, inventory, returns, plugin, mail, conversations)
 
 
 def _order(
@@ -274,12 +272,22 @@ class TestPetlaRozmowy:
         assert messages[-1]["content"] == "A wczoraj?"
 
     async def test_dzisiejsza_data_trafia_do_system_promptu(self):
-        """Model nie zna dzisiejszej daty - bez niej kalendarz nic nie znaczy."""
+        """
+        Model nie zna dzisiejszej daty - bez niej kalendarz nic nie znaczy.
+
+        Promptowi wstrzykiwana jest data z `local_now()` (strefa
+        Europe/Warsaw), NIE z `utc_now()` - to świadoma decyzja serwisu
+        (patrz `_call_model`), bo użytkownik pyta "co dzisiaj" według
+        swojego kalendarza, nie UTC. Latem różnica to 2 godziny, więc
+        między 22:00 a 23:59 UTC lokalna data jest już o dzień do przodu;
+        test porównujący się do `utc_now()` fałszywie padał właśnie w tym
+        oknie każdej doby.
+        """
         harness = _build()
 
         await _ask(harness)
 
-        assert utc_now().date().isoformat() in harness.client.calls[0]["system"]
+        assert local_now().date().isoformat() in harness.client.calls[0]["system"]
 
     async def test_brak_klucza_api_zglasza_brak_konfiguracji(self):
         harness = _build(configured=False)
@@ -303,7 +311,9 @@ class TestPetlaRozmowy:
 
     async def test_model_ktory_w_kolko_pyta_o_dane_konczy_sie_bledem(self):
         harness = _build(
-            FakeAnthropic([FakeResponse([ToolUseBlock("niskie_stany")], stop_reason="tool_use")])
+            FakeAnthropic(
+                [FakeResponse([ToolUseBlock("niskie_stany")], stop_reason="tool_use")]
+            )
         )
 
         with pytest.raises(OrdlakError, match="podejściach"):
@@ -428,7 +438,9 @@ class TestMagazyn:
     async def test_dluga_lista_jest_ucinana_z_informacja_ile_zostalo(self):
         harness = _build(_with_tool("magazyn", {"limit": 2}))
         for index in range(5):
-            harness.inventory.items[f"SKU{index}"] = _item(f"SKU{index}", f"Produkt {index}", 1)
+            harness.inventory.items[f"SKU{index}"] = _item(
+                f"SKU{index}", f"Produkt {index}", 1
+            )
 
         result = await _run_tool(harness)
 
@@ -438,7 +450,9 @@ class TestMagazyn:
         """Model bywa hojny z liczbami - 5000 pozycji nie ma trafić do promptu."""
         harness = _build(_with_tool("magazyn", {"limit": 5000}))
         for index in range(70):
-            harness.inventory.items[f"SKU{index}"] = _item(f"SKU{index}", f"Produkt {index}", 1)
+            harness.inventory.items[f"SKU{index}"] = _item(
+                f"SKU{index}", f"Produkt {index}", 1
+            )
 
         result = await _run_tool(harness)
 
@@ -502,7 +516,9 @@ class TestKalendarzISystem:
 
     async def test_stan_systemu_laczy_zdrowie_i_dzisiejsze_liczby(self):
         harness = _build(_with_tool("stan_systemu"))
-        await harness.orders.save(_order("DZIS", utc_now(), "150.00", fulfillment_status="NEW"))
+        await harness.orders.save(
+            _order("DZIS", utc_now(), "150.00", fulfillment_status="NEW")
+        )
         harness.inventory.items["PET30"] = _item("PET30", "Butelka PET 30ml", 1, min_stock=10)
 
         result = await _run_tool(harness)

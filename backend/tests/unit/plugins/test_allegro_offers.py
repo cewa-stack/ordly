@@ -98,7 +98,6 @@ class TestMapowanieOferty:
         assert offer.price == Decimal("12.90")
         assert offer.image_url == "https://a.allegroimg.com/original/11aabb/butelka60"
         assert offer.synced_at == synced_at
-        assert offer.is_active is True
 
     def test_pusta_sygnatura_staje_sie_none(self):
         """
@@ -114,16 +113,23 @@ class TestMapowanieOferty:
 
         assert offer.signature is None
 
-    def test_oferta_zakonczona_nie_jest_aktywna(self):
-        """Oferta ze statusem ENDED zostaje w katalogu, ale jest nieaktywna."""
+    def test_mapuje_oferte_bez_sekcji_external_i_zdjecia(self):
+        """
+        Mapper nie może zakładać, że wszystkie sekcje odpowiedzi są obecne.
+
+        Trzecia oferta w przykładzie nie ma ani `external`, ani
+        `primaryImage`. Katalog pobiera dziś wyłącznie oferty aktywne,
+        ale odporność na niepełny wiersz to zadanie mappera, nie filtra -
+        Allegro potrafi pominąć sekcję w każdej odpowiedzi.
+        """
         raw = json.loads(
             (_FIXTURES_DIR / "sale_offers_sample.json").read_text(encoding="utf-8")
         )
 
         offer = map_offer_to_domain(raw["offers"][2], "allegro", utc_now())
 
-        assert offer.status == "ENDED"
-        assert offer.is_active is False
+        assert offer.signature is None
+        assert offer.image_url is None
         assert offer.available_stock == 0
 
     def test_oferta_bez_ceny_i_zdjecia_nie_wywraca_mapowania(self):
@@ -134,6 +140,58 @@ class TestMapowanieOferty:
         assert offer.image_url is None
         assert offer.available_stock == 0
         assert offer.status == "ACTIVE"
+
+
+class TestFiltrStatusuPublikacji:
+    """Katalog ma zawierać wyłącznie oferty mogące jeszcze sprzedać."""
+
+    async def test_prosi_allegro_tylko_o_aktywne_oferty(self, config, monkeypatch):
+        """
+        Filtr musi iść w zapytaniu, a nie po pobraniu wszystkiego.
+
+        Sprzedawca z długą historią ma zwykle wielokrotnie więcej ofert
+        zakończonych niż wystawionych - odsiewanie ich lokalnie
+        oznaczałoby ściąganie kilkunastu stron po to, żeby je zaraz
+        wyrzucić.
+        """
+        seen_statuses: list[str] = []
+
+        def handler(request: httpx.Request) -> httpx.Response:
+            seen_statuses.extend(request.url.params.get_list("publication.status"))
+            return httpx.Response(200, json={"offers": [], "count": 0, "totalCount": 0})
+
+        _install_transport(monkeypatch, handler)
+        plugin = AllegroPlugin(
+            config=config, token_store=_FakeTokenStore(TokenEncryptor(_FERNET_KEY))
+        )
+
+        await plugin.get_offers()
+
+        assert seen_statuses == ["ACTIVE", "ACTIVATING"]
+
+    async def test_nie_prosi_o_oferty_zakonczone(self, config, monkeypatch):
+        """
+        Wprost: `ENDED` i `INACTIVE` nie mogą pojawić się w zapytaniu.
+
+        Osobny test od powyższego, bo to jest cała treść zgłoszenia -
+        zakończone oferty zaśmiecały listę do powiązania.
+        """
+        seen_query: list[str] = []
+
+        def handler(request: httpx.Request) -> httpx.Response:
+            seen_query.append(str(request.url))
+            return httpx.Response(200, json={"offers": [], "count": 0, "totalCount": 0})
+
+        _install_transport(monkeypatch, handler)
+        plugin = AllegroPlugin(
+            config=config, token_store=_FakeTokenStore(TokenEncryptor(_FERNET_KEY))
+        )
+
+        await plugin.get_offers()
+
+        assert seen_query, "Nie poszło żadne zapytanie do Allegro"
+        assert "ENDED" not in seen_query[0]
+        assert "INACTIVE" not in seen_query[0]
 
 
 class TestStronicowanieAsortymentu:

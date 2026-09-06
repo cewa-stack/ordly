@@ -50,11 +50,6 @@ const LINK_BADGE: Record<OfferLinkType, LinkBadge> = {
   none: { tone: "pack", label: "nie rusza magazynu" },
 };
 
-/** Oferty zakończone zostają w katalogu, ale nie wołają o uwagę. */
-function isEnded(offer: CatalogOffer): boolean {
-  return offer.status === "ENDED";
-}
-
 export function KatalogAllegroView({
   onLinkOffer,
 }: {
@@ -343,7 +338,7 @@ export function KatalogAllegroView({
                       key={`${offer.marketplace}-${offer.external_id}`}
                       className={`flex items-center gap-3 rounded-lg border border-line bg-panel-2 px-3.5 py-3 ${
                         offer.is_linked ? "" : "shadow-[inset_3px_0_0_var(--coral)]"
-                      } ${isEnded(offer) ? "opacity-60" : ""}`}
+                      }`}
                     >
                       <input
                         type="checkbox"
@@ -371,7 +366,6 @@ export function KatalogAllegroView({
                           {offer.signature ? ` · sygn. ${offer.signature}` : ""} ·{" "}
                           {offer.available_stock} szt. na Allegro
                           {offer.price !== null ? ` · ${formatCurrency(offer.price)}` : ""}
-                          {isEnded(offer) ? " · zakończona" : ""}
                         </p>
                         {offer.components.length > 0 && (
                           <div className="mt-1.5 flex flex-wrap gap-1.5">

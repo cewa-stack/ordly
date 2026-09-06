@@ -23,6 +23,17 @@ przepisany z ręki.
 W aplikacji desktopowej doszła trzecia zakładka w Magazynie:
 **Asortyment Allegro**.
 
+Katalog pobiera **wyłącznie oferty aktywne** (`ACTIVE` i `ACTIVATING`) —
+zakończone i nieaktywne nie schodzą w ogóle. Filtr idzie w zapytaniu do
+Allegro, więc przy długiej historii sprzedaży pobieranie jest też
+wyraźnie szybsze.
+
+> Nie tracisz przez to możliwości naprawy starych ofert. Zakończona
+> oferta, która sprzedała się bez powiązania, dalej wisi na liście
+> **Powiązania ofert → „Sprzedają się bez powiązania"** — ta lista
+> pochodzi z historii zamówień, nie z katalogu — i dalej można jej
+> przypisać składniki oraz zrobić korektę wsteczną.
+
 > **Uwaga — trzy rzeczy do zrobienia, nie jedna:**
 > migracja bazy (`0011`), restart usługi **oraz przebudowanie aplikacji
 > desktopowej** (`.exe`). Sama aktualizacja Pi nie doda zakładki.
@@ -177,7 +188,8 @@ curl -s -X POST http://localhost:8000/api/v1/stock/catalog/sync -H "Authorizatio
 {"marketplace":"allegro","fetched":37,"auto_linked":0,"unlinked":37,...}
 ```
 
-Liczba przy `fetched` to Twoje oferty na Allegro. Jeśli się zgadza —
+Liczba przy `fetched` to Twoje **aktywne** oferty na Allegro — będzie
+mniejsza niż wszystko, co kiedykolwiek wystawiłeś. Jeśli się zgadza —
 działa, przejdź do CZĘŚCI C.
 
 **Jeśli zamiast tego widzisz `503` albo tekst z `AccessDenied` / `403`** —

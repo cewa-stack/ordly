@@ -13,7 +13,7 @@ from loguru import logger
 
 from app.domain.entities.customer import Customer
 from app.domain.entities.issue import Issue, IssueMessage
-from app.domain.entities.marketplace_offer import MarketplaceOffer
+from app.domain.entities.marketplace_offer import ACTIVE_STATUSES, MarketplaceOffer
 from app.domain.entities.order import Order
 from app.domain.entities.order_return import OrderReturn
 from app.domain.entities.shipment import Shipment
@@ -52,6 +52,12 @@ _BETA_ACCEPT_HEADER = "application/vnd.allegro.beta.v1+json"
 # niego błąd stronicowania po stronie API zapętliłby synchronizację.
 _OFFERS_PAGE_SIZE = 100
 _OFFERS_MAX_TOTAL = 10_000
+
+# Katalog ma zawierać wyłącznie oferty, które mogą jeszcze sprzedać -
+# zakończone i nieaktywne tylko zaśmiecałyby listę do powiązania.
+# `publication.status` przyjmuje wiele wartości, httpx powtarza wtedy
+# parametr w query stringu.
+_OFFERS_FETCHED_STATUSES = ACTIVE_STATUSES
 
 
 class AllegroPlugin(MarketplacePlugin):
@@ -265,7 +271,13 @@ class AllegroPlugin(MarketplacePlugin):
 
     async def get_offers(self) -> list[MarketplaceOffer]:
         """
-        Pobiera cały asortyment sprzedawcy z `GET /sale/offers`.
+        Pobiera z `GET /sale/offers` oferty, które mogą jeszcze sprzedawać.
+
+        Filtrujemy po stronie Allegro (`publication.status`), a nie po
+        pobraniu wszystkiego: sprzedawca z długą historią ma zwykle
+        wielokrotnie więcej ofert zakończonych niż wystawionych, więc
+        odsianie ich lokalnie oznaczałoby ściąganie kilkunastu stron
+        po to, żeby je zaraz wyrzucić.
 
         Allegro stronicuje tę listę i oddaje maksymalnie `_OFFERS_PAGE_SIZE`
         pozycji naraz, więc jedno zapytanie wystarcza tylko sprzedawcy
@@ -284,7 +296,11 @@ class AllegroPlugin(MarketplacePlugin):
             response = await self._api_client.get(
                 "/sale/offers",
                 access_token,
-                params={"limit": str(_OFFERS_PAGE_SIZE), "offset": str(offset)},
+                params={
+                    "limit": str(_OFFERS_PAGE_SIZE),
+                    "offset": str(offset),
+                    "publication.status": list(_OFFERS_FETCHED_STATUSES),
+                },
             )
             page = response.get("offers", [])
             if not page:
