@@ -34,6 +34,15 @@ export function Modal({
 }: ModalProps) {
   const boxRef = React.useRef<HTMLDivElement>(null);
 
+  // `onClose` bywa nowa funkcja przy kazdym renderze ekranu pod spodem
+  // (`onClose={() => setCos(null)}`). Gdyby efekt zalezal od niej wprost,
+  // kazde odswiezenie listy w tle przestawialoby fokus na pierwszy
+  // element dialogu - w polu, w ktore wlasnie wpisuje sie liczbe, reszta
+  // cyfr trafialaby w prozne miejsce. Referencja trzyma zawsze aktualne
+  // domkniecie, a efekt uruchamia sie raz na otwarcie.
+  const onCloseRef = React.useRef(onClose);
+  onCloseRef.current = onClose;
+
   React.useEffect(() => {
     if (!open) return;
     const previouslyFocused = document.activeElement as HTMLElement | null;
@@ -42,7 +51,7 @@ export function Modal({
     function handleKey(event: KeyboardEvent) {
       if (event.key === "Escape") {
         event.preventDefault();
-        onClose();
+        onCloseRef.current();
         return;
       }
       if (event.key !== "Tab") return;
@@ -64,7 +73,7 @@ export function Modal({
       window.removeEventListener("keydown", handleKey);
       previouslyFocused?.focus();
     };
-  }, [open, onClose]);
+  }, [open]);
 
   if (!open) return null;
 
