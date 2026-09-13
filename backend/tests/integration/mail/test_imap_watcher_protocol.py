@@ -15,7 +15,11 @@ import aioimaplib
 import pytest
 import pytest_asyncio
 
-from app.infrastructure.mail.imap_watcher import ImapConnectionError, ImapWatcher
+from app.infrastructure.mail.imap_watcher import (
+    ImapConnectionError,
+    ImapLoginRejectedError,
+    ImapWatcher,
+)
 from tests.integration.mail.fake_imap_server import FakeImapServer
 
 _SINCE = datetime(2026, 8, 1, 0, 0, 0)
@@ -295,7 +299,9 @@ class TestBledyLogowaniaIPolaczenia:
     ):
         server.login_rejection = "[AUTHENTICATIONFAILED] Invalid credentials (Failure)"
 
-        with pytest.raises(ImapConnectionError) as exc_info:
+        # Osobny typ: job poczty wysyła wtedy alert "odmowa logowania"
+        # zamiast "ponowna próba", bo ponawianie złego hasła nie naprawi.
+        with pytest.raises(ImapLoginRejectedError) as exc_info:
             await _watcher(server).fetch_new_from_senders(["allegro"], _SINCE)
 
         message = str(exc_info.value)
@@ -311,6 +317,8 @@ class TestBledyLogowaniaIPolaczenia:
         message = str(exc_info.value)
         assert "Too many simultaneous connections" in message
         assert "IMAP_PASS" not in message
+        # Limit mija sam - to nie jest odmowa, którą trzeba naprawiać ręcznie.
+        assert not isinstance(exc_info.value, ImapLoginRejectedError)
 
     async def test_haslo_nie_trafia_do_komunikatu(self, server: FakeImapServer):
         """Nawet gdyby serwer odesłał hasło w odpowiedzi, toast go nie pokaże."""

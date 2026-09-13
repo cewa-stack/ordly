@@ -209,6 +209,9 @@ async def _run_application() -> None:
         await run_mail_sync_job(
             session_scope_factory=container.session_scope,
             build_mailbox_service=container.mailbox_service,
+            failure_tracker=sync_failure_tracker,
+            notifier=container.notifier(),
+            retry_in_minutes=5,
         )
 
     register_sync_orders_job(

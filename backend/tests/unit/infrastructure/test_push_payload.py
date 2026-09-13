@@ -146,6 +146,33 @@ class TestKatalogTresci:
         assert payload.body == "Ponowna próba za 5 minut"
         assert "przepraszam" not in payload.body.lower()
 
+    def test_odmowa_logowania_poczty_mowi_co_przepada_i_gdzie_szukac_powodu(self):
+        """
+        Ponawianie nie naprawi odrzuconego hasła, więc zamiast "ponowna
+        próba" treść mówi, że sprzedaż z maili nie wpada, i kieruje na
+        desktop - tylko tam widać dosłowny powód odmowy serwera.
+        """
+        payload = push_payload.mailbox_unavailable(login_rejected=True, retry_in_minutes=5)
+
+        assert payload.title == "Poczta: odmowa logowania"
+        assert "AllegroLokalnie i OLX" in payload.body
+        assert "desktopie" in payload.body
+        assert "Ponowna próba" not in payload.body
+        assert payload.url == "/mailbox"
+        assert payload.collapse_key == "sync:poczta"
+
+    def test_brak_polaczenia_z_poczta_mowi_kiedy_ponowi(self):
+        payload = push_payload.mailbox_unavailable(login_rejected=False, retry_in_minutes=5)
+
+        assert payload.title == "Poczta nie odpowiada"
+        assert payload.body.startswith("Ponowna próba za 5 minut")
+        assert "AllegroLokalnie i OLX" in payload.body
+        # Osobny klucz niż Allegro - alert poczty nie może nadpisać
+        # na telefonie alertu o niedziałającym API zamówień.
+        assert payload.collapse_key != push_payload.sync_failed(
+            channel="allegro", retry_in_minutes=5
+        ).collapse_key
+
     def test_potwierdzenie_hurtowni_jest_ciche_i_bez_akcji_wyciszenia(self):
         """Katalog oznacza tę pozycję jako „ciche" - nie budzi telefonu."""
         payload = push_payload.wholesaler_confirmed(
@@ -528,6 +555,8 @@ class TestTytulyMieszczaSieNaEkranieBlokady:
             push_payload.new_return(external_id="r", products_summary="A", reason="b"),
             push_payload.pending_packing(count=3, oldest_since="wczoraj"),
             push_payload.sync_failed(channel="allegro", retry_in_minutes=5),
+            push_payload.mailbox_unavailable(login_rejected=True, retry_in_minutes=5),
+            push_payload.mailbox_unavailable(login_rejected=False, retry_in_minutes=5),
             push_payload.unmatched_products(reference="r", product_names=["A"]),
             push_payload.allegro_lokalnie_event(
                 event_type="new_order",

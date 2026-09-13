@@ -23,6 +23,7 @@ class FakeNotifier(Notifier):
         self.sent_active_orders: list[list[Order]] = []
         self.sent_allegro_lokalnie: list[AllegroLokalnieEvent] = []
         self.sent_disputes: list[DisputeNotice] = []
+        self.sent_mailbox_alerts: list[tuple[bool, int]] = []
 
     async def notify_new_order(self, order: Order) -> None:
         self.sent_orders.append(order)
@@ -47,6 +48,9 @@ class FakeNotifier(Notifier):
 
     async def notify_new_dispute(self, notice: DisputeNotice) -> None:
         self.sent_disputes.append(notice)
+
+    async def notify_mailbox_unavailable(self, login_rejected: bool, retry_in_minutes: int) -> None:
+        self.sent_mailbox_alerts.append((login_rejected, retry_in_minutes))
 
     async def send_text(self, text: str) -> None:
         self.sent_texts.append(text)

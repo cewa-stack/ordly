@@ -165,6 +165,24 @@ def _karty() -> list[Karta]:
             payload=push_payload.sync_failed(channel="allegro", retry_in_minutes=5),
         ),
         Karta(
+            builder="mailbox_unavailable (odmowa logowania)",
+            kiedy=(
+                "Gdy skrzynka DWA RAZY z rzędu odrzuci logowanie IMAP (co 5 min, "
+                "czyli po ok. 10 minutach). Raz na serię - nie co 5 minut."
+            ),
+            payload=push_payload.mailbox_unavailable(login_rejected=True, retry_in_minutes=5),
+            uwaga=(
+                "NOWE. Sprzedaż z AllegroLokalnie i OLX przychodzi wyłącznie mailem - "
+                "bez tego alertu zepsute hasło aplikacji oznaczało ciche gubienie zamówień."
+            ),
+        ),
+        Karta(
+            builder="mailbox_unavailable (brak połączenia)",
+            kiedy="Gdy skrzynka DWA RAZY z rzędu nie odpowie (zerwane łącze, timeout).",
+            payload=push_payload.mailbox_unavailable(login_rejected=False, retry_in_minutes=5),
+            uwaga="NOWE. Znika samo przy pierwszej udanej synchronizacji poczty.",
+        ),
+        Karta(
             builder="wholesaler_confirmed",
             kiedy="Gdy hurtownia odpisze na zamówienie. CICHE z definicji.",
             payload=push_payload.wholesaler_confirmed(

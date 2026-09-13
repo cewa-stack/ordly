@@ -246,6 +246,14 @@ class WebPushNotifier(Notifier):
             push_payload.sync_failed(channel=channel, retry_in_minutes=retry_in_minutes)
         )
 
+    async def notify_mailbox_unavailable(self, login_rejected: bool, retry_in_minutes: int) -> None:
+        """Skrzynka nie działa - katalog, pozycja „Poczta nie działa"."""
+        await self._send(
+            push_payload.mailbox_unavailable(
+                login_rejected=login_rejected, retry_in_minutes=retry_in_minutes
+            )
+        )
+
     async def send_text(self, text: str) -> None:
         """
         Dowolna wiadomość tekstowa (np. alert o błędzie z innej warstwy).

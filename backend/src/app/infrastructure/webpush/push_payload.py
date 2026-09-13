@@ -363,6 +363,52 @@ def sync_failed(
     )
 
 
+def mailbox_unavailable(
+    *,
+    login_rejected: bool,
+    retry_in_minutes: int,
+    silent: bool = False,
+) -> PushPayload:
+    """
+    Skrzynka IMAP nie działa - dopiero po DRUGIEJ nieudanej próbie z rzędu.
+
+    To nie jest drobna usterka techniczna: sprzedaż z Allegro Lokalnie
+    i OLX przychodzi WYŁĄCZNIE mailem, więc niedziałająca poczta to
+    zamówienia, o których ORDLY się nie dowie. Treść mówi więc wprost, co
+    przepada, a nie tylko że "coś nie odpowiada".
+
+    Odmowa logowania ma osobny tytuł, bo samo ponawianie jej nie naprawi
+    (zwykle wygasłe hasło aplikacji Google) - zamiast "ponowna próba"
+    treść kieruje do Ustawień NA DESKTOPIE: tylko tam przycisk "Sprawdź
+    logowanie" pokazuje dosłowny powód odmowy serwera. Telefon stanu
+    skrzynki nie ma, więc kliknięcie otwiera zakładkę Poczta - to tam
+    brak nowych maili byłoby widać.
+    """
+    if login_rejected:
+        return PushPayload(
+            title="Poczta: odmowa logowania",
+            body=(
+                "Skrzynka odrzuca logowanie. Sprzedaż z AllegroLokalnie i OLX nie wpada "
+                "do ORDLY — powód w Ustawieniach na desktopie"
+            ),
+            thread="sync",
+            url="/mailbox",
+            silent=silent,
+            collapse_key="sync:poczta",
+        )
+    return PushPayload(
+        title="Poczta nie odpowiada",
+        body=(
+            f"Ponowna próba za {retry_in_minutes} minut. Do tego czasu sprzedaż "
+            "z AllegroLokalnie i OLX nie wpada do ORDLY"
+        ),
+        thread="sync",
+        url="/mailbox",
+        silent=silent,
+        collapse_key="sync:poczta",
+    )
+
+
 def wholesaler_confirmed(
     *,
     wholesaler_name: str,

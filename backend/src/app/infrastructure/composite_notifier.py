@@ -109,3 +109,12 @@ class CompositeNotifier(Notifier):
         await self._run_all(
             [n.notify_sync_failed(channel, retry_in_minutes) for n in self._notifiers]
         )
+
+    async def notify_mailbox_unavailable(self, login_rejected: bool, retry_in_minutes: int) -> None:
+        """Rozgłasza alert o niedziałającej skrzynce IMAP."""
+        await self._run_all(
+            [
+                n.notify_mailbox_unavailable(login_rejected, retry_in_minutes)
+                for n in self._notifiers
+            ]
+        )

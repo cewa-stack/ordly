@@ -41,6 +41,14 @@
     paczkomaty) i Twoje (imię, nazwisko, login, adres zwrotów, e-mail sklepu).
     Zostały zanonimizowane, a **historia repozytorium została przepisana**, żeby
     żadna stara wersja ich nie zawierała.
+11. **Alert o niedziałającej poczcie** — sprzedaż z Allegro Lokalnie i OLX
+    przychodzi tylko mailem, a synchronizacja w tle połykała błąd logowania
+    po cichu. Teraz, gdy skrzynka dwa razy z rzędu (ok. 10 minut) odrzuci
+    logowanie albo nie odpowie, na telefon i Telegram przychodzi jedno
+    powiadomienie: „Poczta: odmowa logowania" albo „Poczta nie odpowiada".
+    Kliknięcie otwiera zakładkę Poczta, a powód odmowy sprawdzisz
+    w Ustawieniach desktopu (CZĘŚĆ B). Następne powiadomienie przyjdzie
+    dopiero po naprawie i kolejnej awarii — nie co 5 minut.
 
 **Bez migracji bazy.** Commit i push na GitHub są już zrobione.
 
@@ -88,8 +96,8 @@ git fetch origin
 git reset --hard origin/main
 ```
 
-Ostatnia linia ma zaczynać się od `HEAD is now at` i opisem commita o danych
-osobowych.
+Ostatnia linia ma zaczynać się od `HEAD is now at` i opisem commita o alercie
+niedziałającej poczty.
 
 ```bash
 uv sync

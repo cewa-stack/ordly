@@ -43,6 +43,18 @@ class ImapConnectionError(Exception):
     """Połączenie, logowanie albo wyszukiwanie IMAP nie powiodło się."""
 
 
+class ImapLoginRejectedError(ImapConnectionError):
+    """
+    Serwer odpowiedział na LOGIN odmową - połączenie było, ale login lub
+    hasło nie przeszły (albo serwer odrzucił je z innego powodu, który
+    podał w odpowiedzi). W odróżnieniu od zerwanego łącza samo ponawianie
+    tu nie pomoże, więc alert mówi, że trzeba zajrzeć do Ustawień.
+
+    Limit jednoczesnych połączeń to też odmowa LOGIN, ale mija sama -
+    dostaje zwykły `ImapConnectionError` (patrz `_login_rejected_error`).
+    """
+
+
 ClientFactory = Callable[[], aioimaplib.IMAP4]
 
 # Wszystko, czym aioimaplib potrafi przerwać rozmowę z serwerem: zerwane
@@ -195,9 +207,7 @@ class ImapWatcher:
         try:
             login_response = await client.login(self._user, self._password)
             if login_response.result != "OK":
-                raise ImapConnectionError(
-                    _login_rejected_message(login_response.lines, self._password)
-                )
+                raise _login_rejected_error(login_response.lines, self._password)
 
             select_response = await client.select("INBOX")
             if select_response.result != "OK":
@@ -245,6 +255,23 @@ def _decode_server_lines(lines: list[bytes | bytearray | str], secret: str) -> s
     if len(reason) > _SERVER_REASON_MAX_LENGTH:
         reason = reason[: _SERVER_REASON_MAX_LENGTH - 1] + "…"
     return reason
+
+
+def _login_rejected_error(
+    lines: list[bytes | bytearray | str], password: str
+) -> ImapConnectionError:
+    """
+    Wyjątek dla odmowy LOGIN - rodzaj zależy od powodu podanego przez serwer.
+
+    Limit jednoczesnych połączeń mija bez niczyjej interwencji, więc to
+    zwykły `ImapConnectionError` (alert "ponowna próba za N minut").
+    Każda inna odmowa to `ImapLoginRejectedError` - ponawianie jej nie
+    naprawi i alert musi to powiedzieć.
+    """
+    message = _login_rejected_message(lines, password)
+    if "TOO MANY" in _decode_server_lines(lines, secret=password).upper():
+        return ImapConnectionError(message)
+    return ImapLoginRejectedError(message)
 
 
 def _login_rejected_message(lines: list[bytes | bytearray | str], password: str) -> str:

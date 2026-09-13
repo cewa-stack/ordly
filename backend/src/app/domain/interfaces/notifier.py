@@ -136,3 +136,29 @@ class Notifier(ABC):
             f"{channel.capitalize()} nie odpowiedziało. "
             f"Ordi spróbuje ponownie za {retry_in_minutes} min."
         )
+
+    async def notify_mailbox_unavailable(self, login_rejected: bool, retry_in_minutes: int) -> None:
+        """
+        Alarmuje, że skrzynka IMAP nie działa.
+
+        Sprzedaż z Allegro Lokalnie i OLX przychodzi WYŁĄCZNIE mailem, więc
+        niedziałająca poczta to po cichu gubione zamówienia - nie drobna
+        usterka. Jak `notify_sync_failed`: wywoływane dopiero po DRUGIEJ
+        nieudanej próbie z rzędu i ma domyślną treść przez `send_text`
+        (Telegram); Web Push nadpisuje ją pozycją z katalogu.
+
+        Args:
+            login_rejected: Serwer odmówił logowania - ponawianie nie
+                pomoże, trzeba poprawić hasło w `.env` na Pi.
+            retry_in_minutes: Za ile minut job spróbuje ponownie.
+        """
+        if login_rejected:
+            await self.send_text(
+                "Poczta: skrzynka odrzuca logowanie. Sprzedaż z Allegro Lokalnie i OLX "
+                "nie trafi do ORDLY, dopóki nie poprawisz IMAP_PASS na Pi - powód "
+                "odmowy zobaczysz w Ustawieniach aplikacji desktopowej."
+            )
+            return
+        await self.send_text(
+            f"Poczta nie odpowiada. Ordi spróbuje ponownie za {retry_in_minutes} min."
+        )
