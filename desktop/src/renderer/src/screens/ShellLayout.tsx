@@ -20,7 +20,7 @@ import { CommandPalette, type PaletteTarget } from "../components/CommandPalette
 import { StatStrip } from "../components/StatStrip";
 import { useAuth } from "../lib/auth";
 import { useSync } from "../lib/sync";
-import { formatLongDate } from "../lib/format";
+import { formatLongDate, formatPlural } from "../lib/format";
 import { isPendingFulfillment } from "../lib/fulfillment";
 import { StartScreen } from "./StartScreen";
 import { ZamowieniaScreen } from "./ZamowieniaScreen";
@@ -49,6 +49,12 @@ const GOTO_KEYS: Record<string, ViewId> = {
   k: "kalendarz",
   u: "ustawienia",
 };
+
+/**
+ * Statusy zwrotow, ktore nie wymagaja juz niczego od sprzedawcy - te same,
+ * ktore ekran Zwroty pokazuje wygaszone (ton "done").
+ */
+const CLOSED_RETURN_STATUSES = new Set(["COMMISSION_REFUNDED", "CANCELLED", "REJECTED"]);
 
 function hostnameOf(baseUrl: string): string {
   try {
@@ -123,12 +129,18 @@ export function ShellLayout() {
   );
   const lowStockCount = dashboardQuery.data?.low_stock_count ?? 0;
 
+  // Licznik zwrotow to te, ktore jeszcze czekaja na ruch. Wczesniej liczyl
+  // wszystkie pobrane (do 50) - razem z zamknietymi - i wisial na stale.
+  const openReturns = (returnsQuery.data ?? []).filter(
+    (item) => !CLOSED_RETURN_STATUSES.has(item.status)
+  );
+
   const counts: NavCounts = {
     zamowienia: pendingOrders.length,
     dyskusje: { value: openIssues.length, alert: openIssues.length > 0 },
     magazyn: { value: lowStockCount, alert: lowStockCount > 0 },
     poczta: unreadMail.length,
-    zwroty: (returnsQuery.data ?? []).length,
+    zwroty: openReturns.length,
   };
 
   // ------------------------------------------------------------- skroty
@@ -213,15 +225,23 @@ export function ShellLayout() {
 
   const crumbs: Record<ViewId, string> = {
     start: formatLongDate(new Date()),
-    zamowienia: "Wszystkie kanały · ostatnie 20",
-    dyskusje: `${openIssues.length} ${
-      openIssues.length === 1 ? "otwarta sprawa" : "otwartych spraw"
-    }`,
+    zamowienia: ordersQuery.data
+      ? `Wszystkie kanały · ostatnie ${ordersQuery.data.length}`
+      : "Wszystkie kanały",
+    dyskusje: formatPlural(openIssues.length, [
+      "otwarta sprawa",
+      "otwarte sprawy",
+      "otwartych spraw",
+    ]),
     magazyn: dashboardQuery.data
-      ? `${lowStockCount} ${lowStockCount === 1 ? "pozycja" : "pozycji"} poniżej progu`
+      ? `${formatPlural(lowStockCount, ["pozycja", "pozycje", "pozycji"])} poniżej progu`
       : "Wczytuję stan magazynu…",
     poczta: "Skrzynka główna · IMAP",
-    zwroty: "Ostatnie 30 dni",
+    zwroty: formatPlural(openReturns.length, [
+      "zwrot do obsłużenia",
+      "zwroty do obsłużenia",
+      "zwrotów do obsłużenia",
+    ]),
     ordlak: "Asystent sprzedaży",
     hurtownie: "Dostawcy i zamówienia",
     olx: "Oferty prowadzone ręcznie",

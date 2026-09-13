@@ -209,17 +209,28 @@ class SqliteOrderRepository(OrderRepository):
         return [self._to_domain(m) for m in result.scalars().all()]
 
     async def count_since(self, since: datetime) -> int:
-        """Liczy zamówienia utworzone od podanej daty."""
+        """Liczy zamówienia utworzone od podanej daty, bez anulowanych."""
         stmt = (
-            select(func.count()).select_from(OrderModel).where(OrderModel.order_date >= since)
+            select(func.count())
+            .select_from(OrderModel)
+            .where(
+                OrderModel.order_date >= since,
+                func.upper(OrderModel.status) != _CANCELLED_STATUS,
+            )
         )
         result = await self._session.execute(stmt)
         return result.scalar_one() or 0
 
     async def sum_amount_since(self, since: datetime) -> float:
-        """Sumuje kwoty zamówień od podanej daty."""
+        """
+        Sumuje kwoty zamówień od podanej daty, bez anulowanych.
+
+        Anulowane zamówienie nie przyniosło pieniędzy - wcześniej wliczało
+        się do "Przychodu dziś" i statystyk miesiąca na równi ze sprzedażą.
+        """
         stmt = select(func.coalesce(func.sum(OrderModel.total_amount), 0)).where(
-            OrderModel.order_date >= since
+            OrderModel.order_date >= since,
+            func.upper(OrderModel.status) != _CANCELLED_STATUS,
         )
         result = await self._session.execute(stmt)
         return float(result.scalar_one())
@@ -231,11 +242,20 @@ class SqliteOrderRepository(OrderRepository):
         return result.scalar_one() or 0
 
     async def sum_amount_by_day(self, since: datetime) -> dict[str, float]:
-        """Sumuje kwoty zamówień pogrupowane po dniu (`func.date` - SQLite)."""
+        """
+        Sumuje kwoty zamówień pogrupowane po dniu UTC (`func.date` - SQLite),
+        bez anulowanych.
+
+        Doby są tu UTC - ekrany i asystent liczą przychód dzienny w polskich
+        dobach przez `revenue_by_local_day`, nie przez tę metodę.
+        """
         day = func.date(OrderModel.order_date)
         stmt = (
             select(day, func.coalesce(func.sum(OrderModel.total_amount), 0))
-            .where(OrderModel.order_date >= since)
+            .where(
+                OrderModel.order_date >= since,
+                func.upper(OrderModel.status) != _CANCELLED_STATUS,
+            )
             .group_by(day)
         )
         result = await self._session.execute(stmt)

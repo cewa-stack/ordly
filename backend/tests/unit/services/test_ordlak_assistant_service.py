@@ -42,7 +42,7 @@ from app.services.ordlak_assistant_service import (
 )
 from app.services.returns_service import ReturnsService
 from app.services.search_service import SearchService
-from app.utils.time import local_now, utc_now
+from app.utils.time import local_midnight_utc, local_now, local_today, utc_now
 from tests.fakes.fake_anthropic import (
     FakeAnthropic,
     FakeResponse,
@@ -370,8 +370,8 @@ class TestPodsumowanieSprzedazy:
         na pomyłkę w całym module - i najbardziej mylące dla użytkownika.
         """
         harness = _build(_with_tool("podsumowanie_sprzedazy", {"okres": "wczoraj"}))
-        now = utc_now()
-        today_start = datetime(now.year, now.month, now.day)
+        # Północ w Polsce, nie w UTC - tak samo liczą ekrany aplikacji.
+        today_start = local_midnight_utc(local_today())
         await harness.orders.save(
             _order("WCZORAJ-1", today_start - timedelta(hours=5), amount="40.00")
         )

@@ -124,6 +124,7 @@ function ThresholdEditor() {
 export function UstawieniaScreen() {
   const { session, logout } = useAuth();
   const toast = useToast();
+  const queryClient = useQueryClient();
   const [logoutConfirm, setLogoutConfirm] = React.useState(false);
 
   const healthQuery = useQuery({
@@ -144,6 +145,28 @@ export function UstawieniaScreen() {
       return result.data;
     },
     retry: false,
+  });
+
+  const mailCheckMutation = useMutation({
+    mutationFn: async () => {
+      const result = await window.ordly.mailbox.sync();
+      if (!result.ok) throw new Error(result.message);
+      return result.data;
+    },
+    onSuccess: (result) => {
+      void queryClient.invalidateQueries({ queryKey: ["mailbox-status"] });
+      void queryClient.invalidateQueries({ queryKey: ["mailbox"] });
+      toast.success(
+        "Logowanie do skrzynki działa",
+        result.new_count > 0 ? `Pobrano nowe maile: ${result.new_count}` : "Brak nowych maili"
+      );
+    },
+    onError: (error) => {
+      toast.error(
+        "Skrzynka nie odpowiedziała",
+        error instanceof Error ? error.message : "Sprawdź logi usługi ordly na Pi."
+      );
+    },
   });
 
   const backupMutation = useMutation({
@@ -233,13 +256,27 @@ export function UstawieniaScreen() {
           )
         }
       >
-        <span
-          className={`o-mono shrink-0 rounded-[20px] px-2.5 py-1 text-[10.5px] ${
-            mail?.configured ? "bg-teal-dim text-teal-bright" : "bg-coral-dim text-coral"
-          }`}
-        >
-          {mail?.configured ? "podłączona" : "wyłączona"}
-        </span>
+        <div className="flex shrink-0 items-center gap-2">
+          {mail?.configured && (
+            // Sam wpis w .env nie znaczy, że logowanie działa - Gmail potrafi
+            // unieważnić hasło aplikacji. Ten przycisk robi prawdziwe
+            // logowanie na Pi i pokazuje dosłowny powód odmowy.
+            <MiniButton
+              icon={<RefreshIcon size={13} />}
+              onClick={() => mailCheckMutation.mutate()}
+              disabled={mailCheckMutation.isPending}
+            >
+              {mailCheckMutation.isPending ? "Sprawdzam…" : "Sprawdź logowanie"}
+            </MiniButton>
+          )}
+          <span
+            className={`o-mono shrink-0 rounded-[20px] px-2.5 py-1 text-[10.5px] ${
+              mail?.configured ? "bg-teal-dim text-teal-bright" : "bg-coral-dim text-coral"
+            }`}
+          >
+            {mail?.configured ? "skonfigurowana" : "wyłączona"}
+          </span>
+        </div>
       </Row>
 
       <Row

@@ -35,6 +35,32 @@ import type { RootStackParamList } from "@/navigation/types";
 const STATUS_FILTERS = ["Wszystkie", "Nowe", "Pakowanie", "Wysłane", "Anulowane"] as const;
 type StatusFilter = (typeof STATUS_FILTERS)[number];
 
+/**
+ * Do którego filtra należy zamówienie.
+ *
+ * Wcześniej filtr porównywał SWOJĄ nazwę z etykietą statusu, a etykiety to
+ * "Do spakowania", "Gotowe do wysyłki" i "Odebrane" - więc "Pakowanie"
+ * było zawsze puste, a odebrane paczki wypadały z "Wysłanych".
+ */
+function filterOf(order: Order): Exclude<StatusFilter, "Wszystkie"> | null {
+  if (order.status === "CANCELLED" || order.fulfillment_status === "CANCELLED") {
+    return "Anulowane";
+  }
+  switch (order.fulfillment_status) {
+    case null:
+    case "NEW":
+      return "Nowe";
+    case "PROCESSING":
+    case "READY_FOR_SHIPMENT":
+      return "Pakowanie";
+    case "SENT":
+    case "PICKED_UP":
+      return "Wysłane";
+    default:
+      return null;
+  }
+}
+
 export function OrdersScreen() {
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const queryClient = useQueryClient();
@@ -59,9 +85,9 @@ export function OrdersScreen() {
       Anulowane: 0,
     };
     for (const order of baseData ?? []) {
-      const label = fulfillmentLabel(order.fulfillment_status) as StatusFilter;
-      if (label in map) {
-        map[label] += 1;
+      const key = filterOf(order);
+      if (key) {
+        map[key] += 1;
       }
     }
     return map;
@@ -71,9 +97,7 @@ export function OrdersScreen() {
     if (statusFilter === "Wszystkie") {
       return baseData ?? [];
     }
-    return (baseData ?? []).filter(
-      (order: Order) => fulfillmentLabel(order.fulfillment_status) === statusFilter
-    );
+    return (baseData ?? []).filter((order: Order) => filterOf(order) === statusFilter);
   }, [baseData, statusFilter]);
 
   async function onRefresh() {

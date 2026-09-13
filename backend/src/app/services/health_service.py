@@ -10,7 +10,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.domain.interfaces.marketplace_plugin import MarketplacePlugin
 from app.shared.dto.stats_dto import HealthStatus
-from app.utils.time import utc_now
+from app.utils.time import to_local, utc_now
 
 _START_TIME = utc_now()
 
@@ -63,8 +63,13 @@ class HealthService:
 
         uptime = utc_now() - _START_TIME
         last_sync_at = self._sync_status.last_sync_at
+        # Czas w Polsce, nie w UTC - ten napis czyta człowiek (Ustawienia,
+        # stopka ekranu Start, /health w Telegramie). W UTC był latem
+        # o dwie godziny "za wcześnie" i wyglądał, jakby synchronizacja stała.
         last_sync_human = (
-            last_sync_at.strftime("%Y-%m-%d %H:%M") if last_sync_at else "jeszcze nie wykonano"
+            to_local(last_sync_at).strftime("%Y-%m-%d %H:%M")
+            if last_sync_at
+            else "jeszcze nie wykonano"
         )
 
         return HealthStatus(

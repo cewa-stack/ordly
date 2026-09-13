@@ -13,11 +13,12 @@
  */
 import * as React from "react";
 import { Animated, Easing, Pressable, StyleSheet, Text, View } from "react-native";
+import { useNavigation } from "@react-navigation/native";
 
 import { colors } from "@/theme/colors";
 import { radii, spacing, typography } from "@/theme/typography";
 import { Mascot } from "@/components/Mascot";
-import { ChevronRightIcon, SyncIcon } from "@/icons";
+import { ChevronRightIcon, GearIcon, SyncIcon } from "@/icons";
 import { useSync } from "@/store/sync";
 
 const DATE_FORMATTER = new Intl.DateTimeFormat("pl-PL", {
@@ -61,6 +62,7 @@ interface AppHeaderProps {
 
 export function AppHeader({ username }: AppHeaderProps) {
   const { pose, title, subtitle, phase, sync } = useSync();
+  const navigation = useNavigation();
   const popScale = React.useRef(new Animated.Value(1)).current;
 
   React.useEffect(() => {
@@ -96,6 +98,18 @@ export function AppHeader({ username }: AppHeaderProps) {
           </Text>
           <Text style={styles.date}>{DATE_FORMATTER.format(new Date())}</Text>
         </View>
+        {/* Jedyne wejście do Ustawień (powiadomienia push, Face ID,
+            wylogowanie). Zniknęło razem z zakładką Start i przez to na
+            nowym telefonie nie dało się włączyć powiadomień. */}
+        <Pressable
+          onPress={() => navigation.navigate("Settings")}
+          accessibilityRole="button"
+          accessibilityLabel="Ustawienia i powiadomienia"
+          hitSlop={8}
+          style={({ pressed }) => [styles.settingsButton, pressed && styles.syncPillPressed]}
+        >
+          <GearIcon size={19} color={colors.textSecondary} />
+        </Pressable>
       </View>
 
       <Pressable
@@ -146,6 +160,16 @@ const styles = StyleSheet.create({
   greetingCopy: {
     flex: 1,
     minWidth: 0,
+  },
+  settingsButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: "rgba(35,43,39,0.07)",
   },
   greeting: {
     ...typography.greeting,

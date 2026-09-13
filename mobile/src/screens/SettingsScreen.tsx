@@ -32,6 +32,24 @@ const LEVEL_COLOR: Record<string, string> = {
   CRITICAL: colors.danger,
 };
 
+/**
+ * Zdarzenia po polsku - lista pokazywała surowe `OrderCreated`
+ * i `SyncFinished`. Nieznany typ zostaje surowy, zamiast zgadywać.
+ */
+const EVENT_LABEL: Record<string, string> = {
+  OrderCreated: "Nowe zamówienie",
+  OrderCancelled: "Anulowane zamówienie",
+  OrderPackingStarted: "Rozpoczęto pakowanie",
+  OrderReturnCreated: "Nowy zwrot",
+  LowStockDetected: "Niski stan magazynowy",
+  StockSynchronized: "Magazyn zaktualizowany",
+  AllegroLokalnieEventDetected: "Mail z Allegro Lokalnie",
+  OlxEventDetected: "Mail z OLX",
+  DisputeNoticeDetected: "Nowa dyskusja",
+  SyncStarted: "Start synchronizacji",
+  SyncFinished: "Koniec synchronizacji",
+};
+
 export function SettingsScreen() {
   const {
     baseUrl,
@@ -150,7 +168,7 @@ export function SettingsScreen() {
                   ]}
                 />
                 <Text style={styles.logLabel} numberOfLines={1}>
-                  {entry.event_type}
+                  {EVENT_LABEL[entry.event_type] ?? entry.event_type}
                 </Text>
               </View>
               <Text style={styles.logDate}>{formatDate(entry.created_at)}</Text>

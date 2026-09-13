@@ -10,7 +10,7 @@ import { Pressable, StyleSheet, Text, View } from "react-native";
 import { colors } from "@/theme/colors";
 import { radii, spacing, typography } from "@/theme/typography";
 import type { Order } from "@/api/types";
-import { formatMoney, fulfillmentLabel, plural } from "@/utils/format";
+import { formatMoney, fulfillmentLabel, parseApiDate, plural } from "@/utils/format";
 import { StatusBadge } from "./StatusBadge";
 
 interface OrderRowProps {
@@ -19,7 +19,7 @@ interface OrderRowProps {
 }
 
 function shortDate(iso: string): string {
-  return new Date(iso).toLocaleDateString("pl-PL", { day: "numeric", month: "short" });
+  return parseApiDate(iso).toLocaleDateString("pl-PL", { day: "numeric", month: "short" });
 }
 
 export function OrderRow({ order, onPress }: OrderRowProps) {

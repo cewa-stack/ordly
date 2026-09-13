@@ -2,11 +2,9 @@
 
 from __future__ import annotations
 
-from datetime import datetime
-
 from app.domain.interfaces.order_repository import OrderRepository
 from app.shared.dto.stats_dto import StatsSummary
-from app.utils.time import utc_now
+from app.utils.time import local_midnight_utc, local_today
 
 
 class StatsService:
@@ -16,10 +14,15 @@ class StatsService:
         self._order_repository = order_repository
 
     async def get_summary(self) -> StatsSummary:
-        """Oblicza statystyki: zamówienia i przychód dziś / w tym miesiącu / łącznie."""
-        now = utc_now()
-        today_start = datetime(now.year, now.month, now.day)
-        month_start = datetime(now.year, now.month, 1)
+        """
+        Oblicza statystyki: zamówienia i przychód dziś / w tym miesiącu / łącznie.
+
+        "Dziś" i "ten miesiąc" liczą się od północy w Polsce, nie w UTC -
+        patrz `local_midnight_utc`.
+        """
+        today = local_today()
+        today_start = local_midnight_utc(today)
+        month_start = local_midnight_utc(today.replace(day=1))
 
         return StatsSummary(
             orders_today=await self._order_repository.count_since(today_start),

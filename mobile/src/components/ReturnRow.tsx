@@ -8,11 +8,11 @@ import { StyleSheet, Text, View } from "react-native";
 
 import { colors } from "@/theme/colors";
 import { radii, spacing, typography } from "@/theme/typography";
-import { returnStatusLabel } from "@/utils/format";
+import { parseApiDate, returnStatusLabel } from "@/utils/format";
 import type { ReturnItem } from "@/api/types";
 
 function shortDate(iso: string): string {
-  return new Date(iso).toLocaleDateString("pl-PL", { day: "numeric", month: "short" });
+  return parseApiDate(iso).toLocaleDateString("pl-PL", { day: "numeric", month: "short" });
 }
 
 interface ReturnRowProps {

@@ -103,12 +103,12 @@ class OrderRepository(ABC):
 
     @abstractmethod
     async def count_since(self, since: datetime) -> int:
-        """Zwraca liczbę zamówień utworzonych od podanej daty."""
+        """Zwraca liczbę zamówień utworzonych od podanej daty (bez anulowanych)."""
         raise NotImplementedError
 
     @abstractmethod
     async def sum_amount_since(self, since: datetime) -> float:
-        """Zwraca sumę kwot zamówień od podanej daty."""
+        """Zwraca sumę kwot zamówień od podanej daty (bez anulowanych)."""
         raise NotImplementedError
 
     @abstractmethod

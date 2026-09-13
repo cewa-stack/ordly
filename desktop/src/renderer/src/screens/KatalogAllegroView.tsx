@@ -27,7 +27,7 @@ import {
   SkeletonRows,
 } from "../components/ui";
 import { useToast } from "../lib/toast";
-import { formatCurrency } from "../lib/format";
+import { formatCurrency, formatPlural } from "../lib/format";
 import type { CatalogOffer, OfferLinkType } from "../types/api";
 
 /** Co pokazujemy: wszystko czy tylko to, co cicho psuje magazyn. */
@@ -116,7 +116,7 @@ export function KatalogAllegroView({
       if (linked > 0) {
         toast.success(
           "Dowiązano po sygnaturze",
-          `${linked} ofert(y) zdejmuje od teraz stan magazynowy`
+          `${formatPlural(linked, ["oferta zdejmuje", "oferty zdejmują", "ofert zdejmuje"])} od teraz stan magazynowy`
         );
       } else {
         toast.success(
@@ -253,7 +253,7 @@ export function KatalogAllegroView({
       {pickedList.length > 0 && (
         <div className="flex items-center gap-3 border-b border-line bg-panel-2 px-[22px] py-2.5">
           <span className="text-[12px] text-white">
-            Zaznaczono {pickedList.length} ofert(y)
+            Zaznaczono {formatPlural(pickedList.length, ["ofertę", "oferty", "ofert"])}
           </span>
           <MiniButton onClick={() => setPicked(new Set())}>Odznacz</MiniButton>
           <div className="ml-auto">
@@ -286,7 +286,12 @@ export function KatalogAllegroView({
                 <AlertIcon size={14} className="mt-[2px] shrink-0 text-coral" />
                 <p className="text-[12px] leading-[1.6] text-slate">
                   <span className="text-white">
-                    {unlinkedCount} ofert nie rusza magazynu.
+                    {formatPlural(unlinkedCount, [
+                      "oferta nie rusza",
+                      "oferty nie ruszają",
+                      "ofert nie rusza",
+                    ])}{" "}
+                    magazynu.
                   </span>{" "}
                   Zaznacz je i załóż produkty jednym kliknięciem albo przypisz składniki
                   ręcznie, jeśli oferta jest zestawem.

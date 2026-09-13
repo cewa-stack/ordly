@@ -9,7 +9,7 @@ które wie, jak poprawnie uzyskać naiwny czas UTC.
 
 from __future__ import annotations
 
-from datetime import UTC, datetime
+from datetime import UTC, date, datetime
 from zoneinfo import ZoneInfo
 
 LOCAL_TIMEZONE = ZoneInfo("Europe/Warsaw")
@@ -33,3 +33,28 @@ def local_now() -> datetime:
     który celowo jest naiwny, bo trafia do bazy.
     """
     return datetime.now(LOCAL_TIMEZONE)
+
+
+def local_today() -> date:
+    """Dzisiejsza data w Polsce - "dziś" tak, jak rozumie je użytkownik."""
+    return local_now().date()
+
+
+def local_midnight_utc(day: date) -> datetime:
+    """
+    Północ podanego dnia w Polsce jako naiwny UTC - granica doby do
+    zapytań po bazie.
+
+    Liczenie "dziś" od północy UTC przesuwało dobę o godzinę zimą i o
+    dwie latem: o 1:00 w nocy ekran Start pokazywał jeszcze wczorajszą
+    sprzedaż, a zamówienie z 0:30 lądowało we wczorajszym słupku.
+    Strefa jest liczona dla KONKRETNEGO dnia, więc zmiana czasu
+    w marcu i październiku nie przesuwa granicy.
+    """
+    midnight = datetime(day.year, day.month, day.day, tzinfo=LOCAL_TIMEZONE)
+    return midnight.astimezone(UTC).replace(tzinfo=None)
+
+
+def to_local(value: datetime) -> datetime:
+    """Zamienia naiwny czas UTC z bazy na czas w Polsce (świadomy strefy)."""
+    return value.replace(tzinfo=UTC).astimezone(LOCAL_TIMEZONE)

@@ -18,7 +18,7 @@ import { ExportIcon, ExternalIcon, PencilIcon, PlusIcon, TrashIcon } from "../ic
 import { Button, EmptyState, MiniButton, SkeletonRows } from "../components/ui";
 import { ConfirmDialog, Modal } from "../components/Modal";
 import { useToast } from "../lib/toast";
-import { formatCurrency } from "../lib/format";
+import { formatCurrency, formatPlural } from "../lib/format";
 import type { OlxOffer } from "../types/api";
 
 const inputClass =
@@ -159,7 +159,7 @@ export function OlxScreen() {
       void queryClient.invalidateQueries({ queryKey: ["olx-offers"] });
       toast.success(
         "Zaimportowano oferty",
-        `${result.imported} ${result.imported === 1 ? "pozycja" : "pozycji"} z pliku CSV`
+        `${formatPlural(result.imported, ["pozycja", "pozycje", "pozycji"])} z pliku CSV`
       );
     },
     onError: () =>

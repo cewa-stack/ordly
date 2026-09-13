@@ -123,9 +123,12 @@ export function SyncProvider({ children }: { children: React.ReactNode }) {
         : phase === "success"
           ? "Wszystko aktualne"
           : "Zsynchronizowano";
+    // Telefon wyzwala wyłącznie `/orders/sync` (zamówienia i zwroty
+    // Allegro). Dawny napis "Allegro · Amazon · OLX · eBay" wymieniał
+    // kanały, których ORDLY nie synchronizuje.
     const subtitle =
       phase === "working"
-        ? "Allegro · Amazon · OLX · eBay"
+        ? "Zamówienia i zwroty Allegro"
         : phase === "success"
           ? successSubtitle
           : humanizeSince(lastSyncAt);

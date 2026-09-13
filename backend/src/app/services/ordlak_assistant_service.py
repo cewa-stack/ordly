@@ -19,7 +19,7 @@ from __future__ import annotations
 
 from collections.abc import Callable, Sequence
 from dataclasses import dataclass
-from datetime import date, datetime, timedelta
+from datetime import date, timedelta
 from decimal import Decimal
 from typing import Any, Literal
 
@@ -37,14 +37,14 @@ from app.domain.interfaces.ordlak_conversation_repository import (
     OrdlakConversationRepository,
 )
 from app.domain.sales_calendar import upcoming_events
-from app.services.dashboard_service import DashboardService
+from app.services.dashboard_service import DashboardService, revenue_by_local_day
 from app.services.health_service import HealthService
 from app.services.inventory_service import InventoryService
 from app.services.issues_service import IssuesService
 from app.services.mailbox_service import MailboxService
 from app.services.returns_service import ReturnsService
 from app.services.search_service import SearchService
-from app.utils.time import local_now, utc_now
+from app.utils.time import local_midnight_utc, local_now, local_today, utc_now
 
 # Klient Anthropic jest typowany jako `Any`, bo `AsyncAnthropic` importuje
 # się dopiero w `build_anthropic_client` (brak paczki nie może wywalić
@@ -760,7 +760,11 @@ class OrdlakAssistantService:
 
     async def _tool_sales_summary(self, payload: dict[str, Any]) -> str:
         period = str(payload.get("okres", "dzis"))
-        since, until = _period_bounds(period)
+        today = local_today()
+        first_day, last_day = _period_days(period, today)
+        since = local_midnight_utc(first_day)
+        # `None` = okres trwa do teraz; zamknięty (wczoraj) kończy się o północy.
+        until = local_midnight_utc(last_day + timedelta(days=1)) if last_day < today else None
 
         orders_count = await self._orders.count_since(since)
         revenue = await self._orders.sum_amount_since(since)
@@ -770,7 +774,7 @@ class OrdlakAssistantService:
             orders_count -= await self._orders.count_since(until)
             revenue -= await self._orders.sum_amount_since(until)
 
-        by_day = await self._orders.sum_amount_by_day(since)
+        by_day = await revenue_by_local_day(self._orders, first_day, last_day)
         sample = [
             order
             for order in await self._orders.get_recent(limit=_BREAKDOWN_SAMPLE)
@@ -779,8 +783,8 @@ class OrdlakAssistantService:
 
         lines = [
             f"Okres: {_PERIOD_LABEL.get(period, period)} "
-            f"(od {since.date().isoformat()}"
-            + (f" do {(until - timedelta(days=1)).date().isoformat()}" if until else "")
+            f"(od {first_day.isoformat()}"
+            + (f" do {last_day.isoformat()}" if until else "")
             + ")",
             f"Zamowienia: {orders_count}",
             f"Przychod: {_money(revenue)} zl",
@@ -788,11 +792,7 @@ class OrdlakAssistantService:
         if orders_count:
             lines.append(f"Srednia wartosc zamowienia: {_money(revenue / orders_count)} zl")
 
-        days = [
-            f"{day}: {_money(amount)} zl"
-            for day, amount in sorted(by_day.items())
-            if until is None or day < until.date().isoformat()
-        ]
+        days = [f"{day.isoformat()}: {_money(amount)} zl" for day, amount in by_day if amount]
         if days:
             lines.append("Przychod dzien po dniu: " + "; ".join(days))
 
@@ -1093,25 +1093,26 @@ def _blocks_to_params(blocks: list[Any]) -> list[dict[str, Any]]:
     return params
 
 
-def _period_bounds(period: str) -> tuple[datetime, datetime | None]:
+def _period_days(period: str, today: date) -> tuple[date, date]:
     """
-    Granice okresu jako (od, do) w naiwnym UTC. `do = None` znaczy "do teraz".
+    Pierwszy i ostatni dzień okresu (oba włącznie) jako POLSKIE daty.
 
-    Dni liczymy od północy UTC, tak samo jak `StatsService` i
-    `DashboardService` - inaczej "dzisiaj" u asystenta znaczyłoby coś
-    innego niż "dzisiaj" na ekranie Start.
+    Doby liczymy od północy w Polsce, tak samo jak `StatsService`
+    i `DashboardService` - inaczej "dzisiaj" u asystenta znaczyłoby coś
+    innego niż "dzisiaj" na ekranie Start. Wcześniej wszystkie trzy
+    liczyły od północy UTC, więc o 1:00 w nocy "dzisiaj" było jeszcze
+    wczoraj.
     """
-    now = utc_now()
-    today_start = datetime(now.year, now.month, now.day)
     if period == "wczoraj":
-        return today_start - timedelta(days=1), today_start
+        yesterday = today - timedelta(days=1)
+        return yesterday, yesterday
     if period == "7dni":
-        return today_start - timedelta(days=6), None
+        return today - timedelta(days=6), today
     if period == "30dni":
-        return today_start - timedelta(days=29), None
+        return today - timedelta(days=29), today
     if period == "biezacy_miesiac":
-        return datetime(now.year, now.month, 1), None
-    return today_start, None
+        return today.replace(day=1), today
+    return today, today
 
 
 def _clamp(value: Any, *, default: int, low: int, high: int) -> int:

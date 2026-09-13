@@ -17,8 +17,23 @@ export function formatMoney(value: number | string, currency = "PLN"): string {
   return `${formatted} ${suffix}`;
 }
 
+/**
+ * Znacznik czasu z API jako `Date`.
+ *
+ * Starszy backend na Pi oddaje daty BEZ strefy ("2026-09-13T17:13:00"),
+ * choć to czas UTC. `new Date()` czyta taki napis jako czas LOKALNY, więc
+ * każda godzina w aplikacji była cofnięta o różnicę do UTC (latem 2 h).
+ * Napis bez strefy traktujemy jako UTC; z `Z` albo offsetem - bez zmian.
+ * Ułamek sekundy skracamy do milisekund - Safari nie gwarantuje dłuższych.
+ */
+export function parseApiDate(iso: string): Date {
+  const trimmed = iso.replace(/(\.\d{3})\d+/, "$1");
+  const hasZone = /(Z|[+-]\d{2}:?\d{2})$/i.test(trimmed);
+  return new Date(trimmed.includes("T") && !hasZone ? `${trimmed}Z` : trimmed);
+}
+
 export function formatDate(isoDate: string): string {
-  const date = new Date(isoDate);
+  const date = parseApiDate(isoDate);
   return date.toLocaleString("pl-PL", {
     day: "2-digit",
     month: "2-digit",

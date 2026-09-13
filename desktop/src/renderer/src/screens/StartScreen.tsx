@@ -10,7 +10,7 @@ import { BoxIcon, ChatIcon, GridIcon, RefreshIcon } from "../icons";
 import { Button, SectionLabel } from "../components/ui";
 import { Mascot } from "../components/Mascot";
 import { useSync } from "../lib/sync";
-import { formatCurrency, formatTime } from "../lib/format";
+import { formatCurrency, formatPlural, formatTime, parseApiDate } from "../lib/format";
 import { isPendingFulfillment } from "../lib/fulfillment";
 import type { ViewId } from "../components/Sidebar";
 
@@ -24,9 +24,10 @@ const EVENT_DOT: Record<string, string> = {
   OrderPackingStarted: "bg-amber",
   OrderReturnCreated: "bg-violet",
   LowStockDetected: "bg-coral",
-  NotificationSent: "bg-slate-dim",
-  SyncStarted: "bg-slate-dim",
-  SyncFinished: "bg-teal-deep",
+  StockSynchronized: "bg-slate-dim",
+  AllegroLokalnieEventDetected: "bg-teal-deep",
+  OlxEventDetected: "bg-violet",
+  DisputeNoticeDetected: "bg-coral",
 };
 
 const EVENT_LABEL: Record<string, string> = {
@@ -35,10 +36,22 @@ const EVENT_LABEL: Record<string, string> = {
   OrderPackingStarted: "Rozpoczęto pakowanie",
   OrderReturnCreated: "Nowy zwrot",
   LowStockDetected: "Niski stan magazynowy",
-  NotificationSent: "Wysłano powiadomienie",
-  SyncStarted: "Start synchronizacji",
-  SyncFinished: "Koniec synchronizacji",
+  StockSynchronized: "Magazyn zaktualizowany",
+  AllegroLokalnieEventDetected: "Mail z Allegro Lokalnie",
+  OlxEventDetected: "Mail z OLX",
+  DisputeNoticeDetected: "Nowa dyskusja",
 };
+
+/**
+ * Wpisy powstajace przy KAZDEJ synchronizacji (co minute). Na liscie
+ * "Dziś w systemie" zaslanialy zamowienia i zwroty - backend je juz
+ * pomija (`include_sync=false`), a to jest siatka na starszy backend.
+ */
+const SYNC_EVENT_TYPES = new Set(["SyncStarted", "SyncFinished"]);
+
+function isToday(iso: string): boolean {
+  return parseApiDate(iso).toDateString() === new Date().toDateString();
+}
 
 function ShortcutCard({
   icon,
@@ -125,20 +138,30 @@ export function StartScreen({ onNavigate }: { onNavigate: (view: ViewId) => void
   const openIssues = (issuesQuery.data ?? []).filter((issue) => issue.chat_active);
   const lowStock = dashboard?.low_stock_count ?? 0;
 
+  // "Dziś w systemie" znaczy DZIŚ - dziennik zwraca ostatnie wpisy bez
+  // wzgledu na date, wiec rano lista pokazywala jeszcze wczorajszy wieczor.
+  const todayEvents = (eventsQuery.data ?? []).filter(
+    (event) => !SYNC_EVENT_TYPES.has(event.event_type) && isToday(event.created_at)
+  );
+
   // Najpilniejsza rzecz - kolejnosc odzwierciedla realny koszt zwloki:
   // niezapakowane zamowienie kosztuje najwiecej, potem czekajacy klient,
   // na koncu magazyn (ktory da sie uzupelnic jutro).
   const headline =
     pendingOrders.length > 0
-      ? `${pendingOrders.length} ${
-          pendingOrders.length === 1 ? "zamówienie czeka" : "zamówień czeka"
-        } na spakowanie`
+      ? `${formatPlural(pendingOrders.length, [
+          "zamówienie czeka",
+          "zamówienia czekają",
+          "zamówień czeka",
+        ])} na spakowanie`
       : openIssues.length > 0
-        ? `${openIssues.length} ${
-            openIssues.length === 1 ? "klient czeka" : "klientów czeka"
-          } na odpowiedź`
+        ? `${formatPlural(openIssues.length, [
+            "klient czeka",
+            "klientów czeka",
+            "klientów czeka",
+          ])} na odpowiedź`
         : lowStock > 0
-          ? `${lowStock} ${lowStock === 1 ? "produkt" : "produkty"} poniżej progu`
+          ? `${formatPlural(lowStock, ["produkt", "produkty", "produktów"])} poniżej progu`
           : "Wszystko obsłużone";
 
   const subline =
@@ -224,12 +247,12 @@ export function StartScreen({ onNavigate }: { onNavigate: (view: ViewId) => void
             {eventsQuery.error instanceof Error ? eventsQuery.error.message : ""}
           </p>
         )}
-        {eventsQuery.data?.length === 0 && (
+        {eventsQuery.data !== undefined && todayEvents.length === 0 && (
           <p className="pt-2 text-[12.5px] text-slate-dim">
             Ordi jeszcze nic dziś nie zanotował.
           </p>
         )}
-        {(eventsQuery.data ?? []).slice(0, 12).map((event, index) => (
+        {todayEvents.slice(0, 12).map((event, index) => (
           <div
             key={`${event.created_at}-${index}`}
             className="flex items-center gap-[11px] rounded-[9px] px-3 py-2.5 text-[12.5px] transition-colors duration-150 hover:bg-panel-2"

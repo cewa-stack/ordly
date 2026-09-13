@@ -15,7 +15,7 @@ import aioimaplib
 import pytest
 import pytest_asyncio
 
-from app.infrastructure.mail.imap_watcher import ImapWatcher
+from app.infrastructure.mail.imap_watcher import ImapConnectionError, ImapWatcher
 from tests.integration.mail.fake_imap_server import FakeImapServer
 
 _SINCE = datetime(2026, 8, 1, 0, 0, 0)
@@ -278,3 +278,83 @@ class TestFetchBodiesByMessageId:
             await _watcher(server).fetch_bodies_by_message_id('<a" OR FROM "bank')
 
         assert not any("HEADER" in command for command in server.commands)
+
+
+class TestBledyLogowaniaIPolaczenia:
+    """
+    Odrzucone logowanie i zawieszony serwer - na prawdziwym protokole.
+
+    Zgłoszony błąd: przy kliknięciu „Synchronizuj" aplikacja pokazywała
+    zawsze ten sam tekst „sprawdź IMAP_USER i IMAP_PASS", niezależnie od
+    powodu, dla którego Gmail odmówił. Nie dało się odróżnić złego hasła
+    od limitu połączeń.
+    """
+
+    async def test_odrzucone_logowanie_niesie_powod_podany_przez_serwer(
+        self, server: FakeImapServer
+    ):
+        server.login_rejection = "[AUTHENTICATIONFAILED] Invalid credentials (Failure)"
+
+        with pytest.raises(ImapConnectionError) as exc_info:
+            await _watcher(server).fetch_new_from_senders(["allegro"], _SINCE)
+
+        message = str(exc_info.value)
+        assert "[AUTHENTICATIONFAILED] Invalid credentials (Failure)" in message
+        assert "IMAP_PASS" in message
+
+    async def test_limit_polaczen_nie_kaze_zmieniac_hasla(self, server: FakeImapServer):
+        server.login_rejection = "[ALERT] Too many simultaneous connections. (Failure)"
+
+        with pytest.raises(ImapConnectionError) as exc_info:
+            await _watcher(server).fetch_bodies_by_message_id("<a1@allegromail.pl>")
+
+        message = str(exc_info.value)
+        assert "Too many simultaneous connections" in message
+        assert "IMAP_PASS" not in message
+
+    async def test_haslo_nie_trafia_do_komunikatu(self, server: FakeImapServer):
+        """Nawet gdyby serwer odesłał hasło w odpowiedzi, toast go nie pokaże."""
+        server.login_rejection = "Bledne haslo haslo-aplikacji dla sklep@gmail.com"
+
+        with pytest.raises(ImapConnectionError) as exc_info:
+            await _watcher(server).fetch_new_from_senders(["allegro"], _SINCE)
+
+        assert "haslo-aplikacji" not in str(exc_info.value)
+
+    async def test_odrzucone_logowanie_konczy_sesje(self, server: FakeImapServer):
+        """
+        Wcześniej po odmowie logowania gniazdo zostawało otwarte. Gmail
+        pozwala na 15 jednoczesnych połączeń, więc seria nieudanych
+        synchronizacji mogła sama zablokować logowanie.
+        """
+        server.login_rejection = "[AUTHENTICATIONFAILED] Invalid credentials (Failure)"
+
+        with pytest.raises(ImapConnectionError):
+            await _watcher(server).fetch_new_from_senders(["allegro"], _SINCE)
+
+        names = [command.partition(" ")[2].split(" ", 1)[0].upper() for command in server.commands]
+        assert names[-1] == "LOGOUT"
+
+    async def test_zawieszony_serwer_to_blad_poczty_a_nie_surowy_timeout(
+        self, server: FakeImapServer
+    ):
+        """
+        Timeout w środku SEARCH nie był opakowany - leciał do FastAPI jako
+        500 „Internal Server Error", bez słowa o poczcie.
+        """
+        server.add_message(_build_message())
+        server.hang_on = {"SEARCH"}
+        watcher = ImapWatcher(
+            host="127.0.0.1",
+            port=server.port,
+            user="sklep@gmail.com",
+            password="haslo-aplikacji",
+            client_factory=lambda: aioimaplib.IMAP4(
+                host="127.0.0.1", port=server.port, timeout=0.3
+            ),
+        )
+
+        with pytest.raises(ImapConnectionError) as exc_info:
+            await watcher.fetch_new_from_senders(["allegro"], _SINCE)
+
+        assert "przekroczony czas oczekiwania" in str(exc_info.value)

@@ -63,8 +63,27 @@ function PulsingRing() {
 
 /** Pionowa oś statusów: ukończone = wypełniony węzeł z ptaszkiem,
  *  bieżący = pierścień primary z pulsem, przyszłe = pusty border. */
-function StatusTimeline({ label }: { label: string }) {
-  const currentIndex = TIMELINE_STAGES.indexOf(label as (typeof TIMELINE_STAGES)[number]);
+function stageIndex(status: string | null): number {
+  // Etap liczony ze STATUSU, nie z etykiety. Etykiety to "Do spakowania",
+  // "Gotowe do wysyłki" i "Odebrane" - nie pasowały do nazw etapów, więc
+  // oś znikała dla każdego zamówienia w realizacji.
+  switch (status) {
+    case null:
+    case "NEW":
+      return 0;
+    case "PROCESSING":
+    case "READY_FOR_SHIPMENT":
+      return 1;
+    case "SENT":
+    case "PICKED_UP":
+      return 2;
+    default:
+      return -1;
+  }
+}
+
+function StatusTimeline({ status }: { status: string | null }) {
+  const currentIndex = stageIndex(status);
   if (currentIndex < 0) {
     return null;
   }
@@ -149,12 +168,12 @@ export function OrderDetailScreen() {
         </View>
         <Text style={styles.amount}>{formatMoney(data.total_amount, data.currency)}</Text>
 
-        {label === "Anulowane" ? (
+        {label === "Anulowane" || data.status === "CANCELLED" ? (
           <View style={styles.cancelledNote}>
             <Text style={styles.cancelledNoteText}>Zamówienie zostało anulowane.</Text>
           </View>
         ) : (
-          <StatusTimeline label={label} />
+          <StatusTimeline status={data.fulfillment_status} />
         )}
 
         <View style={styles.metaBlock}>

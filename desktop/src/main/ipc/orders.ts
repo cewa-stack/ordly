@@ -7,7 +7,9 @@ export function registerOrdersIpc(): void {
   ipcMain.handle("ordly:orders:list", async () =>
     toResult(async () => {
       const session = requireSession();
-      return apiRequest(session.baseUrl, session.token, "/api/v1/orders");
+      // 100 to maksimum API. Domyslne 20 ucinalo liste, liczniki "do
+      // spakowania" i statystyki kanalow do 20 ostatnich zamowien.
+      return apiRequest(session.baseUrl, session.token, "/api/v1/orders?limit=100");
     })
   );
 

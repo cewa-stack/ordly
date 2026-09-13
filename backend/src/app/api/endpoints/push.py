@@ -72,11 +72,15 @@ async def unsubscribe(
 @router.post("/push/test", response_model=dict)
 async def send_test_push(
     container: Annotated[Container, Depends(get_container)],
-    session: Annotated[AsyncSession, Depends(get_session)],
 ) -> dict:
     """
     Wysyła testowe powiadomienie do wszystkich zapisanych subskrypcji -
     przycisk "Wyślij testowe powiadomienie" w Ustawieniach apki.
+
+    `sent_to` to liczba urządzeń, których serwer push (Apple/Google)
+    PRZYJĄŁ powiadomienie - nie liczba wierszy w bazie. Martwe subskrypcje
+    (np. starego telefonu) są przy okazji usuwane i zwracane jako
+    `expired`, żeby aplikacja mogła to powiedzieć wprost.
     """
     notifier = container.web_push_notifier()
     if notifier is None:
@@ -85,13 +89,24 @@ async def send_test_push(
             detail="Web Push nie jest skonfigurowany na backendzie (brak kluczy VAPID w .env).",
         )
 
-    repository = container.push_subscription_repository(session)
-    subscriptions = await repository.get_all()
-    if not subscriptions:
+    report = await notifier.send_test("To jest testowe powiadomienie z ORDLY.")
+    if report.subscriptions == 0:
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
             detail="Brak aktywnych subskrypcji - włącz powiadomienia push w Ustawieniach najpierw.",
         )
-
-    await notifier.send_text("To jest testowe powiadomienie z ORDLY.")
-    return {"status": "ok", "sent_to": len(subscriptions)}
+    if report.delivered == 0:
+        detail = (
+            "Żadne urządzenie nie przyjęło powiadomienia - subskrypcje wygasły i zostały "
+            "usunięte. Wyłącz i włącz powiadomienia ponownie na tym telefonie."
+            if report.failed == 0
+            else "Serwer powiadomień odrzucił wysyłkę - szczegóły w logach usługi ordly na Pi "
+            "(journalctl -u ordly -n 50)."
+        )
+        raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail=detail)
+    return {
+        "status": "ok",
+        "sent_to": report.delivered,
+        "expired": report.expired,
+        "failed": report.failed,
+    }

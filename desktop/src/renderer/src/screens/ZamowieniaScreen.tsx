@@ -25,7 +25,13 @@ import {
 } from "../components/ui";
 import { ConfirmDialog } from "../components/Modal";
 import { useToast } from "../lib/toast";
-import { formatCurrency, formatDateTime, formatTime, toAmount } from "../lib/format";
+import {
+  formatCurrency,
+  formatDateTime,
+  formatPlural,
+  formatTime,
+  toAmount,
+} from "../lib/format";
 import {
   ORDER_FILTER_LABEL,
   fulfillmentLabel,
@@ -61,7 +67,11 @@ function useOrders() {
 function fulfillmentTimeline(order: Order): { label: string; done: boolean; time?: string }[] {
   const status = order.fulfillment_status;
   const paid = status !== null || order.status === "READY_FOR_PROCESSING";
-  const packing = status === "PROCESSING" || status === "SENT" || status === "PICKED_UP";
+  const packing =
+    status === "PROCESSING" ||
+    status === "READY_FOR_SHIPMENT" ||
+    status === "SENT" ||
+    status === "PICKED_UP";
   const sent = status === "SENT" || status === "PICKED_UP";
   return [
     { label: "Zamówienie złożone", done: true, time: formatDateTime(order.order_date) },
@@ -69,6 +79,26 @@ function fulfillmentTimeline(order: Order): { label: string; done: boolean; time
     { label: "Spakowane", done: packing },
     { label: "Wysłane", done: sent },
   ];
+}
+
+/** Anulowane zamowienie - Allegro nie pozwala juz zmieniac jego realizacji. */
+function isCancelled(order: Order): boolean {
+  return order.status === "CANCELLED" || order.fulfillment_status === "CANCELLED";
+}
+
+/**
+ * Czy "Oznacz jako spakowane" ma sens. Wczesniej przycisk byl aktywny takze
+ * dla wyslanych i odebranych paczek - klikniecie cofalo na Allegro status
+ * z "wysłane" na "w realizacji", a kupujacy widzial to od razu.
+ */
+function canMarkPacked(order: Order): boolean {
+  const status = order.fulfillment_status;
+  return !isCancelled(order) && (status === null || status === "NEW");
+}
+
+function canMarkSent(order: Order): boolean {
+  const status = order.fulfillment_status;
+  return !isCancelled(order) && status !== "SENT" && status !== "PICKED_UP";
 }
 
 function OrderDetail({ order }: { order: Order }) {
@@ -189,9 +219,14 @@ function OrderDetail({ order }: { order: Order }) {
       )}
 
       <div className="mt-auto flex flex-col gap-2 pt-1.5">
+        {isCancelled(order) && (
+          <p className="text-[11.5px] leading-[1.5] text-slate-dim">
+            Zamówienie jest anulowane - statusu realizacji nie da się już zmienić.
+          </p>
+        )}
         <Button
           onClick={() => setConfirm("PROCESSING")}
-          disabled={fulfillmentMutation.isPending || order.fulfillment_status === "PROCESSING"}
+          disabled={fulfillmentMutation.isPending || !canMarkPacked(order)}
           icon={<CheckIcon size={14} />}
         >
           Oznacz jako spakowane
@@ -199,7 +234,7 @@ function OrderDetail({ order }: { order: Order }) {
         <Button
           variant="ghost"
           onClick={() => setConfirm("SENT")}
-          disabled={fulfillmentMutation.isPending || order.fulfillment_status === "SENT"}
+          disabled={fulfillmentMutation.isPending || !canMarkSent(order)}
           icon={<TruckIcon size={14} />}
         >
           Oznacz jako wysłane
@@ -257,22 +292,43 @@ export function ZamowieniaScreen({ focusOrderId, onFocusHandled }: ZamowieniaScr
 
   const bulkMutation = useMutation({
     mutationFn: async () => {
-      const ids = [...checked];
+      // Tylko zamowienia, ktore naprawde czekaja na spakowanie - pozostale
+      // (w realizacji, wyslane, anulowane) mialyby cofniety status na Allegro.
+      const eligible = (data ?? []).filter(
+        (order) => checked.has(order.external_id) && canMarkPacked(order)
+      );
       const failures: string[] = [];
-      for (const id of ids) {
-        const result = await window.ordly.orders.setFulfillment(id, "PROCESSING");
-        if (!result.ok) failures.push(id);
+      for (const order of eligible) {
+        const result = await window.ordly.orders.setFulfillment(
+          order.external_id,
+          "PROCESSING"
+        );
+        if (!result.ok) failures.push(order.external_id);
       }
-      return { total: ids.length, failures };
+      return { total: eligible.length, skipped: checked.size - eligible.length, failures };
     },
-    onSuccess: ({ total, failures }) => {
+    onSuccess: ({ total, skipped, failures }) => {
       setBulkConfirm(false);
       setChecked(new Set());
       void queryClient.invalidateQueries({ queryKey: ["orders"] });
-      if (failures.length === 0) {
+      void queryClient.invalidateQueries({ queryKey: ["dashboard"] });
+      const skippedNote =
+        skipped > 0
+          ? ` Pominięto ${formatPlural(skipped, [
+              "zamówienie",
+              "zamówienia",
+              "zamówień",
+            ])} - już w realizacji, wysłane lub anulowane.`
+          : "";
+      if (total === 0) {
+        toast.error(
+          "Nic do oznaczenia",
+          "Zaznaczone zamówienia są już w realizacji, wysłane lub anulowane."
+        );
+      } else if (failures.length === 0) {
         toast.success(
           "Oznaczono jako spakowane",
-          `${total} ${total === 1 ? "zamówienie" : "zamówień"}`
+          `${formatPlural(total, ["zamówienie", "zamówienia", "zamówień"])}.${skippedNote}`
         );
       } else {
         toast.error(
@@ -280,6 +336,13 @@ export function ZamowieniaScreen({ focusOrderId, onFocusHandled }: ZamowieniaScr
           "Allegro odrzuciło część zmian - odśwież listę i spróbuj ponownie."
         );
       }
+    },
+    onError: (error) => {
+      setBulkConfirm(false);
+      toast.error(
+        "Oznaczanie nie przeszło",
+        error instanceof Error ? error.message : "Spróbuj ponownie za chwilę."
+      );
     },
   });
 
@@ -447,8 +510,8 @@ export function ZamowieniaScreen({ focusOrderId, onFocusHandled }: ZamowieniaScr
 
       <ConfirmDialog
         open={bulkConfirm}
-        title={`Oznaczyć ${checked.size} ${checked.size === 1 ? "zamówienie" : "zamówień"}?`}
-        message='Allegro zmieni status wszystkich zaznaczonych zamówień na "w realizacji". Kupujący zobaczą to od razu, a zmiany nie da się cofnąć z poziomu ORDLY.'
+        title={`Oznaczyć ${formatPlural(checked.size, ["zamówienie", "zamówienia", "zamówień"])}?`}
+        message='Allegro zmieni status zaznaczonych nowych zamówień na "w realizacji". Kupujący zobaczą to od razu, a zmiany nie da się cofnąć z poziomu ORDLY. Zamówienia już w realizacji, wysłane i anulowane zostaną pominięte.'
         confirmLabel="Oznacz jako spakowane"
         pending={bulkMutation.isPending}
         onConfirm={() => bulkMutation.mutate()}

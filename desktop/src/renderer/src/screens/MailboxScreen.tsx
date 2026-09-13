@@ -199,11 +199,11 @@ function MailboxDiagnostics({ onSync, syncing }: { onSync: () => void; syncing: 
   return (
     <div className="flex flex-col items-center justify-center gap-4 px-8 py-14 text-center">
       <Mascot pose="happy" size={88} />
-      <h4 className="o-display text-[15px] font-semibold">Skrzynka podłączona, pusto</h4>
+      <h4 className="o-display text-[15px] font-semibold">Skrzynka skonfigurowana, pusto</h4>
       <p className="max-w-[420px] text-[12.5px] leading-[1.6] text-slate-dim">
-        ORDLY jest połączony z {status.host} jako {status.user_masked}, ale nie znalazł jeszcze
-        maili od obserwowanych nadawców ({status.watch_senders.join(", ")}). Sprawdź teraz albo
-        poczekaj - Ordi zagląda do skrzynki co 5 minut.
+        ORDLY ma ustawione konto {status.user_masked} na {status.host}, ale w bazie nie ma
+        jeszcze maili od obserwowanych nadawców ({status.watch_senders.join(", ")}). Sprawdź
+        teraz - jeśli logowanie nie działa, zobaczysz dokładny powód odmowy serwera.
       </p>
       <Button
         onClick={onSync}
@@ -409,8 +409,9 @@ export function MailboxScreen() {
                 </div>
                 {selected.source === "allegro_lokalnie" && (
                   <p className="shrink-0 text-[11.5px] leading-[1.5] text-amber">
-                    Allegro Lokalnie nie ma API - ORDLY tylko o tym mówi. Zamówieniem
-                    zarządzasz na stronie serwisu.
+                    Sprzedaż z takiego maila ORDLY dopisuje do Zamówień i odejmuje z
+                    magazynu, ale Allegro Lokalnie nie ma API - pakowanie i wysyłkę
+                    potwierdzasz na stronie serwisu.
                   </p>
                 )}
                 <MailBody key={selected.message_id} message={selected} />

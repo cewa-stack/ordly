@@ -18,6 +18,7 @@ import { radii, spacing, typography } from "@/theme/typography";
 import { useMailBody, useMailMessages, useMarkMailRead } from "@/api/hooks";
 import { MailBodyFrame, canRenderMailHtml } from "@/components/MailBodyFrame";
 import { Skeleton } from "@/components/Skeleton";
+import { parseApiDate } from "@/utils/format";
 import { hasRemoteImages } from "@/utils/mailDocument";
 import type { MailBody, MailMessage } from "@/api/types";
 import type { RootStackParamList } from "@/navigation/types";
@@ -35,7 +36,7 @@ function gmailSearchUrl(messageId: string): string {
 }
 
 function formatDateTime(iso: string): string {
-  return new Date(iso).toLocaleString("pl-PL", {
+  return parseApiDate(iso).toLocaleString("pl-PL", {
     day: "2-digit",
     month: "2-digit",
     year: "numeric",

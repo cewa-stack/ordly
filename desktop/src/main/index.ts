@@ -1,5 +1,6 @@
 import { app, BrowserWindow, ipcMain, shell } from "electron";
 import { join } from "node:path";
+import { pathToFileURL } from "node:url";
 import { registerAuthIpc } from "./ipc/auth";
 import { registerStockIpc } from "./ipc/stock";
 import { registerOrdersIpc } from "./ipc/orders";
@@ -35,6 +36,36 @@ function registerWindowControlsIpc(): void {
   ipcMain.handle("ordly:window:close", () => {
     BrowserWindow.getFocusedWindow()?.close();
   });
+}
+
+/**
+ * Protokoly, ktore wolno oddac systemowi. Tresc maili i wiadomosci od
+ * kupujacych jest obca - a `shell.openExternal` z `file:`, `smb:` czy
+ * `ms-...:` potrafi uruchomic program albo otworzyc udostepniony plik
+ * wykonywalny. Kazdy inny link jest po cichu ignorowany.
+ */
+const EXTERNAL_PROTOCOLS = new Set(["http:", "https:", "mailto:"]);
+
+function openExternalSafely(url: string): void {
+  try {
+    if (EXTERNAL_PROTOCOLS.has(new URL(url).protocol)) {
+      void shell.openExternal(url);
+    }
+  } catch {
+    // Niepoprawny adres - nie ma czego otwierac.
+  }
+}
+
+function isAppUrl(url: string, devServerUrl: string | undefined): boolean {
+  try {
+    const target = new URL(url);
+    if (devServerUrl) {
+      return target.origin === new URL(devServerUrl).origin;
+    }
+    return target.href.startsWith(pathToFileURL(join(__dirname, "../renderer/")).href);
+  } catch {
+    return false;
+  }
 }
 
 function createWindow(): void {
@@ -73,11 +104,22 @@ function createWindow(): void {
   }
 
   win.webContents.setWindowOpenHandler(({ url }) => {
-    void shell.openExternal(url);
+    openExternalSafely(url);
     return { action: "deny" };
   });
 
   const devServerUrl = process.env["ELECTRON_RENDERER_URL"];
+
+  // Okno aplikacji ma w sobie most `window.ordly` (zapis magazynu, wysylka
+  // maili, odpowiedzi w dyskusjach). Gdyby cokolwiek przenawigowalo je na
+  // obca strone, ta strona dostalaby ten sam most. Dozwolone jest wiec
+  // wylacznie przeladowanie samej aplikacji - reszta idzie do przegladarki.
+  win.webContents.on("will-navigate", (event, url) => {
+    if (isAppUrl(url, devServerUrl)) return;
+    event.preventDefault();
+    openExternalSafely(url);
+  });
+
   if (devServerUrl) {
     void win.loadURL(devServerUrl);
   } else {

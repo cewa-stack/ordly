@@ -14,7 +14,7 @@ import { ErrorState } from "@/components/ErrorState";
 import { RichText } from "@/components/RichText";
 import { Skeleton } from "@/components/Skeleton";
 import { Pill } from "@/components/Pill";
-import { issueStatusLabel, issueStatusTone } from "@/utils/format";
+import { issueStatusLabel, issueStatusTone, parseApiDate } from "@/utils/format";
 import type { Issue, IssueMessage } from "@/api/types";
 import type { RootStackParamList } from "@/navigation/types";
 
@@ -30,7 +30,7 @@ const TONE_TINT: Record<string, string> = {
 };
 
 function formatDateTime(iso: string): string {
-  return new Date(iso).toLocaleString("pl-PL", {
+  return parseApiDate(iso).toLocaleString("pl-PL", {
     day: "2-digit",
     month: "2-digit",
     hour: "2-digit",

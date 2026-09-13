@@ -15,6 +15,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Modal } from "./Modal";
 import { Button, Stepper } from "./ui";
 import { buildWholesalerBody, buildWholesalerSubject } from "../lib/wholesalerTemplate";
+import { formatPlural } from "../lib/format";
 import { useToast } from "../lib/toast";
 import type { StockItem, Wholesaler } from "../types/api";
 
@@ -141,9 +142,11 @@ export function WholesalerOrderModal({
         "Mail wysłany",
         orderItems.length === 0
           ? `${wholesaler.name} · wiadomość bez pozycji`
-          : `${wholesaler.name} · ${orderItems.length} ${
-              orderItems.length === 1 ? "pozycja" : "pozycji"
-            }`
+          : `${wholesaler.name} · ${formatPlural(orderItems.length, [
+              "pozycja",
+              "pozycje",
+              "pozycji",
+            ])}`
       );
       onClose();
     },

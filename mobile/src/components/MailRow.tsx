@@ -9,6 +9,7 @@ import { Pressable, StyleSheet, Text, View } from "react-native";
 import { colors } from "@/theme/colors";
 import { radii, spacing, typography } from "@/theme/typography";
 import type { MailMessage } from "@/api/types";
+import { parseApiDate } from "@/utils/format";
 
 const SOURCE_LABEL: Record<string, string> = {
   allegro: "Allegro",
@@ -21,7 +22,7 @@ const SOURCE_LABEL: Record<string, string> = {
 };
 
 function shortDateTime(iso: string): string {
-  return new Date(iso).toLocaleString("pl-PL", {
+  return parseApiDate(iso).toLocaleString("pl-PL", {
     day: "2-digit",
     month: "2-digit",
     hour: "2-digit",

@@ -25,7 +25,7 @@ import { EmptyState } from "@/components/EmptyState";
 import { PrimaryButton } from "@/components/PrimaryButton";
 import { Skeleton } from "@/components/Skeleton";
 import { FilterChip } from "@/components/FilterChip";
-import { formatMoney } from "@/utils/format";
+import { formatMoney, parseApiDate } from "@/utils/format";
 import type { StockAdjustOp, StockItem, StockMovement } from "@/api/types";
 import type { RootStackParamList } from "@/navigation/types";
 
@@ -33,7 +33,7 @@ const ADJUST_REASONS = ["Dostawa", "Inwentaryzacja", "Uszkodzenie", "Inne"] as c
 type AdjustReason = (typeof ADJUST_REASONS)[number];
 
 function relativeDate(iso: string): string {
-  const date = new Date(iso);
+  const date = parseApiDate(iso);
   return date.toLocaleString("pl-PL", {
     day: "2-digit",
     month: "2-digit",

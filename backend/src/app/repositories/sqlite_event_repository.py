@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+from collections.abc import Collection
 from dataclasses import dataclass
 from datetime import datetime
 
@@ -39,9 +40,21 @@ class SqliteEventRepository:
         self._session.add(model)
         await self._session.flush()
 
-    async def get_recent(self, limit: int) -> list[EventRecord]:
-        """Zwraca ostatnie zdarzenia posortowane od najnowszego."""
-        stmt = select(EventModel).order_by(EventModel.created_at.desc()).limit(limit)
+    async def get_recent(
+        self, limit: int, exclude_types: Collection[str] = ()
+    ) -> list[EventRecord]:
+        """
+        Zwraca ostatnie zdarzenia posortowane od najnowszego.
+
+        `exclude_types` odsiewa typy w SQL, a nie po pobraniu. Synchronizacja
+        zapisuje dwa wpisy co minutę, więc 40 ostatnich zdarzeń to było
+        20 minut samych "Start/Koniec synchronizacji" - odsianie ich dopiero
+        w aplikacji zostawiłoby pustą listę zamiast zamówień i zwrotów.
+        """
+        stmt = select(EventModel)
+        if exclude_types:
+            stmt = stmt.where(EventModel.event_type.not_in(list(exclude_types)))
+        stmt = stmt.order_by(EventModel.created_at.desc()).limit(limit)
         result = await self._session.execute(stmt)
         return [
             EventRecord(event_type=m.event_type, level=m.level, created_at=m.created_at)

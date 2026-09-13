@@ -61,6 +61,13 @@ class FakeImapServer:
         self.messages: list[bytes] = []
         self.commands: list[str] = []
         self.port = 0
+        # Tekst odpowiedzi `NO` na LOGIN - gdy ustawiony, serwer odrzuca
+        # logowanie tak jak Gmail (np. "[AUTHENTICATIONFAILED] Invalid
+        # credentials (Failure)").
+        self.login_rejection: str | None = None
+        # Komendy, na które serwer w ogóle nie odpowiada - symulacja
+        # zawieszonego łącza, na której watcher musi dostać timeout.
+        self.hang_on: set[str] = set()
         self._server: asyncio.AbstractServer | None = None
 
     def add_message(self, raw: bytes) -> None:
@@ -95,11 +102,16 @@ class FakeImapServer:
             tag, _, rest = line.partition(" ")
             name = rest.split(" ", 1)[0].upper()
 
+            if name in self.hang_on:
+                continue
             if name == "CAPABILITY":
                 writer.write(b"* CAPABILITY IMAP4rev1" + _CRLF)
                 self._ok(writer, tag, "CAPABILITY")
             elif name == "LOGIN":
-                self._ok(writer, tag, "LOGIN")
+                if self.login_rejection is not None:
+                    writer.write(f"{tag} NO {self.login_rejection}".encode() + _CRLF)
+                else:
+                    self._ok(writer, tag, "LOGIN")
             elif name == "SELECT":
                 writer.write(f"* {len(self.messages)} EXISTS".encode() + _CRLF)
                 writer.write(f"{tag} OK [READ-WRITE] SELECT completed.".encode() + _CRLF)

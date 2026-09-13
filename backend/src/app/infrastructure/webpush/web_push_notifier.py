@@ -10,8 +10,9 @@ from __future__ import annotations
 import asyncio
 from collections.abc import Callable
 from contextlib import AbstractAsyncContextManager
-from dataclasses import replace
+from dataclasses import dataclass, replace
 from decimal import Decimal
+from typing import Literal
 
 from loguru import logger
 from pywebpush import WebPushException, webpush
@@ -34,6 +35,24 @@ from app.shared.dto.reminder_dto import ShippingReminderData
 from app.utils.time import local_now
 
 _GONE_STATUS_CODES = (404, 410)
+
+_SendOutcome = Literal["delivered", "expired", "failed"]
+
+
+@dataclass(frozen=True, slots=True)
+class PushDeliveryReport:
+    """
+    Wynik jednej wysyłki do wszystkich zapisanych subskrypcji.
+
+    `delivered` liczy urządzenia, których serwer push (Apple/Google)
+    przyjął powiadomienie - dalej backend nie widzi. `expired` to
+    subskrypcje odrzucone jako martwe (404/410) i przy okazji usunięte.
+    """
+
+    subscriptions: int
+    delivered: int
+    expired: int
+    failed: int
 
 
 class WebPushNotifier(Notifier):
@@ -252,35 +271,67 @@ class WebPushNotifier(Notifier):
             )
         )
 
-    async def _send(self, payload: PushPayload) -> None:
+    async def send_test(self, text: str) -> PushDeliveryReport:
+        """
+        Testowe powiadomienie z przycisku w Ustawieniach telefonu.
+
+        Różni się od `send_text` dwiema rzeczami:
+
+        - **zwraca realny wynik wysyłki** - wcześniej endpoint odpowiadał
+          „wysłano do N urządzeń", licząc wiersze w bazie, także martwe
+          subskrypcje starego telefonu. Po zmianie telefonu użytkownik
+          widział „wysłano do 1 urządzenia", a nic nie przychodziło;
+        - **pomija godziny ciszy** - test o 22:30 przychodziłby bez dźwięku
+          i wyglądałby na niedziałający, choć użytkownik sam o niego prosi.
+        """
+        return await self._send(
+            PushPayload(
+                title="ORDLY",
+                body=push_payload.strip_html(text),
+                thread="sync",
+                url="/settings",
+                actions=[{"action": "open", "title": "Pokaż"}],
+            ),
+            respect_quiet_hours=False,
+        )
+
+    async def _send(
+        self, payload: PushPayload, *, respect_quiet_hours: bool = True
+    ) -> PushDeliveryReport:
         """
         Wysyła jedno powiadomienie do wszystkich zapisanych subskrypcji.
 
         Godziny ciszy są nakładane TUTAJ, a nie w budowniczych treści -
         dzięki temu żadna ścieżka wysyłki nie może ich przypadkiem
-        pominąć.
+        pominąć. Jedynym wyjątkiem jest test wywołany ręcznie
+        (`send_test`).
         """
-        if push_payload.is_quiet_hour(local_now().time()):
+        if respect_quiet_hours and push_payload.is_quiet_hour(local_now().time()):
             payload = replace(payload, silent=True)
 
         serialized = payload.to_json()
+        outcomes: list[_SendOutcome] = []
 
         async with self._session_scope_factory() as session:
             repository = SqlitePushSubscriptionRepository(session)
             subscriptions = await repository.get_all()
 
-            if not subscriptions:
-                return
-
             for subscription in subscriptions:
-                await self._send_one(repository, subscription, serialized)
+                outcomes.append(await self._send_one(repository, subscription, serialized))
+
+        return PushDeliveryReport(
+            subscriptions=len(subscriptions),
+            delivered=outcomes.count("delivered"),
+            expired=outcomes.count("expired"),
+            failed=outcomes.count("failed"),
+        )
 
     async def _send_one(
         self,
         repository: SqlitePushSubscriptionRepository,
         subscription: PushSubscription,
         payload: str,
-    ) -> None:
+    ) -> _SendOutcome:
         """
         Wysyła powiadomienie do jednej subskrypcji.
 
@@ -309,7 +360,10 @@ class WebPushNotifier(Notifier):
                     status_code,
                 )
                 await repository.delete_by_endpoint(subscription.endpoint)
-            else:
-                logger.warning("Wysyłka Web Push nie powiodła się: {}", exc)
+                return "expired"
+            logger.warning("Wysyłka Web Push nie powiodła się: {}", exc)
+            return "failed"
         except Exception:
             logger.exception("Nieoczekiwany błąd wysyłki Web Push")
+            return "failed"
+        return "delivered"

@@ -8,7 +8,7 @@ wyłącznie w serwisach (`app/services/`), tak jak dla bota Telegram.
 
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import UTC, datetime
 from decimal import Decimal
 from typing import Annotated, Literal
 
@@ -52,6 +52,25 @@ StockStatus = Literal["ok", "warning", "critical"]
 #: "Najczęściej sprzedawane"). Kwoty w tej aplikacji mieszczą się w groszach,
 #: więc float w JSON-ie nic nie psuje, a usuwa całą klasę tego błędu.
 Money = Annotated[Decimal, PlainSerializer(float, return_type=float, when_used="json")]
+
+
+def _utc_iso(value: datetime) -> str:
+    """Czas z bazy (naiwny UTC) jako ISO 8601 z jawnym `Z` i milisekundami."""
+    aware = value.replace(tzinfo=UTC) if value.tzinfo is None else value.astimezone(UTC)
+    return aware.isoformat(timespec="milliseconds").replace("+00:00", "Z")
+
+
+#: Znacznik czasu w odpowiedzi API - ZAWSZE z oznaczeniem strefy (`...Z`).
+#:
+#: Baza trzyma naiwne datetime w UTC, a Pydantic serializował je bez strefy
+#: ("2026-09-13T17:13:00"). JavaScript czyta taki napis jako czas LOKALNY,
+#: więc desktop i telefon pokazywały każdą godzinę cofniętą o różnicę do
+#: UTC - latem o dwie godziny: zamówienie z 19:13 widniało jako 17:13,
+#: a mail sprzed minuty jako "2 godz.". Milisekundy zamiast mikrosekund,
+#: bo Safari (PWA na iPhonie) nie gwarantuje odczytu dłuższych ułamków.
+UtcDatetime = Annotated[
+    datetime, PlainSerializer(_utc_iso, return_type=str, when_used="json")
+]
 
 
 # --------------------------------------------------------------------------
@@ -101,7 +120,7 @@ class OrderOut(BaseModel):
     currency: str
     status: str
     fulfillment_status: str | None
-    order_date: datetime
+    order_date: UtcDatetime
     products: list[OrderProductOut]
 
 
@@ -136,7 +155,7 @@ class ShipmentOut(BaseModel):
     carrier: str | None
     tracking_number: str | None
     status: str | None
-    updated_at: datetime | None
+    updated_at: UtcDatetime | None
 
 
 def shipment_out(shipment: Shipment) -> ShipmentOut:
@@ -195,7 +214,7 @@ class ReturnOut(BaseModel):
     buyer_login: str
     status: str
     products_summary: str
-    return_date: datetime
+    return_date: UtcDatetime
 
 
 def return_out(record: ReturnRecord) -> ReturnOut:
@@ -227,10 +246,10 @@ class IssueOut(BaseModel):
     buyer_login: str
     subject: str | None
     description: str | None
-    opened_at: datetime
+    opened_at: UtcDatetime
     messages_count: int
     chat_active: bool
-    last_message_at: datetime | None
+    last_message_at: UtcDatetime | None
 
 
 def issue_out(issue: Issue) -> IssueOut:
@@ -258,7 +277,7 @@ class IssueMessageOut(BaseModel):
     text: str
     author_login: str
     author_role: str
-    created_at: datetime
+    created_at: UtcDatetime
 
 
 def issue_message_out(message: IssueMessage) -> IssueMessageOut:
@@ -311,7 +330,7 @@ class MailMessageOut(BaseModel):
     message_id: str
     sender: str
     subject: str
-    received_at: datetime
+    received_at: UtcDatetime
     source: str
     body_preview: str
     is_read: bool
@@ -368,7 +387,7 @@ class MailboxStatusOut(BaseModel):
     user_masked: str
     watch_senders: list[str]
     message_count: int
-    last_received_at: datetime | None
+    last_received_at: UtcDatetime | None
 
 
 def mailbox_status_out(status: MailboxStatus) -> MailboxStatusOut:
@@ -440,7 +459,7 @@ class OrdlakMessageOut(BaseModel):
 
     role: Literal["user", "assistant"]
     content: str
-    created_at: datetime
+    created_at: UtcDatetime
     used_tools: list[str]
 
 
@@ -452,8 +471,8 @@ class OrdlakConversationOut(BaseModel):
 
     id: int
     title: str
-    created_at: datetime
-    updated_at: datetime
+    created_at: UtcDatetime
+    updated_at: UtcDatetime
     message_count: int
     messages: list[OrdlakMessageOut]
 
@@ -610,7 +629,7 @@ class StockMovementOut(BaseModel):
     reason: str
     source: str
     reference: str | None
-    occurred_at: datetime
+    occurred_at: UtcDatetime
 
 
 def stock_movement_out(movement: InventoryMovement) -> StockMovementOut:
@@ -731,7 +750,7 @@ class UnmappedOfferOut(BaseModel):
     name: str
     sold_quantity: int
     orders_count: int
-    last_sold_at: datetime
+    last_sold_at: UtcDatetime
 
 
 def unmapped_offer_out(offer: SoldOffer) -> UnmappedOfferOut:
@@ -800,7 +819,7 @@ class CatalogSyncOut(BaseModel):
     fetched: int
     auto_linked: int
     unlinked: int
-    synced_at: datetime
+    synced_at: UtcDatetime
 
 
 def catalog_sync_out(result: CatalogSyncResult) -> CatalogSyncOut:
@@ -851,7 +870,7 @@ class BackfillLineOut(BaseModel):
     """Zamówienie objęte korektą wsteczną."""
 
     order_external_id: str
-    order_date: datetime
+    order_date: UtcDatetime
     quantity: int
     already_applied: bool
 
@@ -872,7 +891,7 @@ class BackfillPlanOut(BaseModel):
     marketplace: str
     external_product_id: str
     offer_name: str | None
-    since: datetime
+    since: UtcDatetime
     applied: bool
     pending_quantity: int
     lines: list[BackfillLineOut]
@@ -1019,7 +1038,7 @@ class EventOut(BaseModel):
 
     event_type: str
     level: str
-    created_at: datetime
+    created_at: UtcDatetime
 
 
 def event_out(event: EventRecord) -> EventOut:

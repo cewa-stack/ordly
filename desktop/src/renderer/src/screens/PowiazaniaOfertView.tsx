@@ -25,7 +25,7 @@ import {
 } from "../components/ui";
 import { Modal, ConfirmDialog } from "../components/Modal";
 import { useToast } from "../lib/toast";
-import { formatAge, formatDateTime } from "../lib/format";
+import { formatAge, formatDateTime, formatPlural } from "../lib/format";
 import type {
   BackfillPlan,
   OfferRecipe,
@@ -86,7 +86,7 @@ export function RecipeModal({
       void queryClient.invalidateQueries({ queryKey: ["unmapped-offers"] });
       toast.success(
         "Zapisano powiązanie",
-        `${recipe.components.length} składnik(i) - kolejne sprzedaże zdejmą je z magazynu`
+        `${formatPlural(recipe.components.length, ["składnik", "składniki", "składników"])} - kolejne sprzedaże zdejmą je z magazynu`
       );
       onClose();
     },
@@ -216,9 +216,12 @@ function BackfillModal({ offer, onClose }: { offer: OfferRef | null; onClose: ()
       void queryClient.invalidateQueries({ queryKey: ["stock"] });
       void queryClient.invalidateQueries({ queryKey: ["dashboard"] });
       void queryClient.invalidateQueries({ queryKey: ["offer-backfill"] });
+      // Liczymy tylko zamowienia rozliczone TERAZ - wczesniej toast wliczal
+      // tez te, ktore byly rozliczone przy poprzedniej korekcie.
+      const settledNow = plan.lines.filter((line) => !line.already_applied).length;
       toast.success(
         "Stany uzupełnione",
-        `Rozliczono ${plan.lines.length} zamówien(ia) tej oferty`
+        `Rozliczono ${formatPlural(settledNow, ["zamówienie", "zamówienia", "zamówień"])} tej oferty`
       );
       onClose();
     },

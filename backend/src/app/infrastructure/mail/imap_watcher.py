@@ -7,6 +7,7 @@ modyfikuje niczego na serwerze pocztowym.
 
 from __future__ import annotations
 
+import contextlib
 import email
 import email.utils
 from collections.abc import Callable
@@ -43,6 +44,15 @@ class ImapConnectionError(Exception):
 
 
 ClientFactory = Callable[[], aioimaplib.IMAP4]
+
+# Wszystko, czym aioimaplib potrafi przerwać rozmowę z serwerem: zerwane
+# gniazdo (OSError), przekroczony czas komendy (TimeoutError z
+# `asyncio.wait_for`, CommandTimeout przy FETCH) i błędy protokołu (Abort).
+# Bez tej listy timeout w środku SEARCH leciał do FastAPI jako surowe 500
+# i aplikacja nie wiedziała nawet, że chodzi o pocztę.
+_IMAP_FAILURES = (OSError, TimeoutError, aioimaplib.AioImapException)
+
+_SERVER_REASON_MAX_LENGTH = 200
 
 
 class ImapWatcher:
@@ -106,8 +116,12 @@ class ImapWatcher:
                         continue
                     seen_ids.add(message.message_id)
                     messages.append(message)
+        except _IMAP_FAILURES as exc:
+            raise ImapConnectionError(
+                f"Serwer IMAP {self._host} przerwał pobieranie poczty ({_describe(exc)})"
+            ) from exc
         finally:
-            await client.logout()
+            await _close_quietly(client)
         return messages
 
     async def fetch_bodies_by_message_id(self, message_id: str) -> MailBodies | None:
@@ -147,33 +161,146 @@ class ImapWatcher:
             if raw_bytes is None:
                 return None
             return extract_bodies(email.message_from_bytes(raw_bytes))
+        except _IMAP_FAILURES as exc:
+            raise ImapConnectionError(
+                f"Serwer IMAP {self._host} przerwał pobieranie treści maila ({_describe(exc)})"
+            ) from exc
         finally:
-            await client.logout()
+            await _close_quietly(client)
 
     async def _open_inbox(self) -> aioimaplib.IMAP4:
-        """Łączy się, loguje i wybiera INBOX - wspólny start każdej operacji."""
+        """
+        Łączy się, loguje i wybiera INBOX - wspólny start każdej operacji.
+
+        Każda porażka po nawiązaniu połączenia ZAMYKA je przed rzuceniem
+        błędu. Wcześniej odrzucone logowanie zostawiało otwarte gniazdo,
+        a Gmail pozwala na 15 jednoczesnych połączeń na konto - seria
+        nieudanych synchronizacji mogła więc sama wyczerpać ten limit
+        i blokować logowanie nawet po poprawieniu hasła.
+        """
+        client: aioimaplib.IMAP4 | None = None
         try:
             client = self._client_factory()
             await client.wait_hello_from_server()
-        except (OSError, TimeoutError, aioimaplib.Abort) as exc:
+        except _IMAP_FAILURES as exc:
             # Nieosiągalny host/port albo zerwane TLS - bez tego opakowania
             # surowy OSError leciał do FastAPI jako 500 "Internal Server
             # Error" i użytkownik nie wiedział, że chodzi o pocztę.
+            if client is not None:
+                await _close_quietly(client)
             raise ImapConnectionError(
-                f"Brak połączenia z serwerem IMAP {self._host}:{self._port} ({exc})"
+                f"Brak połączenia z serwerem IMAP {self._host}:{self._port} ({_describe(exc)})"
             ) from exc
 
-        login_response = await client.login(self._user, self._password)
-        if login_response.result != "OK":
-            raise ImapConnectionError(
-                "Logowanie IMAP odrzucone - sprawdź IMAP_USER i IMAP_PASS w .env na Pi. "
-                "Gmail i iCloud wymagają hasła aplikacji, nie zwykłego hasła konta."
-            )
+        try:
+            login_response = await client.login(self._user, self._password)
+            if login_response.result != "OK":
+                raise ImapConnectionError(
+                    _login_rejected_message(login_response.lines, self._password)
+                )
 
-        select_response = await client.select("INBOX")
-        if select_response.result != "OK":
-            raise ImapConnectionError("Nie udało się otworzyć skrzynki INBOX")
+            select_response = await client.select("INBOX")
+            if select_response.result != "OK":
+                raise ImapConnectionError("Nie udało się otworzyć skrzynki INBOX")
+        except ImapConnectionError:
+            await _close_quietly(client)
+            raise
+        except _IMAP_FAILURES as exc:
+            await _close_quietly(client)
+            raise ImapConnectionError(
+                f"Serwer IMAP {self._host} nie odpowiedział przy logowaniu ({_describe(exc)})"
+            ) from exc
         return client
+
+
+def _describe(exc: BaseException) -> str:
+    """
+    Krótki opis wyjątku do komunikatu dla użytkownika.
+
+    `str(TimeoutError())` to pusty napis - bez tej zamiany komunikat
+    kończyłby się pustym nawiasem „()" i nie mówił, co się stało.
+    """
+    if isinstance(exc, TimeoutError | aioimaplib.CommandTimeout):
+        return "przekroczony czas oczekiwania"
+    return str(exc) or type(exc).__name__
+
+
+def _decode_server_lines(lines: list[bytes | bytearray | str], secret: str) -> str:
+    """
+    Składa tekst odpowiedzi serwera w jedną linię do pokazania w aplikacji.
+
+    Hasło jest wycinane na wszelki wypadek - żaden znany serwer go nie
+    odsyła, ale ten komunikat trafia do toastu i logów, więc nie może
+    zależeć od uprzejmości serwera.
+    """
+    parts: list[str] = []
+    for line in lines:
+        text = line.decode("utf-8", errors="replace") if isinstance(line, bytes | bytearray) else line
+        text = " ".join(text.split())
+        if text:
+            parts.append(text)
+    reason = " ".join(parts)
+    if secret:
+        reason = reason.replace(secret, "***")
+    if len(reason) > _SERVER_REASON_MAX_LENGTH:
+        reason = reason[: _SERVER_REASON_MAX_LENGTH - 1] + "…"
+    return reason
+
+
+def _login_rejected_message(lines: list[bytes | bytearray | str], password: str) -> str:
+    """
+    Komunikat o odrzuconym logowaniu Z POWODEM podanym przez serwer.
+
+    Poprzednia wersja zawsze mówiła „sprawdź IMAP_USER i IMAP_PASS" -
+    także wtedy, gdy Gmail odrzucał logowanie z zupełnie innego powodu
+    (limit jednoczesnych połączeń, blokada bezpieczeństwa). Użytkownik
+    zmieniał wtedy poprawne hasło i nic to nie dawało. Teraz komunikat
+    niesie dosłowny powód z serwera, a podpowiedź pasuje do tego powodu.
+    """
+    reason = _decode_server_lines(lines, secret=password)
+    normalized = reason.upper()
+
+    if "TOO MANY" in normalized:
+        hint = (
+            "Serwer ogranicza liczbę jednoczesnych połączeń - hasło jest w porządku, "
+            "spróbuj ponownie za kilka minut."
+        )
+    elif "APPLICATION-SPECIFIC PASSWORD" in normalized:
+        hint = (
+            "Gmail wymaga hasła aplikacji zamiast zwykłego hasła konta - wygeneruj je "
+            "i wpisz jako IMAP_PASS w ~/ordly/backend/.env na Pi, potem zrestartuj usługę ordly."
+        )
+    elif "AUTHENTICATIONFAILED" in normalized or "INVALID CREDENTIALS" in normalized:
+        hint = (
+            "Login albo hasło aplikacji są nieprawidłowe. Hasło aplikacji Google przestaje "
+            "działać m.in. po zmianie hasła do konta Google - wygeneruj nowe i wpisz je jako "
+            "IMAP_PASS w ~/ordly/backend/.env na Pi, potem zrestartuj usługę ordly."
+        )
+    else:
+        hint = (
+            "Sprawdź IMAP_USER i IMAP_PASS w ~/ordly/backend/.env na Pi. Gmail i iCloud "
+            "wymagają hasła aplikacji, nie zwykłego hasła konta."
+        )
+
+    prefix = f"Logowanie IMAP odrzucone: {reason}" if reason else "Logowanie IMAP odrzucone"
+    return f"{prefix}. {hint}"
+
+
+async def _close_quietly(client: aioimaplib.IMAP4) -> None:
+    """
+    Kończy sesję IMAP i zamyka gniazdo, nie rzucając wyjątków.
+
+    Wołane w `finally` - błąd samego LOGOUT (np. timeout po zerwanym
+    łączu) nie może przykryć pierwotnego błędu, który użytkownik ma
+    zobaczyć. Gniazdo zamykamy dodatkowo ręcznie, bo LOGOUT w złym stanie
+    protokołu (np. przed powitaniem serwera) kończy się wyjątkiem i nie
+    zamyka połączenia.
+    """
+    with contextlib.suppress(*_IMAP_FAILURES):
+        await client.logout()
+    transport = getattr(client.protocol, "transport", None)
+    if transport is not None and not transport.is_closing():
+        transport.close()
 
 
 def _format_imap_date(value: datetime) -> str:

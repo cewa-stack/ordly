@@ -53,6 +53,7 @@ export function SyncProvider({ children }: { children: React.ReactNode }) {
   const [phase, setPhase] = React.useState<SyncPhase>("idle");
   const [lastSyncAt, setLastSyncAt] = React.useState<Date | null>(null);
   const [successSubtitle, setSuccessSubtitle] = React.useState("");
+  const [mailFailed, setMailFailed] = React.useState(false);
   const busy = React.useRef(false);
   const queryClient = useQueryClient();
   const toast = useToast();
@@ -99,7 +100,12 @@ export function SyncProvider({ children }: { children: React.ReactNode }) {
       const summary = parts.length > 0 ? parts.join(" · ") : "bez zmian";
 
       setLastSyncAt(new Date());
-      setSuccessSubtitle(`Przed chwilą · ${summary}`);
+      // Przy awarii poczty wskaznik nie moze mowic "Wszystko aktualne" -
+      // sprzedaz z Allegro Lokalnie i OLX przychodzi WYLACZNIE mailem.
+      setMailFailed(!mailResult.ok);
+      setSuccessSubtitle(
+        mailResult.ok ? `Przed chwilą · ${summary}` : "Przed chwilą · poczta niedostępna"
+      );
       setPhase("success");
 
       // Odswiezenie wszystkich widokow dopiero PO zakonczeniu zapisu na Pi.
@@ -134,16 +140,21 @@ export function SyncProvider({ children }: { children: React.ReactNode }) {
       phase === "working"
         ? "Synchronizuję…"
         : phase === "success"
-          ? "Wszystko aktualne"
+          ? mailFailed
+            ? "Zamówienia aktualne"
+            : "Wszystko aktualne"
           : "Ordi czuwa";
+    // Kanaly, ktore ten przycisk FAKTYCZNIE odswieza: API Allegro oraz
+    // poczta (Allegro Lokalnie i OLX nie maja API). Dawny napis wymienial
+    // tez Amazon i eBay, ktorych ORDLY nie obsluguje.
     const subtitle =
       phase === "working"
-        ? "Allegro · Amazon · OLX · eBay"
+        ? "Allegro · Lokalnie · OLX"
         : phase === "success"
           ? successSubtitle
           : humanizeSince(lastSyncAt);
     return { phase, pose, title, subtitle, lastSyncAt, sync };
-  }, [phase, successSubtitle, lastSyncAt, sync]);
+  }, [phase, successSubtitle, mailFailed, lastSyncAt, sync]);
 
   return <SyncContext.Provider value={value}>{children}</SyncContext.Provider>;
 }

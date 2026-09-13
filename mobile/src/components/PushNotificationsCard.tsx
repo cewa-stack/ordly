@@ -23,6 +23,20 @@ interface RawPushSubscriptionJson {
   keys?: { p256dh?: string; auth?: string };
 }
 
+function isPolishFew(n: number): boolean {
+  return n % 10 >= 2 && n % 10 <= 4 && !(n % 100 >= 12 && n % 100 <= 14);
+}
+
+function deviceWord(n: number): string {
+  if (n === 1) return "urządzenie";
+  return isPolishFew(n) ? "urządzenia" : "urządzeń";
+}
+
+function expiredWord(n: number): string {
+  if (n === 1) return "wygasłą subskrypcję";
+  return isPolishFew(n) ? "wygasłe subskrypcje" : "wygasłych subskrypcji";
+}
+
 export function PushNotificationsCard() {
   const vapid = useVapidStatus();
   const subscribeMutation = useSubscribePush();
@@ -40,8 +54,18 @@ export function PushNotificationsCard() {
     }
     let cancelled = false;
     getExistingPushSubscription().then((sub) => {
-      if (!cancelled) {
-        setSubscribed(Boolean(sub));
+      if (cancelled) return;
+      setSubscribed(Boolean(sub));
+      // Telefon może mieć subskrypcję, o której Pi już nie wie (np. usuniętą
+      // jako wygasłą albo po odtworzeniu bazy) - wtedy status mówi
+      // "Włączone", a powiadomienia nie przychodzą. Zapis jest idempotentny,
+      // więc odświeżamy go przy każdym wejściu w Ustawienia.
+      const json = sub?.toJSON() as RawPushSubscriptionJson | undefined;
+      if (json?.endpoint && json.keys?.p256dh && json.keys.auth) {
+        subscribeMutation.mutate({
+          endpoint: json.endpoint,
+          keys: { p256dh: json.keys.p256dh, auth: json.keys.auth },
+        });
       }
     });
     return () => {
@@ -100,7 +124,13 @@ export function PushNotificationsCard() {
     setTestResult(null);
     try {
       const result = await testMutation.mutateAsync();
-      setTestResult(`Wysłano do ${result.sent_to} urządzeń.`);
+      const expired = result.expired ?? 0;
+      setTestResult(
+        `Wysłano na ${result.sent_to} ${deviceWord(result.sent_to)}.` +
+          (expired > 0
+            ? ` Usunięto ${expired} ${expiredWord(expired)} (np. ze starego telefonu).`
+            : "")
+      );
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "Nie udało się wysłać testu.");
     }

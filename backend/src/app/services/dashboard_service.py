@@ -3,11 +3,11 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from datetime import datetime, timedelta
+from datetime import date, timedelta
 
 from app.domain.interfaces.inventory_repository import InventoryRepository
 from app.domain.interfaces.order_repository import OrderRepository
-from app.utils.time import utc_now
+from app.utils.time import local_midnight_utc, local_today
 
 _SPARKLINE_DAYS = 7
 
@@ -22,6 +22,31 @@ class DashboardSummary:
     low_stock_count: int
     revenue_last_7_days: tuple[float, ...] = field(default_factory=tuple)
     trend_percent: float | None = None
+
+
+async def revenue_by_local_day(
+    order_repository: OrderRepository, first_day: date, last_day: date
+) -> list[tuple[date, float]]:
+    """
+    Przychód dzień po dniu (obie granice włącznie), w POLSKICH dobach.
+
+    Kwota dnia to różnica dwóch sum "od północy". Wcześniej grupowało to
+    `date()` w SQL, które dzieli doby o północy UTC - zamówienie z 0:30
+    w nocy trafiało latem do wczorajszego słupka. Kosztuje to jedno
+    krótkie zapytanie na dzień, co przy tygodniu czy miesiącu nie ma
+    znaczenia.
+    """
+    boundaries = [
+        first_day + timedelta(days=offset)
+        for offset in range((last_day - first_day).days + 2)
+    ]
+    sums = [
+        await order_repository.sum_amount_since(local_midnight_utc(day)) for day in boundaries
+    ]
+    return [
+        (boundaries[index], round(sums[index] - sums[index + 1], 2))
+        for index in range(len(boundaries) - 1)
+    ]
 
 
 class DashboardService:
@@ -44,39 +69,29 @@ class DashboardService:
 
     async def get_summary(self) -> DashboardSummary:
         """Oblicza podsumowanie dzisiejszej sprzedaży, wysyłek i niskich stanów."""
-        now = utc_now()
-        today_start = datetime(now.year, now.month, now.day)
+        today = local_today()
+        today_start = local_midnight_utc(today)
 
         orders_today = await self._order_repository.count_since(today_start)
-        revenue_today = await self._order_repository.sum_amount_since(today_start)
         unshipped_today = await self._order_repository.get_unshipped_since(today_start)
         low_stock_items = await self._inventory_repository.get_low_stock()
 
-        series = await self._build_sparkline(today_start)
+        series = tuple(
+            amount
+            for _, amount in await revenue_by_local_day(
+                self._order_repository, today - timedelta(days=_SPARKLINE_DAYS - 1), today
+            )
+        )
         trend_percent = self._compute_trend(series)
 
         return DashboardSummary(
             orders_today=orders_today,
-            revenue_today=revenue_today,
+            revenue_today=series[-1],
             orders_to_ship=len(unshipped_today),
             low_stock_count=len(low_stock_items),
             revenue_last_7_days=series,
             trend_percent=trend_percent,
         )
-
-    async def _build_sparkline(self, today_start: datetime) -> tuple[float, ...]:
-        """
-        Zwraca sprzedaż z ostatnich `_SPARKLINE_DAYS` dni (najstarszy -> dziś),
-        uzupełniając dni bez zamówień zerami.
-        """
-        window_start = today_start - timedelta(days=_SPARKLINE_DAYS - 1)
-        by_day = await self._order_repository.sum_amount_by_day(window_start)
-
-        series: list[float] = []
-        for offset in range(_SPARKLINE_DAYS):
-            day = window_start + timedelta(days=offset)
-            series.append(by_day.get(day.strftime("%Y-%m-%d"), 0.0))
-        return tuple(series)
 
     @staticmethod
     def _compute_trend(series: tuple[float, ...]) -> float | None:

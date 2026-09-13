@@ -42,7 +42,13 @@ export function registerStatsIpc(): void {
   ipcMain.handle("ordly:stats:events", async () =>
     toResult(async () => {
       const session = requireSession();
-      return apiRequest(session.baseUrl, session.token, "/api/v1/logs?limit=40");
+      // Bez wpisow synchronizacji - powstaja co minute i zaslanialy
+      // zamowienia, zwroty i ostrzezenia na liscie "Dziś w systemie".
+      return apiRequest(
+        session.baseUrl,
+        session.token,
+        "/api/v1/logs?limit=60&include_sync=false"
+      );
     })
   );
 

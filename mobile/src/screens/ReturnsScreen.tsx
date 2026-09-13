@@ -56,14 +56,14 @@ export function ReturnsScreen() {
           }
           ListFooterComponent={
             (returns.data ?? []).length > 0 ? (
-              <ListEndNote text="To wszystkie zwroty z ostatnich 30 dni. Ordi da znać, gdy pojawi się nowy." />
+              <ListEndNote text="To ostatnie zwroty pobrane z Allegro. Ordi da znać, gdy pojawi się nowy." />
             ) : null
           }
           ListEmptyComponent={
             <EmptyState
               mascotPose="happy"
-              title="Zero zwrotów i anulowań"
-              description="Wszystkie zamówienia idą gładko — nic tu dziś nie ma."
+              title="Zero zwrotów"
+              description="Wszystkie zamówienia idą gładko — żaden kupujący niczego nie zwraca."
             />
           }
         />

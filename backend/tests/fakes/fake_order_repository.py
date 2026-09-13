@@ -86,10 +86,20 @@ class FakeOrderRepository(OrderRepository):
         ]
 
     async def count_since(self, since: datetime) -> int:
-        return sum(1 for o in self._orders if o.order_date >= since)
+        return sum(
+            1
+            for o in self._orders
+            if o.order_date >= since and o.status.upper() != "CANCELLED"
+        )
 
     async def sum_amount_since(self, since: datetime) -> float:
-        return float(sum(o.total_amount for o in self._orders if o.order_date >= since))
+        return float(
+            sum(
+                o.total_amount
+                for o in self._orders
+                if o.order_date >= since and o.status.upper() != "CANCELLED"
+            )
+        )
 
     async def count_all(self) -> int:
         return len(self._orders)
@@ -97,7 +107,7 @@ class FakeOrderRepository(OrderRepository):
     async def sum_amount_by_day(self, since: datetime) -> dict[str, float]:
         totals: dict[str, float] = {}
         for order in self._orders:
-            if order.order_date < since:
+            if order.order_date < since or order.status.upper() == "CANCELLED":
                 continue
             key = order.order_date.strftime("%Y-%m-%d")
             totals[key] = totals.get(key, 0.0) + float(order.total_amount)

@@ -71,3 +71,7 @@ docker-compose.override.yml
 .DS_Store
 Thumbs.db
 .claude/
+
+# Paczka builda PWA do wyslania na Pi (scp) - powstaje lokalnie przy kazdym
+# wdrozeniu, nie jest zrodlem i nie ma czego w niej wersjonowac.
+mobile/mobile-dist.tgz

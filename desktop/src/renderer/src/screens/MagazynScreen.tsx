@@ -1012,8 +1012,12 @@ export function MagazynScreen({ focusSku, onFocusHandled }: MagazynScreenProps) 
                         {item.name}
                         {subItems.length > 0 && (
                           <span className="o-mono shrink-0 rounded-[5px] bg-teal-dim px-1.5 py-[1px] text-[10px] text-teal-bright">
-                            +{subItems.length}{" "}
-                            {subItems.length === 1 ? "podprodukt" : "podprodukty"}
+                            +
+                            {formatPlural(subItems.length, [
+                              "podprodukt",
+                              "podprodukty",
+                              "podproduktów",
+                            ])}
                           </span>
                         )}
                         {item.parent_sku ? (

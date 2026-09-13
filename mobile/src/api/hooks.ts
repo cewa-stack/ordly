@@ -58,7 +58,10 @@ export function useHealth(options?: Partial<UseQueryOptions<Health>>) {
 // Zamówienia
 // ---------------------------------------------------------------------
 
-const ORDERS_PAGE_SIZE = 20;
+// Maksimum, jakie przyjmuje `GET /orders`. Przy 20 lista i odznaka na
+// zakładce widziały tylko 20 ostatnich zamówień, a stopka mówiła "to
+// wszystkie" - starsze niespakowane zamówienie po cichu znikało z widoku.
+const ORDERS_PAGE_SIZE = 100;
 
 export function useOrders(page = 0) {
   return useQuery({
@@ -203,7 +206,9 @@ export function useCreateStockItem() {
 export function useLogs() {
   return useQuery({
     queryKey: ["logs"],
-    queryFn: () => api.get<EventLog[]>("/api/v1/logs?limit=50"),
+    // Bez "Start/Koniec synchronizacji" - powstają co minutę i zasłaniały
+    // wszystko inne. Starszy backend ignoruje nieznany parametr.
+    queryFn: () => api.get<EventLog[]>("/api/v1/logs?limit=50&include_sync=false"),
   });
 }
 
@@ -232,7 +237,11 @@ export function useUnsubscribePush() {
 
 export function useSendTestPush() {
   return useMutation({
-    mutationFn: () => api.post<{ status: string; sent_to: number }>("/api/v1/push/test"),
+    // `expired`/`failed` doszły później - starszy backend na Pi ich nie zwraca.
+    mutationFn: () =>
+      api.post<{ status: string; sent_to: number; expired?: number; failed?: number }>(
+        "/api/v1/push/test"
+      ),
   });
 }
 

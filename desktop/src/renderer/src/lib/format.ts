@@ -62,14 +62,29 @@ export function formatCurrency(
   return `${formatter.format(toAmount(amount))} zł`;
 }
 
+/**
+ * Znacznik czasu z API jako `Date`.
+ *
+ * Starszy backend na Pi oddaje daty BEZ strefy ("2026-09-13T17:13:00"),
+ * choc to czas UTC. `new Date()` czyta taki napis jako czas LOKALNY, wiec
+ * kazda godzina w aplikacji byla cofnieta o roznice do UTC (latem 2 h).
+ * Napis bez strefy traktujemy jako UTC; z `Z` albo offsetem - bez zmian.
+ * Ulamek sekundy skracamy do milisekund, bo tyle gwarantuje specyfikacja.
+ */
+export function parseApiDate(iso: string): Date {
+  const trimmed = iso.replace(/(\.\d{3})\d+/, "$1");
+  const hasZone = /(Z|[+-]\d{2}:?\d{2})$/i.test(trimmed);
+  return new Date(trimmed.includes("T") && !hasZone ? `${trimmed}Z` : trimmed);
+}
+
 /** `08:12` */
 export function formatTime(iso: string): string {
-  return TIME_FORMAT.format(new Date(iso));
+  return TIME_FORMAT.format(parseApiDate(iso));
 }
 
 /** `04.08, 08:12` */
 export function formatDateTime(iso: string): string {
-  return DATE_FORMAT.format(new Date(iso));
+  return DATE_FORMAT.format(parseApiDate(iso));
 }
 
 /** `wtorek, 4 sierpnia` - okruszek ekranu Start. */
@@ -82,7 +97,10 @@ export function formatLongDate(date: Date): string {
  * Skala celowo gruba - dokladna minuta sprzed tygodnia nikomu nie pomaga.
  */
 export function formatAge(iso: string): string {
-  const minutes = Math.max(0, Math.floor((Date.now() - new Date(iso).getTime()) / 60000));
+  const minutes = Math.max(
+    0,
+    Math.floor((Date.now() - parseApiDate(iso).getTime()) / 60000)
+  );
   if (minutes < 1) return "przed chwilą";
   if (minutes < 60) return `${minutes} min`;
   const hours = Math.floor(minutes / 60);
