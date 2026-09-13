@@ -67,9 +67,11 @@ function useOrders() {
 function fulfillmentTimeline(order: Order): { label: string; done: boolean; time?: string }[] {
   const status = order.fulfillment_status;
   const paid = status !== null || order.status === "READY_FOR_PROCESSING";
+  // "Spakowane" = od READY_FOR_SHIPMENT wzwyz. PROCESSING to dopiero
+  // "w realizacji" - tak ustawia Allegro, gdy pakowanie sie zaczyna.
   const packing =
-    status === "PROCESSING" ||
     status === "READY_FOR_SHIPMENT" ||
+    status === "READY_FOR_PICKUP" ||
     status === "SENT" ||
     status === "PICKED_UP";
   const sent = status === "SENT" || status === "PICKED_UP";
@@ -87,24 +89,29 @@ function isCancelled(order: Order): boolean {
 }
 
 /**
- * Czy "Oznacz jako spakowane" ma sens. Wczesniej przycisk byl aktywny takze
- * dla wyslanych i odebranych paczek - klikniecie cofalo na Allegro status
- * z "wysłane" na "w realizacji", a kupujacy widzial to od razu.
+ * Czy "Oznacz jako spakowane" ma sens - tylko dla zamowien, ktore jeszcze
+ * czekaja na spakowanie. Wczesniej przycisk byl aktywny takze dla wyslanych
+ * i odebranych paczek, a klikniecie cofalo ich status na Allegro.
  */
 function canMarkPacked(order: Order): boolean {
   const status = order.fulfillment_status;
-  return !isCancelled(order) && (status === null || status === "NEW");
+  return !isCancelled(order) && (status === null || status === "NEW" || status === "PROCESSING");
 }
 
 function canMarkSent(order: Order): boolean {
   const status = order.fulfillment_status;
-  return !isCancelled(order) && status !== "SENT" && status !== "PICKED_UP";
+  return (
+    !isCancelled(order) &&
+    status !== "SENT" &&
+    status !== "PICKED_UP" &&
+    status !== "READY_FOR_PICKUP"
+  );
 }
 
 function OrderDetail({ order }: { order: Order }) {
   const queryClient = useQueryClient();
   const toast = useToast();
-  const [confirm, setConfirm] = React.useState<null | "PROCESSING" | "SENT">(null);
+  const [confirm, setConfirm] = React.useState<null | "READY_FOR_SHIPMENT" | "SENT">(null);
 
   const trackingQuery = useQuery({
     queryKey: ["tracking", order.external_id],
@@ -117,7 +124,7 @@ function OrderDetail({ order }: { order: Order }) {
   });
 
   const fulfillmentMutation = useMutation({
-    mutationFn: async (status: "PROCESSING" | "SENT") => {
+    mutationFn: async (status: "READY_FOR_SHIPMENT" | "SENT") => {
       const result = await window.ordly.orders.setFulfillment(order.external_id, status);
       if (!result.ok) throw new Error(result.message);
       return result.data;
@@ -225,7 +232,7 @@ function OrderDetail({ order }: { order: Order }) {
           </p>
         )}
         <Button
-          onClick={() => setConfirm("PROCESSING")}
+          onClick={() => setConfirm("READY_FOR_SHIPMENT")}
           disabled={fulfillmentMutation.isPending || !canMarkPacked(order)}
           icon={<CheckIcon size={14} />}
         >
@@ -247,7 +254,7 @@ function OrderDetail({ order }: { order: Order }) {
         message={
           confirm === "SENT"
             ? `Allegro pokaże kupującemu ${order.buyer_login}, że paczka została nadana. Tej zmiany nie da się cofnąć z poziomu ORDLY.`
-            : `Allegro zmieni status zamówienia ${order.buyer_login} na "w realizacji". Kupujący zobaczy to od razu.`
+            : `Allegro zmieni status zamówienia ${order.buyer_login} na "gotowe do wysyłki". Kupujący zobaczy to od razu.`
         }
         confirmLabel={confirm === "SENT" ? "Oznacz jako wysłane" : "Oznacz jako spakowane"}
         pending={fulfillmentMutation.isPending}
@@ -278,9 +285,7 @@ export function ZamowieniaScreen({ focusOrderId, onFocusHandled }: ZamowieniaScr
   }, [focusOrderId, onFocusHandled]);
 
   const visible = React.useMemo(() => {
-    const filtered = (data ?? []).filter((order) =>
-      matchesOrderFilter(order.fulfillment_status, filter)
-    );
+    const filtered = (data ?? []).filter((order) => matchesOrderFilter(order, filter));
     return [...filtered].sort((a, b) =>
       sort === "amount"
         ? toAmount(b.total_amount) - toAmount(a.total_amount)
@@ -293,7 +298,7 @@ export function ZamowieniaScreen({ focusOrderId, onFocusHandled }: ZamowieniaScr
   const bulkMutation = useMutation({
     mutationFn: async () => {
       // Tylko zamowienia, ktore naprawde czekaja na spakowanie - pozostale
-      // (w realizacji, wyslane, anulowane) mialyby cofniety status na Allegro.
+      // (spakowane, wyslane, anulowane) mialyby cofniety status na Allegro.
       const eligible = (data ?? []).filter(
         (order) => checked.has(order.external_id) && canMarkPacked(order)
       );
@@ -301,7 +306,7 @@ export function ZamowieniaScreen({ focusOrderId, onFocusHandled }: ZamowieniaScr
       for (const order of eligible) {
         const result = await window.ordly.orders.setFulfillment(
           order.external_id,
-          "PROCESSING"
+          "READY_FOR_SHIPMENT"
         );
         if (!result.ok) failures.push(order.external_id);
       }
@@ -318,12 +323,12 @@ export function ZamowieniaScreen({ focusOrderId, onFocusHandled }: ZamowieniaScr
               "zamówienie",
               "zamówienia",
               "zamówień",
-            ])} - już w realizacji, wysłane lub anulowane.`
+            ])} - już spakowane, wysłane lub anulowane.`
           : "";
       if (total === 0) {
         toast.error(
           "Nic do oznaczenia",
-          "Zaznaczone zamówienia są już w realizacji, wysłane lub anulowane."
+          "Zaznaczone zamówienia są już spakowane, wysłane lub anulowane."
         );
       } else if (failures.length === 0) {
         toast.success(
@@ -401,7 +406,7 @@ export function ZamowieniaScreen({ focusOrderId, onFocusHandled }: ZamowieniaScr
     <div className="grid min-h-0 flex-1 grid-cols-[minmax(0,1fr)_328px] max-[1100px]:grid-cols-1">
       <div className="flex min-h-0 min-w-0 flex-col">
         <div className="flex flex-wrap items-center gap-2 border-b border-line px-[22px] py-[11px]">
-          {(["all", "pack", "new", "sent"] as const).map((option) => (
+          {(["all", "pack", "ready", "sent"] as const).map((option) => (
             <Chip key={option} active={filter === option} onClick={() => setFilter(option)}>
               {ORDER_FILTER_LABEL[option]}
             </Chip>
@@ -511,7 +516,7 @@ export function ZamowieniaScreen({ focusOrderId, onFocusHandled }: ZamowieniaScr
       <ConfirmDialog
         open={bulkConfirm}
         title={`Oznaczyć ${formatPlural(checked.size, ["zamówienie", "zamówienia", "zamówień"])}?`}
-        message='Allegro zmieni status zaznaczonych nowych zamówień na "w realizacji". Kupujący zobaczą to od razu, a zmiany nie da się cofnąć z poziomu ORDLY. Zamówienia już w realizacji, wysłane i anulowane zostaną pominięte.'
+        message='Allegro zmieni status zaznaczonych zamówień na "gotowe do wysyłki". Kupujący zobaczą to od razu, a zmiany nie da się cofnąć z poziomu ORDLY. Zamówienia już spakowane, wysłane i anulowane zostaną pominięte.'
         confirmLabel="Oznacz jako spakowane"
         pending={bulkMutation.isPending}
         onConfirm={() => bulkMutation.mutate()}

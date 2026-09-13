@@ -69,8 +69,11 @@ export function plural(count: number, one: string, few: string, many: string): s
  */
 const FULFILLMENT_LABELS: Record<string, string> = {
   NEW: "Nowe",
-  PROCESSING: "Do spakowania",
+  // PROCESSING to "w realizacji" - spakowane zamówienie desktop oznacza
+  // jako READY_FOR_SHIPMENT. Dawna etykieta "Do spakowania" myliła oba etapy.
+  PROCESSING: "W realizacji",
   READY_FOR_SHIPMENT: "Gotowe do wysyłki",
+  READY_FOR_PICKUP: "Do odbioru",
   SENT: "Wysłane",
   PICKED_UP: "Odebrane",
   SUSPENDED: "Wstrzymane",

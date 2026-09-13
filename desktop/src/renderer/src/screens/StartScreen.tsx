@@ -11,7 +11,7 @@ import { Button, SectionLabel } from "../components/ui";
 import { Mascot } from "../components/Mascot";
 import { useSync } from "../lib/sync";
 import { formatCurrency, formatPlural, formatTime, parseApiDate } from "../lib/format";
-import { isPendingFulfillment } from "../lib/fulfillment";
+import { isPendingOrder } from "../lib/fulfillment";
 import type { ViewId } from "../components/Sidebar";
 
 /**
@@ -132,9 +132,7 @@ export function StartScreen({ onNavigate }: { onNavigate: (view: ViewId) => void
   });
 
   const dashboard = dashboardQuery.data;
-  const pendingOrders = (ordersQuery.data ?? []).filter((order) =>
-    isPendingFulfillment(order.fulfillment_status)
-  );
+  const pendingOrders = (ordersQuery.data ?? []).filter(isPendingOrder);
   const openIssues = (issuesQuery.data ?? []).filter((issue) => issue.chat_active);
   const lowStock = dashboard?.low_stock_count ?? 0;
 

@@ -21,7 +21,7 @@ import { StatStrip } from "../components/StatStrip";
 import { useAuth } from "../lib/auth";
 import { useSync } from "../lib/sync";
 import { formatLongDate, formatPlural } from "../lib/format";
-import { isPendingFulfillment } from "../lib/fulfillment";
+import { isPendingOrder } from "../lib/fulfillment";
 import { StartScreen } from "./StartScreen";
 import { ZamowieniaScreen } from "./ZamowieniaScreen";
 import { DiscussionsScreen } from "./DiscussionsScreen";
@@ -124,9 +124,7 @@ export function ShellLayout() {
 
   const openIssues = (issuesQuery.data ?? []).filter((issue) => issue.chat_active);
   const unreadMail = (mailQuery.data ?? []).filter((message) => !message.is_read);
-  const pendingOrders = (ordersQuery.data ?? []).filter((order) =>
-    isPendingFulfillment(order.fulfillment_status)
-  );
+  const pendingOrders = (ordersQuery.data ?? []).filter(isPendingOrder);
   const lowStockCount = dashboardQuery.data?.low_stock_count ?? 0;
 
   // Licznik zwrotow to te, ktore jeszcze czekaja na ruch. Wczesniej liczyl

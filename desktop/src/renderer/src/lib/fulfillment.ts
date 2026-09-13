@@ -2,6 +2,16 @@
  * Etykiety fulfillment_status 1:1 z mobile/src/utils/format.ts
  * (fulfillmentLabel) - te same surowe wartosci Allegro, nie zgadywane
  * ponownie tutaj.
+ *
+ * Etapy obslugi zamowienia w ORDLY:
+ *
+ *   NEW (Nowe) -> PROCESSING (W realizacji) -> READY_FOR_SHIPMENT
+ *   (Gotowe do wysyłki = spakowane) -> SENT (Wysłane)
+ *
+ * "Oznacz jako spakowane" ustawia READY_FOR_SHIPMENT. Wczesniej ustawialo
+ * PROCESSING, ktore aplikacja pokazywala jako "Do spakowania" i dalej
+ * liczyla jako czekajace - po kliknieciu "spakowane" zamowienie nadal
+ * wisialo w "czeka na spakowanie".
  */
 import type { PillTone } from "../components/ui";
 
@@ -13,8 +23,9 @@ import type { PillTone } from "../components/ui";
  */
 const FULFILLMENT_LABELS: Record<string, string> = {
   NEW: "Nowe",
-  PROCESSING: "Do spakowania",
+  PROCESSING: "W realizacji",
   READY_FOR_SHIPMENT: "Gotowe do wysyłki",
+  READY_FOR_PICKUP: "Do odbioru",
   SENT: "Wysłane",
   PICKED_UP: "Odebrane",
   SUSPENDED: "Wstrzymane",
@@ -22,19 +33,26 @@ const FULFILLMENT_LABELS: Record<string, string> = {
 };
 
 /**
- * Kolory pigulek wg sekcji 2.4. "Do spakowania" jest koralowe, bo
- * wymaga dzialania; "Wysłane"/"Anulowane" sa wygaszone, bo sa
- * zamknieta historia.
+ * Kolory pigulek wg sekcji 2.4. Koralowe jest to, co czeka na spakowanie
+ * (wymaga dzialania); spakowane czeka juz tylko na kuriera; wyslane
+ * i anulowane sa wygaszone, bo sa zamknieta historia.
  */
 const FULFILLMENT_TONES: Record<string, PillTone> = {
-  NEW: "new",
+  NEW: "pack",
   PROCESSING: "pack",
-  READY_FOR_SHIPMENT: "pack",
+  READY_FOR_SHIPMENT: "new",
+  READY_FOR_PICKUP: "done",
   SENT: "done",
   PICKED_UP: "done",
   SUSPENDED: "warn",
   CANCELLED: "warn",
 };
+
+/** Minimum pol zamowienia potrzebne do decyzji o etapie obslugi. */
+interface OrderStatusFields {
+  status: string;
+  fulfillment_status: string | null;
+}
 
 export function fulfillmentLabel(status: string | null): string {
   if (!status) return "Nowe";
@@ -42,30 +60,37 @@ export function fulfillmentLabel(status: string | null): string {
 }
 
 export function fulfillmentTone(status: string | null): PillTone {
-  if (!status) return "new";
+  if (!status) return "pack";
   return FULFILLMENT_TONES[status] ?? "warn";
 }
 
-/** Brak statusu lub "NEW" - zamówienie jeszcze nieobsłużone, wymaga uwagi. */
-export function isNewFulfillment(status: string | null): boolean {
-  return !status || status === "NEW";
+/** Anulowane zamowienie - Allegro nie pozwala juz zmieniac jego realizacji. */
+export function isCancelledOrder(order: OrderStatusFields): boolean {
+  return order.status === "CANCELLED" || order.fulfillment_status === "CANCELLED";
 }
 
-/** Zamowienie czeka na spakowanie/wyslanie - liczy sie do "do zrobienia". */
-export function isPendingFulfillment(status: string | null): boolean {
-  return !status || status === "NEW" || status === "PROCESSING";
+/**
+ * Zamowienie czeka na spakowanie - liczy sie do "do zrobienia".
+ *
+ * Anulowane odpada nawet wtedy, gdy Allegro zostawilo mu etap NEW -
+ * wczesniej takie zamowienie wisialo w liczniku na zawsze.
+ */
+export function isPendingOrder(order: OrderStatusFields): boolean {
+  const status = order.fulfillment_status;
+  return !isCancelledOrder(order) && (!status || status === "NEW" || status === "PROCESSING");
 }
 
-export type OrderFilter = "all" | "pack" | "new" | "sent";
+export type OrderFilter = "all" | "pack" | "ready" | "sent";
 
-export function matchesOrderFilter(status: string | null, filter: OrderFilter): boolean {
+export function matchesOrderFilter(order: OrderStatusFields, filter: OrderFilter): boolean {
+  const status = order.fulfillment_status;
   switch (filter) {
     case "pack":
-      return status === "PROCESSING" || status === "READY_FOR_SHIPMENT";
-    case "new":
-      return isNewFulfillment(status);
+      return isPendingOrder(order);
+    case "ready":
+      return !isCancelledOrder(order) && status === "READY_FOR_SHIPMENT";
     case "sent":
-      return status === "SENT" || status === "PICKED_UP";
+      return status === "SENT" || status === "PICKED_UP" || status === "READY_FOR_PICKUP";
     default:
       return true;
   }
@@ -74,6 +99,6 @@ export function matchesOrderFilter(status: string | null, filter: OrderFilter): 
 export const ORDER_FILTER_LABEL: Record<OrderFilter, string> = {
   all: "Wszystkie",
   pack: "Do spakowania",
-  new: "Nowe",
+  ready: "Gotowe do wysyłki",
   sent: "Wysłane",
 };

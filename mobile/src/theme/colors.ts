@@ -81,6 +81,9 @@ export const marketplaceColor: Record<string, { background: string; text: string
 /** Mapa statusów zamówień (sekcja 2.4) - klucze = etykiety z fulfillmentLabel. */
 export const orderStatusColor: Record<string, string> = {
   Nowe: "#166F72",
+  "W realizacji": "#C4523A",
+  "Gotowe do wysyłki": "#166F72",
+  "Do odbioru": "#68766F",
   "Do spakowania": "#C4523A",
   Pakowanie: "#C4523A",
   Wysłane: "#68766F",
@@ -90,6 +93,9 @@ export const orderStatusColor: Record<string, string> = {
 
 export const orderStatusTint: Record<string, string> = {
   Nowe: "#D9F0EC",
+  "W realizacji": "#FFE5D8",
+  "Gotowe do wysyłki": "#D9F0EC",
+  "Do odbioru": "#ECEFED",
   "Do spakowania": "#FFE5D8",
   Pakowanie: "#FFE5D8",
   Wysłane: "#ECEFED",

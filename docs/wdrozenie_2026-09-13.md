@@ -24,6 +24,10 @@
 6. **Desktop, Zamówienia:** lista miała tylko 20 ostatnich pozycji (teraz 100);
    „Oznacz jako spakowane" było aktywne dla wysłanych i anulowanych zamówień
    i cofało ich status na Allegro — teraz jest zablokowane.
+   **„Oznacz jako spakowane" ustawia teraz na Allegro status „Gotowe do
+   wysyłki"** (wcześniej „W realizacji", przez co spakowane zamówienie dalej
+   wisiało jako „czeka na spakowanie"). Filtry: Do spakowania · Gotowe do
+   wysyłki · Wysłane. Anulowane zamówienia nie liczą się już do „do spakowania".
 7. **Desktop, bezpieczeństwo:** link z treści maila mógł otworzyć w systemie
    dowolny protokół (np. plik z udziału sieciowego). Teraz tylko `http`,
    `https` i `mailto`, a okno aplikacji nie da się przenawigować na obcą stronę.
@@ -32,11 +36,23 @@
 9. **„Dziś w systemie"** nie jest już zapchane wpisami „Start/Koniec
    synchronizacji" (powstają co minutę).
 
+10. **Dane osobowe usunięte z GitHuba** — przykładowe maile w testach
+    zawierały prawdziwe dane kupujących (loginy, nazwiska, telefony, e-maile,
+    paczkomaty) i Twoje (imię, nazwisko, login, adres zwrotów, e-mail sklepu).
+    Zostały zanonimizowane, a **historia repozytorium została przepisana**, żeby
+    żadna stara wersja ich nie zawierała.
+
 **Bez migracji bazy.** Commit i push na GitHub są już zrobione.
 
 ---
 
 ## CZĘŚĆ A — Raspberry Pi (przez SSH)
+
+> **Uwaga: tym razem NIE używaj `git pull`.** Historia repozytorium na GitHubie
+> została przepisana (usunięcie danych osobowych), więc `git pull` zatrzyma się
+> z błędem o rozbieżnych gałęziach. Zamiast tego Pi dostaje dokładną kopię
+> wersji z GitHuba (krok A3). `.env`, baza danych, logi i kopie zapasowe są poza
+> Gitem — nie zostaną ruszone.
 
 ### A1. Połącz się i wejdź do backendu
 
@@ -48,7 +64,7 @@ ssh cewastack2@cewastack2
 cd ~/ordly/backend
 ```
 
-### A2. Sprawdź, czy nic nie blokuje pobrania
+### A2. Sprawdź, czy na Pi nie ma lokalnych zmian w kodzie
 
 ```bash
 git status --short
@@ -65,8 +81,15 @@ git restore .
 **Migracji nie ma** — pomiń `alembic upgrade`.
 
 ```bash
-git pull
+git fetch origin
 ```
+
+```bash
+git reset --hard origin/main
+```
+
+Ostatnia linia ma zaczynać się od `HEAD is now at` i opisem commita o danych
+osobowych.
 
 ```bash
 uv sync
