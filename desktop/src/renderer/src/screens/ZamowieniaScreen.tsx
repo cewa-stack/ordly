@@ -34,8 +34,9 @@ import {
 } from "../lib/format";
 import {
   ORDER_FILTER_LABEL,
-  fulfillmentLabel,
-  fulfillmentTone,
+  displayFulfillmentLabel,
+  displayFulfillmentTone,
+  isShippedForDisplay,
   matchesOrderFilter,
   type OrderFilter,
 } from "../lib/fulfillment";
@@ -69,12 +70,13 @@ function fulfillmentTimeline(order: Order): { label: string; done: boolean; time
   const paid = status !== null || order.status === "READY_FOR_PROCESSING";
   // "Spakowane" = od READY_FOR_SHIPMENT wzwyz. PROCESSING to dopiero
   // "w realizacji" - tak ustawia Allegro, gdy pakowanie sie zaczyna.
+  const sent = isShippedForDisplay(order);
   const packing =
+    sent ||
     status === "READY_FOR_SHIPMENT" ||
     status === "READY_FOR_PICKUP" ||
     status === "SENT" ||
     status === "PICKED_UP";
-  const sent = status === "SENT" || status === "PICKED_UP";
   return [
     { label: "Zamówienie złożone", done: true, time: formatDateTime(order.order_date) },
     { label: "Opłacone", done: paid },
@@ -368,7 +370,7 @@ export function ZamowieniaScreen({ focusOrderId, onFocusHandled }: ZamowieniaScr
         order.marketplace,
         order.buyer_login,
         toAmount(order.total_amount).toFixed(2).replace(".", ","),
-        fulfillmentLabel(order.fulfillment_status),
+        displayFulfillmentLabel(order),
         order.order_date,
       ].join(";")
     );
@@ -470,8 +472,8 @@ export function ZamowieniaScreen({ focusOrderId, onFocusHandled }: ZamowieniaScr
                   <span className="o-mono w-[78px] shrink-0 text-right text-[12.5px] text-slate">
                     {formatCurrency(order.total_amount)}
                   </span>
-                  <Pill tone={fulfillmentTone(order.fulfillment_status)}>
-                    {fulfillmentLabel(order.fulfillment_status)}
+                  <Pill tone={displayFulfillmentTone(order)}>
+                    {displayFulfillmentLabel(order)}
                   </Pill>
                 </button>
               </div>

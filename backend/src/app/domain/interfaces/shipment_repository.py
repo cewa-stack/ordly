@@ -9,12 +9,11 @@ from app.domain.entities.shipment import Shipment
 
 class ShipmentRepository(ABC):
     """
-    Kontrakt zapisu wyników ręcznego sprawdzenia statusu przesyłki.
+    Kontrakt zapisu wyników sprawdzenia statusu przesyłki.
 
-    Nie służy do automatycznej synchronizacji (projekt tego nie robi) -
-    wyłącznie do zachowania historii tego, co użytkownik sprawdził
-    komendą /tracking, oraz jako fallback, gdy Allegro API jest
-    chwilowo niedostępne.
+    Zasila historię tego, co użytkownik sprawdził komendą /tracking,
+    oraz to, co automatycznie wykrył `check_waybills_job` - a także
+    działa jako fallback, gdy Allegro API jest chwilowo niedostępne.
     """
 
     @abstractmethod

@@ -52,6 +52,22 @@ const FULFILLMENT_TONES: Record<string, PillTone> = {
 interface OrderStatusFields {
   status: string;
   fulfillment_status: string | null;
+  tracking_number: string | null;
+}
+
+const RAW_SHIPPED_STATUSES = new Set(["SENT", "PICKED_UP"]);
+
+/**
+ * Zamowienie jest wyslane z punktu widzenia interfejsu, gdy Allegro
+ * ustawilo juz odpowiedni fulfillment_status ALBO gdy ORDLY samo wykrylo
+ * numer przesylki (check_waybills_job) - zanim uzytkownik recznie zmieni
+ * status na Allegro. Lustrzane odbicie backendowego
+ * OrderRepository.get_unshipped_since.
+ */
+export function isShippedForDisplay(order: OrderStatusFields): boolean {
+  if (isCancelledOrder(order)) return false;
+  const status = order.fulfillment_status;
+  return (status !== null && RAW_SHIPPED_STATUSES.has(status)) || Boolean(order.tracking_number);
 }
 
 export function fulfillmentLabel(status: string | null): string {
@@ -64,6 +80,25 @@ export function fulfillmentTone(status: string | null): PillTone {
   return FULFILLMENT_TONES[status] ?? "warn";
 }
 
+/**
+ * Etykieta/ton pigulki do wyswietlenia - jak fulfillmentLabel/Tone, ale
+ * pokazuje "Wysłane" tez wtedy, gdy tracking_number zostal wykryty lokalnie
+ * (check_waybills_job), zanim uzytkownik recznie zmienil status na Allegro.
+ */
+export function displayFulfillmentLabel(order: OrderStatusFields): string {
+  if (isShippedForDisplay(order) && !RAW_SHIPPED_STATUSES.has(order.fulfillment_status ?? "")) {
+    return fulfillmentLabel("SENT");
+  }
+  return fulfillmentLabel(order.fulfillment_status);
+}
+
+export function displayFulfillmentTone(order: OrderStatusFields): PillTone {
+  if (isShippedForDisplay(order) && !RAW_SHIPPED_STATUSES.has(order.fulfillment_status ?? "")) {
+    return fulfillmentTone("SENT");
+  }
+  return fulfillmentTone(order.fulfillment_status);
+}
+
 /** Anulowane zamowienie - Allegro nie pozwala juz zmieniac jego realizacji. */
 export function isCancelledOrder(order: OrderStatusFields): boolean {
   return order.status === "CANCELLED" || order.fulfillment_status === "CANCELLED";
@@ -73,9 +108,12 @@ export function isCancelledOrder(order: OrderStatusFields): boolean {
  * Zamowienie czeka na spakowanie - liczy sie do "do zrobienia".
  *
  * Anulowane odpada nawet wtedy, gdy Allegro zostawilo mu etap NEW -
- * wczesniej takie zamowienie wisialo w liczniku na zawsze.
+ * wczesniej takie zamowienie wisialo w liczniku na zawsze. Wykryty
+ * numer przesylki tez zdejmuje zamowienie z tej listy, nawet gdy Allegro
+ * jeszcze nie zmienilo statusu - patrz isShippedForDisplay.
  */
 export function isPendingOrder(order: OrderStatusFields): boolean {
+  if (isShippedForDisplay(order)) return false;
   const status = order.fulfillment_status;
   return !isCancelledOrder(order) && (!status || status === "NEW" || status === "PROCESSING");
 }
@@ -88,9 +126,9 @@ export function matchesOrderFilter(order: OrderStatusFields, filter: OrderFilter
     case "pack":
       return isPendingOrder(order);
     case "ready":
-      return !isCancelledOrder(order) && status === "READY_FOR_SHIPMENT";
+      return !isCancelledOrder(order) && status === "READY_FOR_SHIPMENT" && !order.tracking_number;
     case "sent":
-      return status === "SENT" || status === "PICKED_UP" || status === "READY_FOR_PICKUP";
+      return isShippedForDisplay(order) || status === "READY_FOR_PICKUP";
     default:
       return true;
   }

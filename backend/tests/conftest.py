@@ -22,6 +22,7 @@ from tests.fakes.fake_marketplace_plugin import FakeMarketplacePlugin
 from tests.fakes.fake_notifier import FakeNotifier
 from tests.fakes.fake_order_repository import FakeOrderRepository
 from tests.fakes.fake_return_repository import FakeReturnRepository
+from tests.fakes.fake_shipment_repository import FakeShipmentRepository
 
 
 @pytest.fixture
@@ -102,6 +103,12 @@ def fake_order_repository() -> FakeOrderRepository:
 def fake_marketplace_plugin() -> FakeMarketplacePlugin:
     """Zwraca świeżą instancję fake pluginu marketplace."""
     return FakeMarketplacePlugin()
+
+
+@pytest.fixture
+def fake_shipment_repository() -> FakeShipmentRepository:
+    """Zwraca świeżą, pustą instancję fake repozytorium przesyłek."""
+    return FakeShipmentRepository()
 
 
 @pytest.fixture

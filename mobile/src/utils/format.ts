@@ -87,14 +87,46 @@ export function fulfillmentLabel(status: string | null): string {
   return FULFILLMENT_LABELS[status] ?? status;
 }
 
+/** Minimum pól zamówienia potrzebne do decyzji o etapie obsługi. */
+interface OrderStatusFields {
+  status: string;
+  fulfillment_status: string | null;
+  tracking_number: string | null;
+}
+
+/**
+ * Zamówienie jest wysłane z punktu widzenia interfejsu, gdy Allegro
+ * ustawiło już odpowiedni fulfillment_status ALBO gdy ORDLY samo wykryło
+ * numer przesyłki (check_waybills_job), zanim użytkownik ręcznie zmieni
+ * status na Allegro - 1:1 z desktop/.../lib/fulfillment.ts.
+ */
+export function isShippedForDisplay(order: OrderStatusFields): boolean {
+  if (order.status === "CANCELLED" || order.fulfillment_status === "CANCELLED") {
+    return false;
+  }
+  const status = order.fulfillment_status;
+  return status === "SENT" || status === "PICKED_UP" || Boolean(order.tracking_number);
+}
+
+/** Etykieta jak fulfillmentLabel, ale pokazuje "Wysłane" po wykryciu numeru przesyłki. */
+export function displayFulfillmentLabel(order: OrderStatusFields): string {
+  if (isShippedForDisplay(order) && order.fulfillment_status !== "PICKED_UP") {
+    return fulfillmentLabel("SENT");
+  }
+  return fulfillmentLabel(order.fulfillment_status);
+}
+
 /**
  * Zamówienie czeka na obsłużenie - liczy się do odznaki na zakładce
  * i do plakietki aplikacji.
  *
  * Plakietka liczy WYŁĄCZNIE sprawy wymagające decyzji na desktopie
- * (sekcja 04 koncepcji push), więc wysłane i anulowane odpadają.
+ * (sekcja 04 koncepcji push), więc wysłane i anulowane odpadają - w tym
+ * zamówienia z lokalnie wykrytym numerem przesyłki.
  */
-export function isPendingFulfillment(status: string | null): boolean {
+export function isPendingFulfillment(order: OrderStatusFields): boolean {
+  if (isShippedForDisplay(order)) return false;
+  const status = order.fulfillment_status;
   return (
     !status ||
     status === "NEW" ||

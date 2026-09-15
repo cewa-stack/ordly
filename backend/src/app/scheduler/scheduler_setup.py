@@ -38,6 +38,31 @@ def register_sync_orders_job(
     logger.info("Zarejestrowano job synchronizacji zamówień co {}s", interval_seconds)
 
 
+def register_check_waybills_job(
+    scheduler: AsyncIOScheduler,
+    job_coroutine: Callable[[], Awaitable[None]],
+    interval_seconds: int,
+) -> None:
+    """
+    Rejestruje job sprawdzania nowych numerów przesyłek z podanym interwałem.
+
+    Args:
+        scheduler: Instancja schedulera zwrócona przez create_scheduler().
+        job_coroutine: Bezargumentowa korutyna do wywołania cyklicznie.
+        interval_seconds: Odstęp w sekundach między wywołaniami (domyślnie 300).
+    """
+    scheduler.add_job(
+        job_coroutine,
+        trigger="interval",
+        seconds=interval_seconds,
+        id="check_waybills_job",
+        max_instances=1,
+        coalesce=True,
+        misfire_grace_time=60,
+    )
+    logger.info("Zarejestrowano job sprawdzania numerów przesyłek co {}s", interval_seconds)
+
+
 def register_mail_sync_job(
     scheduler: AsyncIOScheduler,
     job_coroutine: Callable[[], Awaitable[None]],

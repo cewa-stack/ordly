@@ -68,6 +68,7 @@ from app.services.stock_sync_service import StockSyncService
 from app.services.sync_orders_service import SyncOrdersService
 from app.services.telegram_cleanup_service import TelegramCleanupService
 from app.services.tracking_service import TrackingService
+from app.services.waybill_check_service import WaybillCheckService
 
 
 class Container:
@@ -138,6 +139,13 @@ class Container:
         shipment_repository = SqliteShipmentRepository(session)
         plugin = self.build_plugin(session)
         return TrackingService(plugin, order_repository, shipment_repository)
+
+    def waybill_check_service(self, session: AsyncSession) -> WaybillCheckService:
+        """Buduje WaybillCheckService dla cyklicznego check_waybills_job."""
+        order_repository = SqliteOrderRepository(session)
+        shipment_repository = SqliteShipmentRepository(session)
+        plugin = self.build_plugin(session)
+        return WaybillCheckService(plugin, order_repository, shipment_repository)
 
     def stats_service(self, session: AsyncSession) -> StatsService:
         """Buduje StatsService dla komendy /stats."""

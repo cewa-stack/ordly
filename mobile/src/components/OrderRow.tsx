@@ -10,7 +10,7 @@ import { Pressable, StyleSheet, Text, View } from "react-native";
 import { colors } from "@/theme/colors";
 import { radii, spacing, typography } from "@/theme/typography";
 import type { Order } from "@/api/types";
-import { formatMoney, fulfillmentLabel, parseApiDate, plural } from "@/utils/format";
+import { displayFulfillmentLabel, formatMoney, parseApiDate, plural } from "@/utils/format";
 import { StatusBadge } from "./StatusBadge";
 
 interface OrderRowProps {
@@ -23,7 +23,7 @@ function shortDate(iso: string): string {
 }
 
 export function OrderRow({ order, onPress }: OrderRowProps) {
-  const label = fulfillmentLabel(order.fulfillment_status);
+  const label = displayFulfillmentLabel(order);
   const count = order.products.length;
   const productsLabel = `${count} ${plural(count, "produkt", "produkty", "produktów")}`;
 

@@ -97,7 +97,7 @@ class SqliteOrderRepository(OrderRepository):
         """Zwraca zamówienie wraz z produktami, mapowane do encji domenowej."""
         stmt = (
             select(OrderModel)
-            .options(selectinload(OrderModel.products))
+            .options(selectinload(OrderModel.products), selectinload(OrderModel.shipment))
             .where(OrderModel.external_id == external_id)
         )
         result = await self._session.execute(stmt)
@@ -108,7 +108,7 @@ class SqliteOrderRepository(OrderRepository):
         """Zwraca ostatnie zamówienia posortowane malejąco po dacie zamówienia."""
         stmt = (
             select(OrderModel)
-            .options(selectinload(OrderModel.products))
+            .options(selectinload(OrderModel.products), selectinload(OrderModel.shipment))
             .order_by(OrderModel.order_date.desc())
             .offset(offset)
             .limit(limit)
@@ -127,7 +127,7 @@ class SqliteOrderRepository(OrderRepository):
         """
         stmt = (
             select(OrderModel)
-            .options(selectinload(OrderModel.products))
+            .options(selectinload(OrderModel.products), selectinload(OrderModel.shipment))
             .outerjoin(ShipmentModel, ShipmentModel.order_id == OrderModel.id)
             .where(
                 OrderModel.order_date >= since,
@@ -155,7 +155,7 @@ class SqliteOrderRepository(OrderRepository):
         """
         stmt = (
             select(OrderModel)
-            .options(selectinload(OrderModel.products))
+            .options(selectinload(OrderModel.products), selectinload(OrderModel.shipment))
             .where(
                 func.upper(OrderModel.status) != _CANCELLED_STATUS,
                 func.upper(OrderModel.fulfillment_status) == FULFILLMENT_NEW,
@@ -175,7 +175,7 @@ class SqliteOrderRepository(OrderRepository):
         """
         stmt = (
             select(OrderModel)
-            .options(selectinload(OrderModel.products))
+            .options(selectinload(OrderModel.products), selectinload(OrderModel.shipment))
             .where(
                 func.upper(OrderModel.status) != _CANCELLED_STATUS,
                 func.upper(OrderModel.fulfillment_status).in_(
@@ -193,7 +193,7 @@ class SqliteOrderRepository(OrderRepository):
         pattern = f"%{query}%"
         stmt = (
             select(OrderModel)
-            .options(selectinload(OrderModel.products))
+            .options(selectinload(OrderModel.products), selectinload(OrderModel.shipment))
             .join(ProductModel, isouter=True)
             .where(
                 or_(
@@ -401,4 +401,5 @@ class SqliteOrderRepository(OrderRepository):
             status=model.status,
             order_date=model.order_date,
             fulfillment_status=model.fulfillment_status,
+            tracking_number=model.shipment.tracking_number if model.shipment else None,
         )

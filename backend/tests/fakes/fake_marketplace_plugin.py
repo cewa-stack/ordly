@@ -31,6 +31,8 @@ class FakeMarketplacePlugin(MarketplacePlugin):
         self.should_raise_api_error: bool = False
         self.should_raise_returns_api_error: bool = False
         self.should_raise_issues_api_error: bool = False
+        self.should_raise_tracking_api_error: bool = False
+        self.orders_without_waybill: set[str] = set()
         self.authenticate_called = False
         self.refresh_token_called = False
 
@@ -81,6 +83,16 @@ class FakeMarketplacePlugin(MarketplacePlugin):
         return order
 
     async def get_tracking(self, external_id: str) -> Shipment:
+        if self.should_raise_tracking_api_error:
+            raise AllegroApiError(503, "Serwis testowy: symulowana niedostępność przesyłek")
+        if external_id in self.orders_without_waybill:
+            return Shipment(
+                order_external_id=external_id,
+                carrier=None,
+                tracking_number=None,
+                status="PRZYGOTOWYWANA",
+                updated_at=None,
+            )
         return Shipment(
             order_external_id=external_id,
             carrier="TESTCARRIER",

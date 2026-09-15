@@ -32,6 +32,7 @@ export interface Order {
   currency: string;
   status: string;
   fulfillment_status: string | null;
+  tracking_number: string | null;
   order_date: string;
   products: OrderProduct[];
 }

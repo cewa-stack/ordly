@@ -18,7 +18,7 @@ import { Skeleton } from "@/components/Skeleton";
 import { StatusBadge } from "@/components/StatusBadge";
 import { CheckIcon, TruckIcon } from "@/icons";
 import type { OrderProduct } from "@/api/types";
-import { formatDate, formatMoney, fulfillmentLabel } from "@/utils/format";
+import { displayFulfillmentLabel, formatDate, formatMoney } from "@/utils/format";
 import type { RootStackParamList } from "@/navigation/types";
 
 const TIMELINE_STAGES = ["Nowe", "Pakowanie", "Wysłane"] as const;
@@ -150,7 +150,7 @@ export function OrderDetailScreen() {
   }
 
   const data = order.data;
-  const label = fulfillmentLabel(data.fulfillment_status);
+  const label = displayFulfillmentLabel(data);
   const statusColor = orderStatusColor[label] ?? colors.textSecondary;
   const productsTotal = data.products.reduce(
     (sum: number, product: OrderProduct) => sum + Number(product.total_price || 0),

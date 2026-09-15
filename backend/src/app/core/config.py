@@ -165,6 +165,9 @@ class SchedulerSettings(BaseSettings):
     sync_orders_interval_seconds: int = Field(
         default=60, alias="SYNC_ORDERS_INTERVAL_SECONDS", ge=10
     )
+    check_waybills_interval_seconds: int = Field(
+        default=300, alias="CHECK_WAYBILLS_INTERVAL_SECONDS", ge=60
+    )
 
 
 class BackupSettings(BaseSettings):

@@ -61,6 +61,7 @@ from app.core.config import Settings, get_settings
 from app.core.logging import configure_logging
 from app.event_subscriptions import register_event_subscriptions
 from app.scheduler.jobs.backup_job import run_backup_job
+from app.scheduler.jobs.check_waybills_job import run_check_waybills_job
 from app.scheduler.jobs.shipping_reminder_job import run_shipping_reminder_job
 from app.scheduler.jobs.sync_mail_job import run_mail_sync_job
 from app.scheduler.jobs.sync_orders_job import run_sync_orders_job
@@ -68,6 +69,7 @@ from app.scheduler.jobs.telegram_cleanup_job import run_telegram_cleanup_job
 from app.scheduler.scheduler_setup import (
     create_scheduler,
     register_backup_job,
+    register_check_waybills_job,
     register_mail_sync_job,
     register_shipping_reminder_job,
     register_sync_orders_job,
@@ -204,6 +206,13 @@ async def _run_application() -> None:
             build_cleanup_service=container.telegram_cleanup_service,
         )
 
+    async def scheduled_check_waybills_job() -> None:
+        """Wrapper sprawdzania nowych numerów przesyłek (co 5 min)."""
+        await run_check_waybills_job(
+            session_scope_factory=container.session_scope,
+            build_waybill_check_service=container.waybill_check_service,
+        )
+
     async def scheduled_mail_sync_job() -> None:
         """Wrapper synchronizacji skrzynki (co 5 min - patrz sync_mail_job)."""
         await run_mail_sync_job(
@@ -218,6 +227,11 @@ async def _run_application() -> None:
         scheduler,
         scheduled_sync_job,
         interval_seconds=settings.scheduler.sync_orders_interval_seconds,
+    )
+    register_check_waybills_job(
+        scheduler,
+        scheduled_check_waybills_job,
+        interval_seconds=settings.scheduler.check_waybills_interval_seconds,
     )
     register_backup_job(scheduler, scheduled_backup_job)
     register_shipping_reminder_job(scheduler, scheduled_shipping_reminder_job)

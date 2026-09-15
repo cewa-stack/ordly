@@ -25,6 +25,11 @@ class Order:
     To on zmienia się w miarę pakowania i nadawania paczki - dlatego
     opierają się na nim przypomnienia o wysyłce i SMS o pakowaniu.
     Może być None dla zamówień pobranych przed wdrożeniem tej funkcji.
+
+    `tracking_number` pochodzi z tabeli `shipments` (zapis ręczny przez
+    /tracking albo automatyczny job check_waybills_job), NIE z
+    checkout-formu Allegro - `fulfillment_status` z niego nie korzysta
+    i pozostaje sterowany wyłącznie przez Allegro.
     """
 
     external_id: str
@@ -36,6 +41,7 @@ class Order:
     status: str
     order_date: datetime
     fulfillment_status: str | None = None
+    tracking_number: str | None = None
     products_summary: str = field(init=False)
 
     def __post_init__(self) -> None:

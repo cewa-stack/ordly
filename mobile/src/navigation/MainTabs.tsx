@@ -53,7 +53,7 @@ export function MainTabs() {
   const mail = useMailMessages();
 
   const pendingOrders = ((orders.data ?? []) as Order[]).filter((order) =>
-    isPendingFulfillment(order.fulfillment_status)
+    isPendingFulfillment(order)
   ).length;
   const openIssues = ((issues.data ?? []) as Issue[]).filter((issue) => issue.chat_active).length;
   const lowStock = ((stock.data ?? []) as StockItem[]).filter((item) => item.is_low_stock).length;

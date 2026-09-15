@@ -18,9 +18,12 @@ class ShipmentModel(Base, TimestampMixin):
     """
     Tabela `shipments`.
 
-    Status przesyłki NIE jest synchronizowany automatycznie - ten
-    wiersz jest tworzony/aktualizowany wyłącznie na żądanie
-    użytkownika przez komendę /tracking.
+    Wiersz jest tworzony/aktualizowany na dwa sposoby: ręcznie przez
+    komendę /tracking (TrackingService) oraz automatycznie przez
+    cykliczny `check_waybills_job`, który tą samą ścieżką sprawdza
+    zamówienia jeszcze bez numeru przewozowego. `tracking_number`
+    ustawiony w tej tabeli NIE zmienia `orders.fulfillment_status` -
+    to dwa niezależne sygnały (patrz app/domain/entities/order.py).
     """
 
     __tablename__ = "shipments"

@@ -167,6 +167,39 @@ class TestSqliteOrderRepository:
         assert [o.external_id for o in unshipped] == ["PENDING"]
 
     @pytest.mark.asyncio
+    async def test_zwraca_tracking_number_po_zapisaniu_przesylki(
+        self, in_memory_session, sample_order
+    ):
+        """
+        get_by_external_id i get_recent powinny wystawić tracking_number
+        zapisany w tabeli shipments, bez dotykania fulfillment_status.
+        """
+        repository = SqliteOrderRepository(in_memory_session)
+        shipments = SqliteShipmentRepository(in_memory_session)
+        await repository.save(replace(sample_order, fulfillment_status="READY_FOR_SHIPMENT"))
+        await in_memory_session.commit()
+
+        await shipments.save_check_result(
+            sample_order.external_id,
+            Shipment(
+                order_external_id=sample_order.external_id,
+                carrier="INPOST",
+                tracking_number="640123456789",
+                status="NADANA",
+                updated_at=None,
+            ),
+        )
+        await in_memory_session.commit()
+
+        by_id = await repository.get_by_external_id(sample_order.external_id)
+        recent = await repository.get_recent(limit=10)
+
+        assert by_id is not None
+        assert by_id.tracking_number == "640123456789"
+        assert by_id.fulfillment_status == "READY_FOR_SHIPMENT"
+        assert recent[0].tracking_number == "640123456789"
+
+    @pytest.mark.asyncio
     async def test_get_active_zwraca_tylko_nowe_i_pakowane(
         self, in_memory_session, sample_order
     ):

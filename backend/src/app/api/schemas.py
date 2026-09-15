@@ -120,6 +120,7 @@ class OrderOut(BaseModel):
     currency: str
     status: str
     fulfillment_status: str | None
+    tracking_number: str | None
     order_date: UtcDatetime
     products: list[OrderProductOut]
 
@@ -134,6 +135,7 @@ def order_out(order: Order) -> OrderOut:
         currency=order.currency,
         status=order.status,
         fulfillment_status=order.fulfillment_status,
+        tracking_number=order.tracking_number,
         order_date=order.order_date,
         products=[
             OrderProductOut(
