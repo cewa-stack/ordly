@@ -11,23 +11,12 @@ from sqlalchemy.ext.asyncio import AsyncEngine, create_async_engine
 from alembic import context
 from app.core.config import get_settings
 from app.database.base import Base
-from app.database.models import (  # noqa: F401 - import wymagany dla autogenerate
-    EventModel,
-    InventoryItemModel,
-    InventoryMovementModel,
-    MailMessageModel,
-    OfferLinkModel,
-    OrderModel,
-    ProductModel,
-    PushSubscriptionModel,
-    ReturnModel,
-    SettingsModel,
-    ShipmentModel,
-    SmsMessageModel,
-    StockSyncModel,
-    TelegramMessageModel,
-    TokenModel,
-)
+
+# Import calego pakietu, nie pojedynczych klas: `models/__init__.py` i tak
+# sciaga wszystkie modele, a wypisana tu druga lista nazw cicho rozjezdzala
+# sie z pierwsza - po usunieciu modelu `alembic upgrade` wywracal sie na
+# ImportError, mimo ze sama migracja byla poprawna.
+import app.database.models  # noqa: F401 - rejestruje modele w Base.metadata
 
 config = context.config
 
