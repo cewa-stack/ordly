@@ -189,31 +189,37 @@ def _author_fallback_login(role: str | None) -> str:
 
 def map_shipment_to_domain(order_external_id: str, raw: dict[str, Any]) -> Shipment:
     """
-    Mapuje informacje o pojedynczej przesyłce z Allegro na encję Shipment.
+    Mapuje pojedynczy wpis z listy `shipments` (GET .../checkout-forms/{id}/shipments)
+    na encję Shipment.
+
+    WAŻNE: prawdziwy kształt tej odpowiedzi (schemat `CheckoutFormAddWaybillCreated`
+    w oficjalnym swagger.yaml Allegro) ma PŁASKIE pola `waybill` (string) i
+    `carrierId` bezpośrednio na obiekcie - NIE zagnieżdżoną tablicę `waybills`,
+    jak zakładała wcześniejsza (błędna, oparta na zmyślonym kształcie) wersja
+    tego mappera. Ten endpoint w ogóle nie zwraca pola `status` - dopóki wpis
+    jest w tablicy `shipments`, przesyłka MA już numer, bo Allegro zwraca
+    ten sam kształt niezależnie od tego, czy numer nadano przyciskiem "Kup
+    etykietę" w Allegro, czy dopisała go zewnętrzna integracja (np. własny
+    panel InPost) - patrz opis endpointu w swagger.yaml: "the shipment list
+    may contain parcel tracking numbers added through other channels".
+
+    Brak jakiejkolwiek przesyłki (pusta lista `shipments`) jest obsługiwany
+    osobno w AllegroPlugin.get_tracking() - tam dopiero status ustawia się
+    na "PRZYGOTOWYWANA".
 
     Args:
         order_external_id: Numer zamówienia, dla którego pobrano status.
-        raw: Surowy słownik JSON z danymi pojedynczej przesyłki/paczki.
+        raw: Surowy słownik JSON pojedynczego wpisu z tablicy `shipments`.
 
     Returns:
-        Encja domenowa Shipment. Jeśli przesyłka nie ma jeszcze numeru
-        listu przewozowego (waybill), pola carrier/tracking_number
-        będą None, a status odzwierciedli rzeczywisty stan
-        ("przygotowywana", nie "brak danych").
+        Encja domenowa Shipment z numerem listu przewozowego i przewoźnikiem.
     """
-    waybills = raw.get("waybills", [])
-    first_waybill = waybills[0] if waybills else {}
-
-    status = raw.get("status")
-    if not waybills and not status:
-        status = "PRZYGOTOWYWANA"
-
     return Shipment(
         order_external_id=order_external_id,
-        carrier=first_waybill.get("carrierId"),
-        tracking_number=first_waybill.get("number"),
-        status=status,
-        updated_at=_parse_datetime(raw.get("updatedAt")) if raw.get("updatedAt") else None,
+        carrier=raw.get("carrierId"),
+        tracking_number=raw.get("waybill"),
+        status="NADANA",
+        updated_at=_parse_datetime(raw.get("createdAt")) if raw.get("createdAt") else None,
     )
 
 

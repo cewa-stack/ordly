@@ -24,11 +24,11 @@ async def handle_tracking(
     message: Message, command: CommandObject, container: Container, session: AsyncSession
 ) -> None:
     """
-    Pobiera i wyświetla aktualny status przesyłki.
+    Pobiera i wyświetla aktualny status przesyłki na żądanie użytkownika.
 
-    Zgodnie z wymaganiami projektu, status przesyłki NIE jest sprawdzany
-    automatycznie przez scheduler - ta komenda jest jedynym miejscem,
-    gdzie wykonywane jest zapytanie do Allegro o status przesyłki.
+    Ta sama logika (TrackingService.get_current_tracking) działa też
+    automatycznie w tle przez check_waybills_job - ta komenda jest po
+    prostu ręcznym, natychmiastowym wywołaniem tego samego sprawdzenia.
     """
     if not command.args:
         await message.answer("Podaj numer zamówienia: <code>/tracking 12345678</code>")

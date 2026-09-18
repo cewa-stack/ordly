@@ -82,26 +82,26 @@ class TestAllegroMapper:
 
         assert order.fulfillment_status is None
 
-    def test_przesylka_bez_waybills_ma_status_przygotowywana(self):
-        """Zamówienie bez nadanej paczki powinno mieć status PRZYGOTOWYWANA."""
-        shipment = map_shipment_to_domain("ORDER-1", {"waybills": [], "status": None})
-
-        assert shipment.status == "PRZYGOTOWYWANA"
-        assert shipment.tracking_number is None
-
-    def test_przesylka_z_waybill_mapuje_numer_i_przewoznika(self):
-        """Przesyłka z jednym waybillem powinna poprawnie zmapować przewoźnika i numer."""
+    def test_przesylka_mapuje_numer_i_przewoznika_z_plaskiego_ksztaltu(self):
+        """
+        Realny kształt pojedynczego wpisu z GET .../shipments (schemat
+        CheckoutFormAddWaybillCreated w swagger.yaml Allegro) - PŁASKIE pola
+        `waybill`/`carrierId`, bez zagnieżdżonej tablicy `waybills` i bez
+        pola `status` (którego ten endpoint w ogóle nie zwraca).
+        """
         raw = {
-            "waybills": [{"carrierId": "DPD", "number": "1234567890"}],
-            "status": "SENT",
-            "updatedAt": "2026-07-02T08:00:00Z",
+            "id": "REhMOjEyMzQ1Njc4OTEwUEw=",
+            "waybill": "1234567890",
+            "carrierId": "DPD",
+            "carrierName": "",
+            "createdAt": "2026-07-02T08:00:00Z",
         }
 
         shipment = map_shipment_to_domain("ORDER-1", raw)
 
         assert shipment.carrier == "DPD"
         assert shipment.tracking_number == "1234567890"
-        assert shipment.status == "SENT"
+        assert shipment.status == "NADANA"
 
     def test_mapuje_zwrot_klienta_z_pelnymi_danymi(self):
         """Sprawdza mapowanie wszystkich kluczowych pól zwrotu klienta."""
