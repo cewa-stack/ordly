@@ -14,10 +14,10 @@ from typing import Annotated, Literal
 
 from pydantic import BaseModel, Field, PlainSerializer, field_validator
 
-from app.domain.entities.inventory_item import InventoryItem
-from app.domain.entities.inventory_movement import InventoryMovement
 from app.domain.entities.issue import Issue, IssueMessage
 from app.domain.entities.mail_message import MailMessage
+from app.domain.entities.marketplace_offer import MarketplaceOffer
+from app.domain.entities.offer_stock_movement import OfferStockMovement
 from app.domain.entities.order import Order
 from app.domain.entities.order_return import ReturnRecord
 from app.domain.entities.ordlak_conversation import OrdlakConversation
@@ -27,20 +27,8 @@ from app.repositories.sqlite_event_repository import EventRecord
 from app.services.dashboard_service import DashboardSummary
 from app.services.mailbox_service import MailboxStatus
 from app.services.ordlak_assistant_service import ChatResult
-from app.shared.dto.inventory_dto import (
-    InventoryItemDeletion,
-    InventoryReport,
-    ItemForecast,
-)
-from app.shared.dto.offer_catalog_dto import (
-    CatalogOffer,
-    CatalogSyncResult,
-    OfferImportResult,
-)
-from app.shared.dto.offer_mapping_dto import BackfillPlan, OfferRecipe, SoldOffer
+from app.shared.dto.offer_catalog_dto import CatalogSyncResult
 from app.shared.dto.stats_dto import HealthStatus, StatsSummary, SyncResult
-
-StockStatus = Literal["ok", "warning", "critical"]
 
 #: Kwota pieniężna w odpowiedzi API - w Pythonie dalej `Decimal` (dokładne
 #: sumowanie i zaokrąglanie), ale w JSON-ie ZAWSZE liczba, nigdy string.
@@ -513,270 +501,14 @@ def ordlak_conversation_out(conversation: OrdlakConversation) -> OrdlakConversat
 # --------------------------------------------------------------------------
 
 
-def _stock_status(item: InventoryItem) -> StockStatus:
-    """Odwzorowuje `status_emoji` z bota na status semantyczny dla apki."""
-    if item.stock == 0:
-        return "critical"
-    if item.min_stock > 0 and item.stock <= item.min_stock:
-        return "warning"
-    return "ok"
-
-
-class StockItemOut(BaseModel):
-    """Produkt magazynowy zwracany przez `/api/v1/stock`."""
-
-    sku: str
-    name: str
-    stock: int
-    min_stock: int
-    max_stock: int | None
-    ean: str | None
-    category: str | None
-    location: str | None
-    purchase_cost: Money | None
-    sale_price: Money | None
-    stock_value: Money
-    is_low_stock: bool
-    status: StockStatus
-
-    #: SKU produktu głównego, jeśli ten produkt jest podproduktem.
-    #: Lista magazynowa w desktopie chowa takie pozycje pod produktem
-    #: głównym, zamiast pokazywać je płasko obok niego.
-    parent_sku: str | None = None
-
-
-def stock_item_out(item: InventoryItem) -> StockItemOut:
-    """Mapuje encję domenową `InventoryItem` na schemat odpowiedzi API."""
-    return StockItemOut(
-        sku=item.sku,
-        name=item.name,
-        stock=item.stock,
-        min_stock=item.min_stock,
-        max_stock=item.max_stock,
-        ean=item.ean,
-        category=item.category,
-        location=item.location,
-        purchase_cost=item.purchase_cost,
-        sale_price=item.sale_price,
-        stock_value=item.stock_value,
-        is_low_stock=item.is_low_stock,
-        status=_stock_status(item),
-        parent_sku=item.parent_sku,
-    )
-
-
-class StockSetParentIn(BaseModel):
+class OfferOut(BaseModel):
     """
-    Ciało żądania `PUT /api/v1/stock/{sku}/parent`.
+    Oferta wystawiona na marketplace - pozycja magazynu ORDLY.
 
-    `parent_sku=None` (albo pominięte pole) zdejmuje powiązanie -
-    produkt wraca na listę magazynową jako samodzielny.
-    """
-
-    parent_sku: str | None = None
-
-
-class StockDeleteOut(BaseModel):
-    """
-    Podsumowanie `DELETE /api/v1/stock/{sku}`.
-
-    Poza samym produktem wraca to, co usunięcie pociągnęło za sobą:
-    odwiązane podprodukty i liczba receptur ofert, z których produkt
-    wypadł. Aplikacja desktopowa pokazuje to w potwierdzeniu, żeby
-    nikt nie odkrył rozpiętej receptury dopiero po tym, że sprzedaż
-    przestała ruszać magazyn.
-    """
-
-    sku: str
-    name: str
-    stock: int
-    detached_sub_items: list[str]
-    removed_offer_links: int
-
-
-def stock_delete_out(deletion: InventoryItemDeletion) -> StockDeleteOut:
-    """Mapuje `InventoryItemDeletion` na schemat odpowiedzi API."""
-    return StockDeleteOut(
-        sku=deletion.sku,
-        name=deletion.name,
-        stock=deletion.stock,
-        detached_sub_items=list(deletion.detached_sub_items),
-        removed_offer_links=deletion.removed_offer_links,
-    )
-
-
-class StockCreateIn(BaseModel):
-    """Ciało żądania `POST /api/v1/stock` (nowy produkt magazynowy)."""
-
-    sku: str = Field(min_length=1)
-    name: str = Field(min_length=1)
-    min_stock: int = Field(default=0, ge=0)
-
-
-class StockAdjustIn(BaseModel):
-    """Ciało żądania `POST /api/v1/stock/{sku}/adjust`."""
-
-    op: Literal["set", "add", "remove", "min"]
-    quantity: int = Field(ge=0)
-    reason: str | None = None
-
-
-class StockMovementOut(BaseModel):
-    """Wpis historii magazynowej zwracany przez `/api/v1/stock/{sku}/history`."""
-
-    item_sku: str
-    item_name: str
-    change: int
-    stock_after: int
-    reason: str
-    source: str
-    reference: str | None
-    occurred_at: UtcDatetime
-
-
-def stock_movement_out(movement: InventoryMovement) -> StockMovementOut:
-    """Mapuje encję domenową `InventoryMovement` na schemat odpowiedzi API."""
-    return StockMovementOut(
-        item_sku=movement.item_sku,
-        item_name=movement.item_name,
-        change=movement.change,
-        stock_after=movement.stock_after,
-        reason=movement.reason,
-        source=movement.source,
-        reference=movement.reference,
-        occurred_at=movement.occurred_at,
-    )
-
-
-class ItemForecastOut(BaseModel):
-    """Prognoza wyczerpania zapasów dla jednego produktu."""
-
-    sku: str
-    name: str
-    stock: int
-    avg_daily_sales: float
-    days_left: int
-
-
-def item_forecast_out(forecast: ItemForecast) -> ItemForecastOut:
-    """Mapuje `ItemForecast` na schemat odpowiedzi API."""
-    return ItemForecastOut(
-        sku=forecast.sku,
-        name=forecast.name,
-        stock=forecast.stock,
-        avg_daily_sales=forecast.avg_daily_sales,
-        days_left=forecast.days_left,
-    )
-
-
-class StockReportOut(BaseModel):
-    """Raport magazynowy zwracany przez `/api/v1/stock/report`."""
-
-    total_items: int
-    total_stock_value: Money
-    low_stock_items: list[StockItemOut]
-    items_without_sales: list[StockItemOut]
-    forecasts: list[ItemForecastOut]
-    recent_movements: list[StockMovementOut]
-
-
-def stock_report_out(report: InventoryReport) -> StockReportOut:
-    """Mapuje `InventoryReport` na schemat odpowiedzi API."""
-    return StockReportOut(
-        total_items=report.total_items,
-        total_stock_value=report.total_stock_value,
-        low_stock_items=[stock_item_out(i) for i in report.low_stock_items],
-        items_without_sales=[stock_item_out(i) for i in report.items_without_sales],
-        forecasts=[item_forecast_out(f) for f in report.forecasts],
-        recent_movements=[stock_movement_out(m) for m in report.recent_movements],
-    )
-
-
-class StockLinkIn(BaseModel):
-    """Ciało żądania `POST /api/v1/stock/links` (mapowanie oferty na SKU)."""
-
-    marketplace: str = Field(default="allegro")
-    external_product_id: str = Field(min_length=1)
-    sku: str = Field(min_length=1)
-    quantity: int = Field(default=1, ge=1)
-
-
-class RecipeComponentIn(BaseModel):
-    """Jeden składnik receptury w żądaniu `PUT /api/v1/stock/offers/{...}`."""
-
-    sku: str = Field(min_length=1)
-    quantity: int = Field(default=1, ge=1)
-
-
-class OfferRecipeIn(BaseModel):
-    """Ciało żądania zapisu pełnej receptury oferty."""
-
-    components: list[RecipeComponentIn] = Field(min_length=1)
-
-
-class RecipeComponentOut(BaseModel):
-    """Składnik receptury zwracany przez API (z nazwą produktu)."""
-
-    sku: str
-    name: str
-    quantity: int
-
-
-class OfferRecipeOut(BaseModel):
-    """Receptura oferty zwracana przez `/api/v1/stock/offers`."""
-
-    marketplace: str
-    external_product_id: str
-    offer_name: str | None
-    components: list[RecipeComponentOut]
-
-
-def offer_recipe_out(recipe: OfferRecipe) -> OfferRecipeOut:
-    """Mapuje `OfferRecipe` na schemat odpowiedzi API."""
-    return OfferRecipeOut(
-        marketplace=recipe.marketplace,
-        external_product_id=recipe.external_product_id,
-        offer_name=recipe.offer_name,
-        components=[
-            RecipeComponentOut(sku=c.sku, name=c.name, quantity=c.quantity)
-            for c in recipe.components
-        ],
-    )
-
-
-class UnmappedOfferOut(BaseModel):
-    """Oferta sprzedana bez receptury - jej sprzedaż nie rusza magazynu."""
-
-    marketplace: str
-    external_product_id: str
-    name: str
-    sold_quantity: int
-    orders_count: int
-    last_sold_at: UtcDatetime
-
-
-def unmapped_offer_out(offer: SoldOffer) -> UnmappedOfferOut:
-    """Mapuje `SoldOffer` na schemat odpowiedzi API."""
-    return UnmappedOfferOut(
-        marketplace=offer.marketplace,
-        external_product_id=offer.external_product_id,
-        name=offer.name,
-        sold_quantity=offer.sold_quantity,
-        orders_count=offer.orders_count,
-        last_sold_at=offer.last_sold_at,
-    )
-
-
-class CatalogOfferOut(BaseModel):
-    """
-    Oferta z katalogu asortymentu zwracana przez `/api/v1/stock/catalog`.
-
-    `link_type` niesie CZTERY stany, nie dwa: `recipe` i `sku` znaczą, że
-    sprzedaż realnie zdejmuje stan, `signature` to sama podpowiedź
-    (sygnatura trafia w istniejące SKU, ale receptury jeszcze nie ma),
-    a `none` to oferta przechodząca obok magazynu. `is_linked` mówi
-    wprost, które z nich naprawdę działają - interfejs nie musi tej
-    reguły powtarzać.
+    `available_stock` i `quantity_on_hand` to dwie różne liczby i obie
+    są tu celowo: pierwsza mówi, ile sztuk obiecuje oferta kupującym
+    (pochodzi z API), druga - ile ich naprawdę leży na półce (wpisana
+    ręcznie). Rozjazd między nimi jest informacją, nie błędem.
     """
 
     marketplace: str
@@ -788,14 +520,16 @@ class CatalogOfferOut(BaseModel):
     sold_count: int
     price: Money | None
     image_url: str | None
-    link_type: str
-    is_linked: bool
-    components: list[RecipeComponentOut]
+    synced_at: UtcDatetime | None
+
+    #: `null` znaczy "nigdy nie wpisano" i jest czymś innym niż 0
+    #: ("sprawdziłem, nie ma") - interfejs pokazuje w tym miejscu kreskę.
+    quantity_on_hand: int | None
 
 
-def catalog_offer_out(offer: CatalogOffer) -> CatalogOfferOut:
-    """Mapuje `CatalogOffer` na schemat odpowiedzi API."""
-    return CatalogOfferOut(
+def offer_out(offer: MarketplaceOffer) -> OfferOut:
+    """Mapuje encję domenową `MarketplaceOffer` na schemat odpowiedzi API."""
+    return OfferOut(
         marketplace=offer.marketplace,
         external_id=offer.external_id,
         name=offer.name,
@@ -805,22 +539,51 @@ def catalog_offer_out(offer: CatalogOffer) -> CatalogOfferOut:
         sold_count=offer.sold_count,
         price=offer.price,
         image_url=offer.image_url,
-        link_type=offer.link_type,
-        is_linked=offer.is_linked,
-        components=[
-            RecipeComponentOut(sku=c.sku, name=c.name, quantity=c.quantity)
-            for c in offer.components
-        ],
+        synced_at=offer.synced_at,
+        quantity_on_hand=offer.quantity_on_hand,
+    )
+
+
+class OfferQuantityIn(BaseModel):
+    """
+    Ciało żądania `PUT /api/v1/stock/offers/{marketplace}/{id}/quantity`.
+
+    Zawsze ustawienie wartości, nigdy "dodaj"/"odejmij": ilość bierze się
+    tu z policzenia towaru na półce, a nie z operacji na poprzedniej
+    liczbie, której i tak nikt nie pilnował.
+    """
+
+    quantity: int = Field(ge=0)
+    reason: str = Field(default="Inwentaryzacja", min_length=1, max_length=255)
+
+
+class OfferMovementOut(BaseModel):
+    """Wpis historii ręcznych zmian ilości przy ofercie."""
+
+    #: `null` przy pierwszym wpisie - nie było od czego liczyć różnicy.
+    change: int | None
+    quantity_after: int
+    reason: str
+    occurred_at: UtcDatetime
+
+
+def offer_movement_out(movement: OfferStockMovement) -> OfferMovementOut:
+    """Mapuje `OfferStockMovement` na schemat odpowiedzi API."""
+    return OfferMovementOut(
+        change=movement.change,
+        quantity_after=movement.quantity_after,
+        reason=movement.reason,
+        occurred_at=movement.occurred_at,
     )
 
 
 class CatalogSyncOut(BaseModel):
-    """Podsumowanie pobrania asortymentu z marketplace."""
+    """Podsumowanie `POST /api/v1/stock/sync`."""
 
     marketplace: str
     fetched: int
-    auto_linked: int
-    unlinked: int
+    added: int
+    removed: int
     synced_at: UtcDatetime
 
 
@@ -829,105 +592,9 @@ def catalog_sync_out(result: CatalogSyncResult) -> CatalogSyncOut:
     return CatalogSyncOut(
         marketplace=result.marketplace,
         fetched=result.fetched,
-        auto_linked=result.auto_linked,
-        unlinked=result.unlinked,
+        added=result.added,
+        removed=result.removed,
         synced_at=result.synced_at,
-    )
-
-
-class OfferImportIn(BaseModel):
-    """Żądanie założenia produktów magazynowych z ofert katalogu."""
-
-    external_ids: list[str] = Field(..., min_length=1)
-
-
-class OfferImportSkipOut(BaseModel):
-    """Oferta pominięta przy imporcie wraz z powodem."""
-
-    external_id: str
-    reason: str
-
-
-class OfferImportOut(BaseModel):
-    """Skutek importu ofert do magazynu."""
-
-    created: list[str]
-    linked: list[str]
-    skipped: list[OfferImportSkipOut]
-
-
-def offer_import_out(result: OfferImportResult) -> OfferImportOut:
-    """Mapuje `OfferImportResult` na schemat odpowiedzi API."""
-    return OfferImportOut(
-        created=list(result.created),
-        linked=list(result.linked),
-        skipped=[
-            OfferImportSkipOut(external_id=external_id, reason=reason)
-            for external_id, reason in result.skipped
-        ],
-    )
-
-
-class BackfillLineOut(BaseModel):
-    """Zamówienie objęte korektą wsteczną."""
-
-    order_external_id: str
-    order_date: UtcDatetime
-    quantity: int
-    already_applied: bool
-
-
-class BackfillComponentOut(BaseModel):
-    """Skutek korekty wstecznej dla jednego składnika."""
-
-    sku: str
-    name: str
-    current_stock: int
-    quantity: int
-    stock_after: int
-
-
-class BackfillPlanOut(BaseModel):
-    """Podgląd albo potwierdzenie korekty wstecznej stanów."""
-
-    marketplace: str
-    external_product_id: str
-    offer_name: str | None
-    since: UtcDatetime
-    applied: bool
-    pending_quantity: int
-    lines: list[BackfillLineOut]
-    components: list[BackfillComponentOut]
-
-
-def backfill_plan_out(plan: BackfillPlan) -> BackfillPlanOut:
-    """Mapuje `BackfillPlan` na schemat odpowiedzi API."""
-    return BackfillPlanOut(
-        marketplace=plan.marketplace,
-        external_product_id=plan.external_product_id,
-        offer_name=plan.offer_name,
-        since=plan.since,
-        applied=plan.applied,
-        pending_quantity=plan.pending_quantity,
-        lines=[
-            BackfillLineOut(
-                order_external_id=line.order_external_id,
-                order_date=line.order_date,
-                quantity=line.quantity,
-                already_applied=line.already_applied,
-            )
-            for line in plan.lines
-        ],
-        components=[
-            BackfillComponentOut(
-                sku=c.sku,
-                name=c.name,
-                current_stock=c.current_stock,
-                quantity=c.quantity,
-                stock_after=c.stock_after,
-            )
-            for c in plan.components
-        ],
     )
 
 
@@ -982,7 +649,6 @@ class DashboardOut(BaseModel):
     orders_today: int
     revenue_today: float
     orders_to_ship: int
-    low_stock_count: int
     revenue_last_7_days: list[float]
     trend_percent: float | None
     last_sync_human: str
@@ -995,7 +661,6 @@ def dashboard_out(summary: DashboardSummary, health: HealthStatus) -> DashboardO
         orders_today=summary.orders_today,
         revenue_today=summary.revenue_today,
         orders_to_ship=summary.orders_to_ship,
-        low_stock_count=summary.low_stock_count,
         revenue_last_7_days=list(summary.revenue_last_7_days),
         trend_percent=summary.trend_percent,
         last_sync_human=health.last_sync_human,

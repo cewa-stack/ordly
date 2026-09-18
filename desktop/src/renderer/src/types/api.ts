@@ -5,51 +5,55 @@
  * procesami.
  */
 
-export type StockStatus = "ok" | "warning" | "critical";
-
 /**
- * Podsumowanie usuniecia pozycji magazynowej (`DELETE /api/v1/stock/{sku}`).
+ * Oferta wystawiona na marketplace - jedna pozycja Magazynu.
  *
- * Backend oddaje nie sam fakt usuniecia, tylko jego SKUTKI UBOCZNE:
- * ktore podprodukty przestaly byc podproduktami i z ilu receptur ofert
- * produkt wypadl. Bez tego toast po usunieciu moglby powiedziec tylko
- * "usunieto", a rozpieta receptura wyszlaby na jaw dopiero po tym, ze
- * sprzedaz przestala ruszac magazyn.
+ * `available_stock` przychodzi z API marketplace i mowi, ile sztuk
+ * obiecuje oferta kupujacym. `quantity_on_hand` wpisuje sie recznie
+ * i mowi, ile ich naprawde lezy na polce. Rozjazd miedzy nimi jest
+ * informacja, nie bledem - dlatego obie liczby sa tu obok siebie.
+ *
+ * `quantity_on_hand === null` znaczy "nigdy nie liczono" i nie jest
+ * tym samym co 0 ("policzylem, nie ma").
  */
-export interface StockDeletion {
-  sku: string;
+export interface MarketplaceOffer {
+  marketplace: string;
+  external_id: string;
   name: string;
-  stock: number;
-  detached_sub_items: string[];
-  removed_offer_links: number;
+  signature: string | null;
+  status: string;
+  available_stock: number;
+  sold_count: number;
+  price: number | null;
+  image_url: string | null;
+  synced_at: string | null;
+  quantity_on_hand: number | null;
 }
 
-export interface StockItem {
-  sku: string;
-  name: string;
-  stock: number;
-  min_stock: number;
-  max_stock: number | null;
-  ean: string | null;
-  category: string | null;
-  location: string | null;
-  purchase_cost: number | null;
-  sale_price: number | null;
-  stock_value: number;
-  is_low_stock: boolean;
-  status: StockStatus;
-  /**
-   * SKU produktu glownego, jesli ten produkt jest podproduktem.
-   * Lista magazynowa pokazuje tylko wiersze z `null` - podprodukty
-   * chowaja sie pod produktem glownym, po rozwinieciu.
-   */
-  parent_sku: string | null;
+/** Wpis historii recznych zmian ilosci. `change === null` przy pierwszym. */
+export interface OfferMovement {
+  change: number | null;
+  quantity_after: number;
+  reason: string;
+  occurred_at: string;
 }
 
-export interface StockAdjustPayload {
-  op: "set" | "add" | "remove" | "min";
+export interface OfferQuantityPayload {
   quantity: number;
-  reason?: string;
+  reason: string;
+}
+
+export interface OfferRef {
+  marketplace: string;
+  externalId: string;
+}
+
+export interface CatalogSyncResult {
+  marketplace: string;
+  fetched: number;
+  added: number;
+  removed: number;
+  synced_at: string;
 }
 
 export interface OrderProduct {
@@ -118,12 +122,22 @@ export interface Session {
   username: string;
 }
 
+/**
+ * Pozycja asortymentu hurtowni. Lista zyje WYLACZNIE lokalnie, przy
+ * hurtowni - nie ma zwiazku z ofertami w Magazynie, bo to, co sie kupuje
+ * (surowiec, opakowanie), rzadko jest tym, co sie sprzedaje.
+ */
+export interface WholesalerItem {
+  name: string;
+  quantity: number;
+}
+
 export interface Wholesaler {
   id: string;
   name: string;
   email: string;
   contactPerson?: string;
-  linkedSkus: string[];
+  items: WholesalerItem[];
 }
 
 export interface WholesalerOrderRecord {
@@ -141,23 +155,6 @@ export interface StatsSummary {
   revenue_today: number;
   revenue_this_month: number;
   total_orders: number;
-}
-
-export interface ItemForecast {
-  sku: string;
-  name: string;
-  stock: number;
-  avg_daily_sales: number;
-  days_left: number;
-}
-
-export interface StockReport {
-  total_items: number;
-  total_stock_value: number;
-  low_stock_items: StockItem[];
-  items_without_sales: StockItem[];
-  forecasts: ItemForecast[];
-  recent_movements: unknown[];
 }
 
 export interface OlxOffer {
@@ -254,7 +251,6 @@ export interface DashboardSummary {
   orders_today: number;
   revenue_today: number;
   orders_to_ship: number;
-  low_stock_count: number;
   revenue_last_7_days: number[];
   trend_percent: number;
   last_sync_human: string;
@@ -272,119 +268,6 @@ export interface SystemEvent {
   event_type: string;
   level: string;
   created_at: string;
-}
-
-export interface StockMovement {
-  item_sku: string;
-  item_name: string;
-  change: number;
-  stock_after: number;
-  reason: string;
-  source: string;
-  reference: string | null;
-  occurred_at: string;
-}
-
-export interface RecipeComponent {
-  sku: string;
-  name: string;
-  quantity: number;
-}
-
-export interface OfferRecipe {
-  marketplace: string;
-  external_product_id: string;
-  offer_name: string | null;
-  components: RecipeComponent[];
-}
-
-export interface UnmappedOffer {
-  marketplace: string;
-  external_product_id: string;
-  name: string;
-  sold_quantity: number;
-  orders_count: number;
-  last_sold_at: string;
-}
-
-/**
- * Sposób, w jaki oferta trafia w magazyn.
- *
- * `recipe` i `sku` naprawdę zdejmują stan. `signature` to sama
- * podpowiedź - sygnatura oferty pasuje do istniejącego SKU, ale
- * receptury jeszcze nie ma, więc sprzedaż nadal przechodzi obok
- * magazynu. `none` to oferta bez żadnego powiązania.
- */
-export type OfferLinkType = "recipe" | "sku" | "signature" | "none";
-
-export interface CatalogOffer {
-  marketplace: string;
-  external_id: string;
-  name: string;
-  signature: string | null;
-  status: string;
-  available_stock: number;
-  sold_count: number;
-  price: number | null;
-  image_url: string | null;
-  link_type: OfferLinkType;
-  is_linked: boolean;
-  components: RecipeComponent[];
-}
-
-export interface CatalogSyncResult {
-  marketplace: string;
-  fetched: number;
-  auto_linked: number;
-  unlinked: number;
-  synced_at: string;
-}
-
-export interface OfferImportResult {
-  created: string[];
-  linked: string[];
-  skipped: { external_id: string; reason: string }[];
-}
-
-export interface OfferRecipePayload {
-  components: { sku: string; quantity: number }[];
-}
-
-export interface OfferRef {
-  marketplace: string;
-  externalProductId: string;
-}
-
-export interface BackfillLine {
-  order_external_id: string;
-  order_date: string;
-  quantity: number;
-  already_applied: boolean;
-}
-
-export interface BackfillComponent {
-  sku: string;
-  name: string;
-  current_stock: number;
-  quantity: number;
-  stock_after: number;
-}
-
-export interface BackfillPlan {
-  marketplace: string;
-  external_product_id: string;
-  offer_name: string | null;
-  since: string;
-  applied: boolean;
-  pending_quantity: number;
-  lines: BackfillLine[];
-  components: BackfillComponent[];
-}
-
-export interface StockCreatePayload {
-  sku: string;
-  name: string;
-  min_stock: number;
 }
 
 export interface Shipment {

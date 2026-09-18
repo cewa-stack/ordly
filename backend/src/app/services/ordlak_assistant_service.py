@@ -26,7 +26,7 @@ from typing import Any, Literal
 from loguru import logger
 
 from app.core.config import OrdlakSettings
-from app.domain.entities.inventory_item import InventoryItem
+from app.domain.entities.marketplace_offer import MarketplaceOffer
 from app.domain.entities.order import Order
 from app.domain.entities.ordlak_conversation import (
     OrdlakConversation,
@@ -39,9 +39,9 @@ from app.domain.interfaces.ordlak_conversation_repository import (
 from app.domain.sales_calendar import upcoming_events
 from app.services.dashboard_service import DashboardService, revenue_by_local_day
 from app.services.health_service import HealthService
-from app.services.inventory_service import InventoryService
 from app.services.issues_service import IssuesService
 from app.services.mailbox_service import MailboxService
+from app.services.offer_catalog_service import OfferCatalogService
 from app.services.returns_service import ReturnsService
 from app.services.search_service import SearchService
 from app.utils.time import local_midnight_utc, local_now, local_today, utc_now
@@ -181,20 +181,12 @@ TOOLS: list[dict[str, Any]] = [
         },
     },
     {
-        "name": "niskie_stany",
-        "description": (
-            "Produkty, ktorych stan spadl do progu minimalnego albo ponizej - "
-            "czyli lista zakupowa do hurtowni. Uzyj przy 'co ma niski stan', "
-            "'co domowic', 'czego brakuje'."
-        ),
-        "input_schema": {"type": "object", "properties": {}},
-    },
-    {
         "name": "magazyn",
         "description": (
-            "Stan magazynowy. Bez argumentu 'szukaj' zwraca przeglad calego "
-            "magazynu, z argumentem - tylko pozycje pasujace do frazy w nazwie "
-            "lub SKU. Uzyj przy pytaniu o konkretny produkt albo o to, ile "
+            "Magazyn: oferty wystawione na marketplace i recznie wpisana ilosc "
+            "przy kazdej. Bez argumentu 'szukaj' zwraca przeglad calej listy, "
+            "z argumentem - tylko oferty pasujace do frazy w nazwie lub "
+            "sygnaturze. Uzyj przy pytaniu o konkretna oferte albo o to, ile "
             "czegos zostalo."
         ),
         "input_schema": {
@@ -202,23 +194,14 @@ TOOLS: list[dict[str, Any]] = [
             "properties": {
                 "szukaj": {
                     "type": "string",
-                    "description": "Fragment nazwy albo SKU produktu.",
+                    "description": "Fragment nazwy albo sygnatury oferty.",
                 },
                 "limit": {
                     "type": "integer",
-                    "description": "Ile pozycji zwrocic (1-60, domyslnie 25).",
+                    "description": "Ile ofert zwrocic (1-60, domyslnie 25).",
                 },
             },
         },
-    },
-    {
-        "name": "prognoza_zapasow",
-        "description": (
-            "Na ile dni starczy zapasu przy obecnym tempie sprzedazy, wartosc "
-            "magazynu oraz produkty, ktore nie sprzedaly sie ani razu w oknie "
-            "prognozy. Uzyj przy 'co sie skonczy', 'na kiedy zamowic'."
-        ),
-        "input_schema": {"type": "object", "properties": {}},
     },
     {
         "name": "ostatnie_zamowienia",
@@ -387,9 +370,9 @@ TOOLS: list[dict[str, Any]] = [
         "name": "stan_systemu",
         "description": (
             "Kondycja samego ORDLY: kiedy byla ostatnia synchronizacja, czy "
-            "polaczenie z Allegro dziala, ile zamowien czeka na wysylke, ile "
-            "pozycji jest ponizej progu. Uzyj przy 'jak leci', 'co dzis do "
-            "zrobienia', 'czy wszystko dziala'."
+            "polaczenie z Allegro dziala, ile zamowien czeka na wysylke. "
+            "Uzyj przy 'jak leci', 'co dzis do zrobienia', 'czy wszystko "
+            "dziala'."
         ),
         "input_schema": {"type": "object", "properties": {}},
     },
@@ -417,12 +400,13 @@ JAK ODPOWIADAĆ:
 - Listy - maksymalnie 5-8 pozycji, najważniejsze na górze. Resztę streść
   jednym zdaniem ("i 12 innych pozycji").
 - Nie używaj tabel ani HTML - czysty tekst, myślniki na listy.
-- Gdy widzisz w danych coś niepokojącego (produkt schodzi za 3 dni,
-  zamówienie czeka na wysyłkę drugi dzień) - powiedz o tym sam, bez pytania.
+- Gdy widzisz w danych coś niepokojącego (oferta sprzedaje się przy
+  zerowym stanie na półce, zamówienie czeka na wysyłkę drugi dzień) -
+  powiedz o tym sam, bez pytania.
 - Gdy pytanie jest szersze niż jedno narzędzie ("jak leci?"), zbierz dane
   z kilku i podaj jeden spójny obraz.
-- Wyniki narzędzi przychodzą bez polskich znaków ("Zamowienia", "ponizej
-  progu") - to zapis techniczny. Ty pisz normalną polszczyzną z ogonkami,
+- Wyniki narzędzi przychodzą bez polskich znaków ("Zamowienia", "na
+  polce") - to zapis techniczny. Ty pisz normalną polszczyzną z ogonkami,
   a nazwy produktów przepisuj dokładnie tak, jak zwróciło narzędzie.
 
 ODPOWIEDZI NA DYSKUSJE I REKLAMACJE: gdy użytkownik prosi o odpowiedź dla
@@ -436,8 +420,14 @@ CENA: nigdy nie licz jej w pamięci. Do każdego pytania "za ile wystawić"
 użyj narzędzia `kalkulator_ceny` - ono zna regułę Allegro, że prowizja
 naliczana jest też od kosztu wysyłki.
 
+MAGAZYN: jednostką magazynu jest OFERTA wystawiona na marketplace, nie SKU.
+Przy każdej ofercie są dwie różne liczby: ile sztuk deklaruje sama oferta
+(z Allegro) i ile naprawdę leży na półce (wpisane ręcznie, może brzmieć
+"nie policzono"). Rozjazd między nimi jest informacją, nie błędem - warto
+go wskazać. ORDLY nie odejmuje niczego automatycznie przy sprzedaży.
+
 CZEGO NIE ROBISZ: nie wysyłasz maili, nie odpowiadasz za użytkownika
-w dyskusjach, nie zmieniasz stanów magazynowych i nie zmieniasz niczego
+w dyskusjach, nie wpisujesz ilości w magazynie i nie zmieniasz niczego
 w aplikacji. Jesteś od patrzenia, liczenia i pisania propozycji. Gdy
 użytkownik prosi o akcję, powiedz, na którym ekranie ORDLY ją wykona
 (Magazyn, Hurtownie, Zamówienia, Dyskusje, Poczta).
@@ -540,7 +530,7 @@ class OrdlakAssistantService:
         self,
         settings: OrdlakSettings,
         order_repository: OrderRepository,
-        inventory_service: InventoryService,
+        offer_catalog_service: OfferCatalogService,
         returns_service: ReturnsService,
         dashboard_service: DashboardService,
         health_service: HealthService,
@@ -552,7 +542,7 @@ class OrdlakAssistantService:
     ) -> None:
         self._settings = settings
         self._orders = order_repository
-        self._inventory = inventory_service
+        self._catalog = offer_catalog_service
         self._returns = returns_service
         self._dashboard = dashboard_service
         self._health = health_service
@@ -731,9 +721,7 @@ class OrdlakAssistantService:
         try:
             handler = {
                 "podsumowanie_sprzedazy": self._tool_sales_summary,
-                "niskie_stany": self._tool_low_stock,
                 "magazyn": self._tool_stock,
-                "prognoza_zapasow": self._tool_forecast,
                 "ostatnie_zamowienia": self._tool_orders,
                 "zwroty": self._tool_returns,
                 "kalendarz_sprzedazowy": self._tool_calendar,
@@ -818,58 +806,30 @@ class OrdlakAssistantService:
             lines.append("Brak sprzedanych pozycji w tym okresie.")
         return "\n".join(lines)
 
-    async def _tool_low_stock(self, _payload: dict[str, Any]) -> str:
-        items = await self._inventory.get_shopping_list()
-        if not items:
-            return "Zadna pozycja nie jest ponizej progu minimalnego."
-        return "Pozycje ponizej progu:\n" + "\n".join(_stock_line(item) for item in items)
-
     async def _tool_stock(self, payload: dict[str, Any]) -> str:
         query = str(payload.get("szukaj") or "").strip().lower()
         limit = _clamp(payload.get("limit"), default=25, low=1, high=60)
 
-        items = await self._inventory.get_stock_overview()
+        offers = await self._catalog.get_offers()
         if query:
-            items = [
-                item
-                for item in items
-                if query in item.name.lower() or query in item.sku.lower()
+            offers = [
+                offer
+                for offer in offers
+                if query in offer.name.lower()
+                or query in (offer.signature or "").lower()
             ]
-        if not items:
+        if not offers:
             return (
-                f"Brak pozycji pasujacych do '{query}'."
+                f"Brak ofert pasujacych do '{query}'."
                 if query
-                else "Magazyn jest pusty - nie ma zadnej pozycji."
+                else "Magazyn jest pusty - zsynchronizuj liste ofert."
             )
 
-        head = items[:limit]
-        lines = [_stock_line(item) for item in head]
-        if len(items) > limit:
-            lines.append(f"...oraz {len(items) - limit} dalszych pozycji.")
-        return f"Pozycje magazynowe ({len(items)} pasujacych):\n" + "\n".join(lines)
-
-    async def _tool_forecast(self, _payload: dict[str, Any]) -> str:
-        report = await self._inventory.get_report()
-        lines = [
-            f"Pozycji w magazynie: {report.total_items}",
-            f"Wartosc magazynu: {_money(report.total_stock_value)} zl",
-            f"Ponizej progu: {len(report.low_stock_items)}",
-        ]
-        if report.forecasts:
-            lines.append("Na ile dni starczy zapasu (najpilniejsze pierwsze):")
-            lines.extend(
-                f"- {f.name} ({f.sku}): {f.stock} szt., ok. {f.days_left} dni, "
-                f"srednio {f.avg_daily_sales:.2f} szt./dzien"
-                for f in report.forecasts[:10]
-            )
-        else:
-            lines.append("Brak historii sprzedazy - nie ma z czego liczyc prognozy.")
-        if report.items_without_sales:
-            names = ", ".join(item.name for item in report.items_without_sales[:8])
-            lines.append(
-                f"Bez ani jednej sprzedazy w oknie prognozy ({len(report.items_without_sales)}): {names}"
-            )
-        return "\n".join(lines)
+        head = offers[:limit]
+        lines = [_offer_line(offer) for offer in head]
+        if len(offers) > limit:
+            lines.append(f"...oraz {len(offers) - limit} dalszych ofert.")
+        return f"Oferty w magazynie ({len(offers)} pasujacych):\n" + "\n".join(lines)
 
     async def _tool_orders(self, payload: dict[str, Any]) -> str:
         limit = _clamp(payload.get("limit"), default=10, low=1, high=30)
@@ -1048,7 +1008,6 @@ class OrdlakAssistantService:
                 f"Zamowienia dzis: {summary.orders_today}, przychod dzis: "
                 f"{_money(summary.revenue_today)} zl ({trend})",
                 f"Czeka na wysylke: {summary.orders_to_ship}",
-                f"Ponizej progu w magazynie: {summary.low_stock_count}",
             ]
         )
 
@@ -1138,16 +1097,17 @@ def _top_products(orders: list[Order]) -> list[tuple[str, int, float]]:
     return [(name, quantity, value) for name, (quantity, value) in ranked]
 
 
-def _stock_line(item: InventoryItem) -> str:
-    parts = [f"- {item.name} ({item.sku}): {item.stock} szt."]
-    if item.min_stock:
-        parts.append(f"prog {item.min_stock}")
-    if item.is_low_stock:
-        parts.append("PONIZEJ PROGU")
-    if item.sale_price is not None:
-        parts.append(f"cena {_money(item.sale_price)} zl")
-    if item.parent_sku:
-        parts.append(f"podprodukt {item.parent_sku}")
+def _offer_line(offer: MarketplaceOffer) -> str:
+    """Jedna oferta magazynu w formie, w jakiej widzi ją model."""
+    ilosc = "nie policzono" if offer.quantity_on_hand is None else f"{offer.quantity_on_hand} szt."
+    parts = [f"- {offer.name}: na polce {ilosc}"]
+    if offer.signature:
+        parts.append(f"sygnatura {offer.signature}")
+    if offer.price is not None:
+        parts.append(f"cena {_money(offer.price)} zl")
+    parts.append(f"oferta deklaruje {offer.available_stock} szt.")
+    parts.append(f"sprzedano {offer.sold_count}")
+    parts.append(f"kanal {offer.marketplace}")
     return ", ".join(parts)
 
 

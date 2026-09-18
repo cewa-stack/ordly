@@ -54,14 +54,13 @@ export const colors = {
 **Zasada użycia limonki (najważniejsza reguła wizualna apki):** limonka
 pojawia się WYŁĄCZNIE w:
 1. trendzie/wartości hero na ekranie Start ("+12%", liczba sprzedaży),
-2. wypełnieniu paska stanu magazynowego, gdy stan jest OK,
-3. aktywnej zakładce dolnej nawigacji,
-4. aktywnym filtrze/chipie wybranym przez użytkownika,
-5. głównym przycisku akcji (CTA), maks. jeden na ekran.
+2. aktywnej zakładce dolnej nawigacji,
+3. aktywnym filtrze/chipie wybranym przez użytkownika,
+4. głównym przycisku akcji (CTA), maks. jeden na ekran.
 
 Nigdzie indziej — żadnych teł ikon w kolorze limonki z przezroczystością,
-żadnych "chipów" z tłem `lime@10%`. Ikony stanu (niski stan, do wysłania,
-sync) są zawsze płaskie, w kolorze `muted`/`white`, bez tła — jedyna
+żadnych "chipów" z tłem `lime@10%`. Ikony stanu (do wysłania, sync) są
+zawsze płaskie, w kolorze `muted`/`white`, bez tła — jedyna
 różnica między nimi to sam kształt ikony, nie kolor.
 
 ## 2. Typografia
@@ -149,16 +148,17 @@ tylko "happy path" (patrz też §7).
   skeleton w kolorze `surface2` pulsujący; `error`: komunikat "Nie udało
   się pobrać danych" + przycisk "Spróbuj ponownie"; brak stanu "empty"
   (0 PLN to poprawna wartość, nie błąd).
-- **`StatCard`** — ikona + etykieta + wartość (niski stan / do wysłania).
+- **`StatCard`** — ikona + etykieta + wartość (do wysłania).
 - **`SyncStatusRow`** — kropka stanu (`ok`/`warn`/`crit`) + "Synchronizacja:
   X min temu". Kropka `crit`, gdy ostatni sync > 15 minut temu (2× interwał
   `SYNC_ORDERS_INTERVAL_SECONDS`).
 - **`OrderRow`** — awatar-inicjały, ID, kupujący, kwota, status (kropka +
   etykieta, kolor wg mapy: `NOWE→lime`, `PAKOWANIE→warn`, `WYSŁANE→muted`
   z kropką `ok`, `ANULOWANE→crit`).
-- **`StockRow`** — nazwa + SKU, ilość `aktualna/min` (tabular-nums), pasek
-  stanu (`lime` gdy OK, `crit` gdy `is_low_stock`), opcjonalna etykieta
-  "poniżej minimum — dodaj do zamówienia" gdy niski stan.
+- **`OfferRow`** — miniatura oferty, tytuł, cena (tabular-nums) i ikona
+  kanału (Allegro / Allegro Lokalnie / OLX). Bez paska stanu i bez ilości:
+  na telefonie Magazyn jest podglądem tego, co jest wystawione, a ilość
+  wpisuje się na desktopie.
 - **`FilterChipRow`** — pozioma lista bez widocznego paska przewijania
   (`showsHorizontalScrollIndicator={false}` w RN — odpowiednik naprawionego
   suwaka z mockupu).
@@ -184,8 +184,8 @@ Prawdziwa apka musi obsłużyć:
 - **401 (zły/wygasły token):** przekierowanie do ekranu logowania,
   komunikat "Sesja wygasła, zaloguj się ponownie".
 - **Pusty magazyn / brak zamówień:** stan pusty z ikoną + jednym zdaniem
-  instrukcji (np. "Magazyn jest pusty. Dodaj pierwszy produkt." — ten sam
-  ton co dziś w komunikatach bota, patrz `stock.py`), nie goła pusta lista.
+  instrukcji (np. "Katalog jest pusty. Kliknij Synchronizuj, żeby pobrać
+  wystawione oferty."), nie goła pusta lista.
 
 ## 8. Odniesienie wizualne
 

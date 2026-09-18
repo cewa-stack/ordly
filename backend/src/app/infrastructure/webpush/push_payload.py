@@ -29,7 +29,7 @@ from urllib.parse import quote
 
 # Wątki grupowania z sekcji 04 - nazwa wątku zastępuje nazwę aplikacji
 # w nagłówku powiadomienia na iOS.
-PushThread = Literal["orders", "stock", "issues", "returns", "mail", "sync"]
+PushThread = Literal["orders", "issues", "returns", "mail", "sync"]
 
 # Godziny ciszy z sekcji 04. Powiadomienie wysłane w tym oknie leci bez
 # dźwięku i wibracji - ale LECI, bo Web Push nie ma kolejki "do rana",
@@ -252,25 +252,6 @@ def many_new_orders(
         url="/orders",
         silent=silent,
         badge=badge,
-    )
-
-
-def low_stock(
-    *,
-    name: str,
-    sku: str,
-    stock: int,
-    min_stock: int,
-    silent: bool = False,
-) -> PushPayload:
-    """Niski stan - natychmiast. Produkt, ile zostało, przy jakim progu."""
-    return PushPayload(
-        title="Niski stan",
-        body=f"{name} — {stock} szt. (próg {min_stock})",
-        thread="stock",
-        url=f"/stock/{sku}",
-        silent=silent,
-        collapse_key=f"stock:{sku}",
     )
 
 
@@ -521,12 +502,6 @@ def olx_event(
     dotyczące ogłoszeń"), a przy sprzedaży mówi głównie o terminie
     potwierdzenia. Bez tytułu powiadomienia z OLX byłyby nierozróżnialne.
 
-    Przy sprzedaży treść kończy się „stan bez zmian" - tym samym
-    sformułowaniem, co `unmatched_products`, i z tego samego powodu:
-    magazyn się NIE zmienił i trzeba go poprawić ręcznie. To jedyne
-    miejsce, w którym ta informacja dociera na ekran blokady, więc nie
-    może jej tam zabraknąć.
-
     Kwoty nie ma w ogóle, bo nie ma jej w mailu - patrz
     `domain/entities/olx_event.py`.
 
@@ -536,11 +511,8 @@ def olx_event(
     """
     title = _OLX_TITLES.get(event_type, _OLX_TITLES["unknown"])
     kanal = _channel_label("olx")
-    if event_type == "new_order":
-        body = f"{_shorten(opis, 46)} — stan bez zmian"
-    else:
-        pozycja = _shorten(opis, 62)
-        body = pozycja if kanal in title else f"{kanal} · {pozycja}"
+    pozycja = _shorten(opis, 62)
+    body = pozycja if kanal in title else f"{kanal} · {pozycja}"
     return PushPayload(
         title=title,
         body=body,
@@ -548,39 +520,6 @@ def olx_event(
         url=f"/mailbox/{quote(message_id, safe='')}",
         silent=silent,
         collapse_key=f"olx:{message_id}",
-    )
-
-
-def unmatched_products(
-    *,
-    reference: str,
-    product_names: list[str],
-    silent: bool = False,
-) -> PushPayload:
-    """
-    Sprzedaż bez powiązania z magazynem - stan się nie zmienił.
-
-    Zdarzenie miało dotąd tylko wariant telegramowy i szło na telefon
-    wspólną ścieżką `send_text`, przez co na ekranie blokady lądowały
-    dosłowne `<b>` i `<code>` (zgłoszony błąd). Teraz ma własną pozycję
-    w katalogu: tytuł mówi, CO się stało, treść - której pozycji to
-    dotyczy, a kliknięcie prowadzi do zamówienia, nie do ustawień.
-
-    Numer zamówienia nie wchodzi do treści - pełny UUID zająłby całą
-    linię, a i tak nie da się go przepisać z ekranu blokady.
-    """
-    if not product_names:
-        opis = "brak danych"
-    else:
-        extra = f" +{len(product_names) - 1} poz." if len(product_names) > 1 else ""
-        opis = f"{_shorten(product_names[0], 52)}{extra}"
-    return PushPayload(
-        title="Sprzedaż poza magazynem",
-        body=f"{opis} — stan bez zmian",
-        thread="stock",
-        url=f"/orders/{reference}",
-        silent=silent,
-        collapse_key=f"unmatched:{reference}",
     )
 
 

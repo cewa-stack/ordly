@@ -29,9 +29,9 @@ import { StockScreen } from "@/screens/StockScreen";
 import { ReturnsScreen } from "@/screens/ReturnsScreen";
 import { DiscussionsScreen } from "@/screens/DiscussionsScreen";
 import { MailboxScreen } from "@/screens/MailboxScreen";
-import { useIssues, useMailMessages, useOrders, useStock } from "@/api/hooks";
+import { useIssues, useMailMessages, useOrders } from "@/api/hooks";
 import { isPendingFulfillment } from "@/utils/format";
-import type { Issue, MailMessage, Order, StockItem } from "@/api/types";
+import type { Issue, MailMessage, Order } from "@/api/types";
 import type { MainTabParamList } from "./types";
 
 const Tab = createBottomTabNavigator<MainTabParamList>();
@@ -49,14 +49,12 @@ function TabBadge({ count }: { count: number }) {
 export function MainTabs() {
   const orders = useOrders();
   const issues = useIssues();
-  const stock = useStock();
   const mail = useMailMessages();
 
   const pendingOrders = ((orders.data ?? []) as Order[]).filter((order) =>
     isPendingFulfillment(order)
   ).length;
   const openIssues = ((issues.data ?? []) as Issue[]).filter((issue) => issue.chat_active).length;
-  const lowStock = ((stock.data ?? []) as StockItem[]).filter((item) => item.is_low_stock).length;
   const unreadMail = ((mail.data ?? []) as MailMessage[]).filter(
     (message) => !message.is_read
   ).length;
@@ -107,13 +105,10 @@ export function MainTabs() {
         name="Stock"
         component={StockScreen}
         options={{
+          // Bez odznaki: Magazyn nie ma już progów, więc nie ma liczby
+          // spraw wymagających decyzji, którą mogłaby pokazać.
           title: "Magazyn",
-          tabBarIcon: ({ color, size }) => (
-            <View>
-              <BoxIcon color={color} size={size} />
-              <TabBadge count={lowStock} />
-            </View>
-          ),
+          tabBarIcon: ({ color, size }) => <BoxIcon color={color} size={size} />,
         }}
       />
       <Tab.Screen

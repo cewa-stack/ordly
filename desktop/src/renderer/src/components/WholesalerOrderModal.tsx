@@ -1,14 +1,13 @@
 /**
  * Kompozytor maila do hurtowni (sekcja 9.1 pkt 9).
  *
- * Modal dostaje CALY asortyment danej hurtowni (produkty powiazane z nia
- * przez SKU), a nie tylko to, czego brakuje. Pozycje ponizej progu sa
- * zaznaczone z gory, reszte zaznacza sie recznie.
+ * Pozycje sa wlasnoscia hurtowni, nie magazynu - to lista tego, co sie
+ * u niej kupuje (surowiec, opakowanie), a to rzadko jest tym samym, co
+ * stoi w ofertach. Dlatego zmiana hurtowni w liscie rozwijanej podmienia
+ * cala liste pozycji.
  *
- * Wczesniej modal przyjmowal wylacznie produkty ponizej progu i blokowal
- * wysylke przy pustej liscie - przez co przy pelnym magazynie nie dalo sie
- * w ogole napisac do hurtowni (np. zapytac o cennik). Mail bez pozycji jest
- * teraz normalna sciezka: licza sie adresat, temat i tresc.
+ * Mail bez pozycji jest normalna sciezka: do hurtowni pisze sie tez po to,
+ * zeby zapytac o cennik albo termin. Wymagany jest adresat, temat i tresc.
  */
 import * as React from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
@@ -17,15 +16,11 @@ import { Button, Stepper } from "./ui";
 import { buildWholesalerBody, buildWholesalerSubject } from "../lib/wholesalerTemplate";
 import { formatPlural } from "../lib/format";
 import { useToast } from "../lib/toast";
-import type { StockItem, Wholesaler } from "../types/api";
+import type { Wholesaler } from "../types/api";
 
 interface WholesalerOrderModalProps {
   open: boolean;
   onClose: () => void;
-  /** Produkty, ktore mozna zamowic w tej hurtowni (cale jej powiazane SKU). */
-  items: StockItem[];
-  /** SKU zaznaczone od razu po otwarciu - zwykle te ponizej progu. */
-  initialSelection?: string[];
   /** Hurtownia wybrana z gory (klikniecie "Napisz zamówienie" na karcie). */
   preselected?: Wholesaler | null;
 }
@@ -33,16 +28,9 @@ interface WholesalerOrderModalProps {
 const inputClass =
   "w-full rounded-sm border border-line bg-ink-raised px-3 py-2.5 text-[12.5px] text-white outline-none focus:border-teal-bright";
 
-/** Ilosc do uzupelnienia: brakuje do progu, minimum 1 sztuka. */
-function suggestedQuantity(item: StockItem): number {
-  return Math.max(item.min_stock - item.stock, 1);
-}
-
 export function WholesalerOrderModal({
   open,
   onClose,
-  items,
-  initialSelection,
   preselected = null,
 }: WholesalerOrderModalProps) {
   const queryClient = useQueryClient();
@@ -63,32 +51,36 @@ export function WholesalerOrderModal({
   const [body, setBody] = React.useState("");
   const [bodyTouched, setBodyTouched] = React.useState(false);
 
-  // Klucze zawartosci, nie same tablice: identycznosc `items` zmienia sie
-  // przy kazdym renderze rodzica, wiec tablica w zaleznosciach efektu
-  // kasowalaby zaznaczenia i ilosci w trakcie pisania maila.
-  const itemsKey = items.map((item) => item.sku).join(",");
-  const selectionKey = (initialSelection ?? []).join(",");
+  const selected = (wholesalers ?? []).find((w) => w.id === selectedId) ?? null;
+  const items = React.useMemo(() => selected?.items ?? [], [selected]);
 
   React.useEffect(() => {
     if (!open) return;
     setSelectedId(preselected?.id ?? "__new__");
     setBodyTouched(false);
-    const preset = new Set(initialSelection ?? []);
-    setChecked(Object.fromEntries(items.map((item) => [item.sku, preset.has(item.sku)])));
-    setQuantities(Object.fromEntries(items.map((item) => [item.sku, suggestedQuantity(item)])));
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [open, preselected, itemsKey, selectionKey]);
+  }, [open, preselected]);
 
-  const selected = (wholesalers ?? []).find((w) => w.id === selectedId) ?? null;
+  // Klucz zawartosci, nie sama tablica: `items` to nowy obiekt przy kazdym
+  // odswiezeniu zapytania w tle, wiec tablica w zaleznosciach efektu
+  // kasowalaby zaznaczenia i ilosci w trakcie pisania maila.
+  const itemsKey = items.map((item) => `${item.name}:${item.quantity}`).join("|");
+
+  React.useEffect(() => {
+    if (!open) return;
+    // Lista pozycji hurtowni JEST jej lista zakupowa - domyslnie zaznaczone
+    // jest wszystko, odznacza sie to, czego akurat nie trzeba.
+    setChecked(Object.fromEntries(items.map((item) => [item.name, true])));
+    setQuantities(Object.fromEntries(items.map((item) => [item.name, item.quantity])));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, itemsKey]);
 
   const orderItems = React.useMemo(
     () =>
       items
-        .filter((item) => checked[item.sku])
+        .filter((item) => checked[item.name])
         .map((item) => ({
-          sku: item.sku,
           name: item.name,
-          quantity: quantities[item.sku] ?? suggestedQuantity(item),
+          quantity: quantities[item.name] ?? item.quantity,
         })),
     [items, checked, quantities]
   );
@@ -101,7 +93,7 @@ export function WholesalerOrderModal({
       id: "",
       name: newName || "Hurtownia",
       email: newEmail,
-      linkedSkus: [],
+      items: [],
     };
     setBody(buildWholesalerBody(target, orderItems));
   }, [open, orderItems, selected, newName, newEmail, bodyTouched]);
@@ -116,7 +108,7 @@ export function WholesalerOrderModal({
         wholesaler = await window.ordly.wholesalers.save({
           name: newName.trim(),
           email: newEmail.trim(),
-          linkedSkus: orderItems.map((item) => item.sku),
+          items: orderItems,
         });
         void queryClient.invalidateQueries({ queryKey: ["wholesalers"] });
       }
@@ -129,9 +121,7 @@ export function WholesalerOrderModal({
         itemsSummary:
           orderItems.length === 0
             ? "wiadomość bez pozycji"
-            : orderItems
-                .map((item) => `${item.name} (${item.sku}) x${item.quantity}`)
-                .join(", "),
+            : orderItems.map((item) => `${item.name} x${item.quantity}`).join(", "),
       });
       if (!result.ok) throw new Error(result.message);
       return wholesaler;
@@ -160,8 +150,6 @@ export function WholesalerOrderModal({
     },
   });
 
-  // Pozycje sa opcjonalne - mail do hurtowni bywa zwyklym pytaniem o cennik
-  // albo termin. Twardo wymagany jest adresat, temat i niepusta tresc.
   const canSend = Boolean(
     (selected || (newName.trim() && newEmail.trim())) && subject.trim() && body.trim()
   );
@@ -173,10 +161,8 @@ export function WholesalerOrderModal({
       title="Napisz zamówienie"
       subtitle={
         items.length === 0
-          ? "Brak powiązanych produktów - napisz zwykłą wiadomość"
-          : `${orderItems.length} z ${items.length} ${
-              items.length === 1 ? "produktu" : "produktów"
-            } zaznaczonych`
+          ? "Hurtownia bez zapisanych pozycji - napisz zwykłą wiadomość"
+          : `Zaznaczone ${orderItems.length} z ${items.length} pozycji`
       }
       width={600}
       footer={
@@ -234,15 +220,15 @@ export function WholesalerOrderModal({
           </div>
           {items.length === 0 && (
             <p className="text-[12px] leading-[1.6] text-slate-dim">
-              Ta hurtownia nie ma powiązanych produktów w magazynie. Możesz i tak wysłać
-              wiadomość - wpisz treść niżej.
+              Ta hurtownia nie ma jeszcze zapisanych pozycji. Dopisz je w edycji hurtowni
+              albo wyślij samą wiadomość - treść wpiszesz niżej.
             </p>
           )}
           {items.map((item) => {
-            const isChecked = Boolean(checked[item.sku]);
+            const isChecked = Boolean(checked[item.name]);
             return (
               <div
-                key={item.sku}
+                key={item.name}
                 className={`flex items-center gap-3 rounded-sm border px-3 py-2 transition-colors ${
                   isChecked ? "border-line-strong bg-panel-3" : "border-line bg-panel-2"
                 }`}
@@ -251,7 +237,7 @@ export function WholesalerOrderModal({
                   type="checkbox"
                   checked={isChecked}
                   onChange={(event) =>
-                    setChecked((prev) => ({ ...prev, [item.sku]: event.target.checked }))
+                    setChecked((prev) => ({ ...prev, [item.name]: event.target.checked }))
                   }
                   aria-label={`Dodaj ${item.name} do zamówienia`}
                   className="h-[15px] w-[15px] shrink-0 accent-[var(--teal-bright)]"
@@ -259,24 +245,18 @@ export function WholesalerOrderModal({
                 <span className="min-w-0 flex-1 truncate text-[12.5px] text-white">
                   {item.name}
                 </span>
-                {item.is_low_stock && (
-                  <span className="o-mono shrink-0 text-[10px] text-coral">poniżej progu</span>
-                )}
-                <span className="o-mono shrink-0 text-[11px] text-slate-dim">
-                  {item.stock} szt.
-                </span>
                 <Stepper
-                  value={quantities[item.sku] ?? suggestedQuantity(item)}
+                  value={quantities[item.name] ?? item.quantity}
                   onDecrease={() =>
                     setQuantities((prev) => ({
                       ...prev,
-                      [item.sku]: Math.max(1, (prev[item.sku] ?? suggestedQuantity(item)) - 1),
+                      [item.name]: Math.max(1, (prev[item.name] ?? item.quantity) - 1),
                     }))
                   }
                   onIncrease={() =>
                     setQuantities((prev) => ({
                       ...prev,
-                      [item.sku]: (prev[item.sku] ?? suggestedQuantity(item)) + 1,
+                      [item.name]: (prev[item.name] ?? item.quantity) + 1,
                     }))
                   }
                 />

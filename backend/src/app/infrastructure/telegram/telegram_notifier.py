@@ -104,21 +104,6 @@ class TelegramNotifier(Notifier):
         )
         await self.send_text(text)
 
-    async def notify_low_stock(self, name: str, sku: str, stock: int, min_stock: int) -> None:
-        """
-        Wysyła ostrzeżenie o osiągnięciu minimalnego stanu magazynowego.
-
-        Nazwa i SKU pochodzą z danych wprowadzonych przez użytkownika,
-        więc są escapowane (parse_mode=HTML).
-        """
-        text = (
-            "⚠️ <b>Niski stan magazynowy</b>\n"
-            f"{html.quote(name)} · <code>{html.quote(sku)}</code>\n\n"
-            f"📉 Zostało: <b>{stock} szt.</b> (minimum: {min_stock})\n\n"
-            "Dodano do listy zakupów — rozważ zamówienie nowej dostawy."
-        )
-        await self.send_text(text)
-
     async def notify_shipping_reminder(self, data: ShippingReminderData) -> None:
         """
         Wysyła wieczorne przypomnienie o zamówieniach czekających na
@@ -195,7 +180,7 @@ class TelegramNotifier(Notifier):
         nie doszła. Realne tytuły z OLX zawierają np. `|`, więc to nie
         jest teoretyczne ryzyko.
 
-        Przy sprzedaży dopisujemy WPROST, że magazyn się nie zmienił -
+        Przy sprzedaży dopisujemy WPROST, że zamówienie nie powstało -
         na Telegramie jest miejsce, żeby powiedzieć również dlaczego,
         czego nie da się zmieścić na ekranie blokady.
         """
@@ -203,7 +188,8 @@ class TelegramNotifier(Notifier):
         wiersze = [headline, f"🛍️ {html.quote(event.opis)}"]
         if event.event_type == "new_order":
             wiersze.append(
-                "📦 <b>Stan magazynowy bez zmian</b> — odejmij go ręcznie.\n"
+                "📋 <b>Nie ma tego w zamówieniach</b> — ta sprzedaż nie liczy się "
+                "do statystyk.\n"
                 "<i>Mail z OLX nie podaje kwoty sprzedaży, więc ORDLY nie tworzy "
                 "z niego zamówienia: rekord z kwotą 0 zł zafałszowałby przychód.</i>"
             )
@@ -235,29 +221,6 @@ class TelegramNotifier(Notifier):
                 "inaczej Allegro włączy się do rozmowy."
             )
         await self.send_text("\n".join(wiersze))
-
-    async def notify_unmatched_products(
-        self, reference: str, product_names: list[str]
-    ) -> None:
-        """
-        Sprzedaż bez powiązania z magazynem - format BEZ ZMIAN względem
-        tego, co bot wysyłał dotąd.
-
-        Telegram renderuje HTML, więc pogrubienie i `<code>` z komendą do
-        skopiowania zostają - to one czynią tę wiadomość użyteczną na
-        desktopie. Zmiana dotyczyła wyłącznie kanału Web Push, gdzie ten
-        sam tekst wychodził jako surowe znaczniki.
-        """
-        products = "\n".join(f"• {html.quote(name)}" for name in product_names)
-        text = (
-            "⚠️ <b>Sprzedaż poza magazynem</b>\n"
-            f"Zamówienie {html.quote(reference)} zawiera pozycje bez powiązania "
-            "z magazynem, więc stany się nie zmieniły:\n"
-            f"{products}\n\n"
-            "Przypisz składniki w Magazyn → Powiązania ofert "
-            "(albo <code>/stock link [oferta] [SKU] [ilość]</code>)."
-        )
-        await self.send_text(text)
 
     async def send_text(self, text: str) -> None:
         """

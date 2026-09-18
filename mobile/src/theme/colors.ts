@@ -45,20 +45,9 @@ export const colors = {
   warningTint: "#FBF0D8",
   dangerTint: "#FFE5D8",
 
-  // Tor paska zapasu (2.2)
-  trackStock: "#E7EDEA",
-
   // Cień karty (2.6) - w RN rozbity na osobne właściwości.
   cardShadow: "rgba(35,43,39,0.06)",
 } as const;
-
-export type StockStatus = "ok" | "warning" | "critical";
-
-export const stockStatusColor: Record<StockStatus, string> = {
-  ok: colors.primary,
-  warning: colors.warning,
-  critical: colors.danger,
-};
 
 /**
  * Kolory kanałów sprzedaży (sekcja 2.3), wariant jasny.

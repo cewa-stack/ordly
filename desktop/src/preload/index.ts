@@ -13,36 +13,14 @@ const ordly = {
     logout: () => ipcRenderer.invoke("ordly:auth:logout"),
   },
   stock: {
-    list: () => ipcRenderer.invoke("ordly:stock:list"),
-    create: (payload: { sku: string; name: string; min_stock: number }) =>
-      ipcRenderer.invoke("ordly:stock:create", payload),
-    remove: (sku: string) => ipcRenderer.invoke("ordly:stock:remove", sku),
-    history: (sku: string) => ipcRenderer.invoke("ordly:stock:history", sku),
-    adjust: (
-      sku: string,
-      payload: { op: "set" | "add" | "remove" | "min"; quantity: number; reason?: string }
-    ) => ipcRenderer.invoke("ordly:stock:adjust", sku, payload),
-    subItems: (sku: string) => ipcRenderer.invoke("ordly:stock:subItems", sku),
-    setParent: (sku: string, parentSku: string | null) =>
-      ipcRenderer.invoke("ordly:stock:setParent", sku, parentSku),
-    recipes: () => ipcRenderer.invoke("ordly:stock:recipes"),
-    catalog: (onlyUnlinked?: boolean) =>
-      ipcRenderer.invoke("ordly:stock:catalog", onlyUnlinked),
-    syncCatalog: () => ipcRenderer.invoke("ordly:stock:syncCatalog"),
-    relinkCatalog: () => ipcRenderer.invoke("ordly:stock:relinkCatalog"),
-    importOffers: (externalIds: string[]) =>
-      ipcRenderer.invoke("ordly:stock:importOffers", externalIds),
-    unmappedOffers: () => ipcRenderer.invoke("ordly:stock:unmappedOffers"),
-    setRecipe: (
-      offer: { marketplace: string; externalProductId: string },
-      payload: { components: { sku: string; quantity: number }[] }
-    ) => ipcRenderer.invoke("ordly:stock:setRecipe", offer, payload),
-    deleteRecipe: (offer: { marketplace: string; externalProductId: string }) =>
-      ipcRenderer.invoke("ordly:stock:deleteRecipe", offer),
-    previewBackfill: (offer: { marketplace: string; externalProductId: string }) =>
-      ipcRenderer.invoke("ordly:stock:previewBackfill", offer),
-    applyBackfill: (offer: { marketplace: string; externalProductId: string }) =>
-      ipcRenderer.invoke("ordly:stock:applyBackfill", offer),
+    offers: () => ipcRenderer.invoke("ordly:stock:offers"),
+    sync: () => ipcRenderer.invoke("ordly:stock:sync"),
+    setQuantity: (
+      offer: { marketplace: string; externalId: string },
+      payload: { quantity: number; reason: string }
+    ) => ipcRenderer.invoke("ordly:stock:setQuantity", offer, payload),
+    history: (offer: { marketplace: string; externalId: string }) =>
+      ipcRenderer.invoke("ordly:stock:history", offer),
   },
   orders: {
     list: () => ipcRenderer.invoke("ordly:orders:list"),
@@ -63,8 +41,6 @@ const ordly = {
   },
   stats: {
     get: () => ipcRenderer.invoke("ordly:stats:get"),
-    stockReport: () => ipcRenderer.invoke("ordly:stats:stockReport"),
-    shoppingList: () => ipcRenderer.invoke("ordly:stats:shoppingList"),
     dashboard: () => ipcRenderer.invoke("ordly:stats:dashboard"),
     health: () => ipcRenderer.invoke("ordly:stats:health"),
     events: () => ipcRenderer.invoke("ordly:stats:events"),
@@ -114,7 +90,7 @@ const ordly = {
       name: string;
       email: string;
       contactPerson?: string;
-      linkedSkus: string[];
+      items: { name: string; quantity: number }[];
     }) => ipcRenderer.invoke("ordly:wholesalers:save", input),
     delete: (id: string) => ipcRenderer.invoke("ordly:wholesalers:delete", id),
     history: () => ipcRenderer.invoke("ordly:wholesalers:history"),

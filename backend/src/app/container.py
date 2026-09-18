@@ -28,7 +28,6 @@ from app.infrastructure.sms.logging_sms_provider import LoggingSmsProvider
 from app.infrastructure.telegram.telegram_notifier import TelegramNotifier
 from app.infrastructure.webpush.web_push_notifier import WebPushNotifier
 from app.repositories.sqlite_event_repository import SqliteEventRepository
-from app.repositories.sqlite_inventory_repository import SqliteInventoryRepository
 from app.repositories.sqlite_mail_repository import SqliteMailRepository
 from app.repositories.sqlite_offer_catalog_repository import SqliteOfferCatalogRepository
 from app.repositories.sqlite_order_repository import SqliteOrderRepository
@@ -41,30 +40,25 @@ from app.repositories.sqlite_push_subscription_repository import (
 from app.repositories.sqlite_return_repository import SqliteReturnRepository
 from app.repositories.sqlite_shipment_repository import SqliteShipmentRepository
 from app.repositories.sqlite_sms_history_repository import SqliteSmsHistoryRepository
-from app.repositories.sqlite_stock_sync_repository import SqliteStockSyncRepository
 from app.repositories.sqlite_telegram_message_repository import (
     SqliteTelegramMessageRepository,
 )
 from app.repositories.sqlite_token_store import SqliteTokenStore
 from app.services.allegro_lokalnie_orders_service import AllegroLokalnieOrdersService
 from app.services.backup_service import BackupService
-from app.services.component_resolver import ComponentResolver
 from app.services.dashboard_service import DashboardService
 from app.services.events_service import EventsService
 from app.services.health_service import HealthService, SyncStatus
-from app.services.inventory_service import InventoryService
 from app.services.issues_service import IssuesService
 from app.services.mail_service import MailService
 from app.services.mailbox_service import MailboxService
 from app.services.offer_catalog_service import OfferCatalogService
-from app.services.offer_mapping_service import OfferMappingService
 from app.services.ordlak_assistant_service import OrdlakAssistantService
 from app.services.returns_service import ReturnsService
 from app.services.search_service import SearchService
 from app.services.shipping_reminder_service import ShippingReminderService
 from app.services.sms_service import SmsService
 from app.services.stats_service import StatsService
-from app.services.stock_sync_service import StockSyncService
 from app.services.sync_orders_service import SyncOrdersService
 from app.services.telegram_cleanup_service import TelegramCleanupService
 from app.services.tracking_service import TrackingService
@@ -196,13 +190,12 @@ class Container:
         Buduje asystenta Ordlaka dla `POST /api/v1/ordlak/chat`.
 
         Dostaje gotowe serwisy, a nie repozytoria - asystent ma widzieć
-        dokładnie te same liczby co ekrany aplikacji (magazyn liczy
-        podprodukty, prognoza ma swoje okno), a to jest wiedza serwisów.
+        dokładnie te same liczby co ekrany aplikacji.
         """
         return OrdlakAssistantService(
             settings=self._settings.ordlak,
             order_repository=SqliteOrderRepository(session),
-            inventory_service=self.inventory_service(session),
+            offer_catalog_service=self.offer_catalog_service(session),
             returns_service=self.returns_service(session),
             dashboard_service=self.dashboard_service(session),
             health_service=self.health_service(session),
@@ -236,39 +229,15 @@ class Container:
             event_bus=self.event_bus,
         )
 
-    def inventory_service(self, session: AsyncSession) -> InventoryService:
-        """Buduje InventoryService dla komend /stock."""
-        return InventoryService(SqliteInventoryRepository(session))
-
     def dashboard_service(self, session: AsyncSession) -> DashboardService:
         """Buduje DashboardService dla ekranu Start aplikacji mobilnej."""
-        return DashboardService(
-            order_repository=SqliteOrderRepository(session),
-            inventory_repository=SqliteInventoryRepository(session),
-        )
-
-    def offer_mapping_service(self, session: AsyncSession) -> OfferMappingService:
-        """Buduje OfferMappingService dla /api/v1/stock/offers/* (receptury ofert)."""
-        return OfferMappingService(
-            inventory_repository=SqliteInventoryRepository(session),
-            order_repository=SqliteOrderRepository(session),
-        )
+        return DashboardService(order_repository=SqliteOrderRepository(session))
 
     def offer_catalog_service(self, session: AsyncSession) -> OfferCatalogService:
-        """Buduje OfferCatalogService dla /api/v1/stock/catalog/* (asortyment)."""
+        """Buduje OfferCatalogService dla /api/v1/stock/* (magazyn ofert)."""
         return OfferCatalogService(
             plugin=self.build_plugin(session),
             catalog_repository=SqliteOfferCatalogRepository(session),
-            inventory_repository=SqliteInventoryRepository(session),
-        )
-
-    def stock_sync_service(self, session: AsyncSession) -> StockSyncService:
-        """Buduje StockSyncService dla automatycznej synchronizacji stanów."""
-        inventory_repository = SqliteInventoryRepository(session)
-        return StockSyncService(
-            inventory_repository=inventory_repository,
-            stock_sync_repository=SqliteStockSyncRepository(session),
-            component_resolver=ComponentResolver(inventory_repository),
         )
 
     def _build_sms_provider(self) -> SmsProvider:

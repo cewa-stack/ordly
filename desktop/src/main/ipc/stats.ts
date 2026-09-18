@@ -11,20 +11,6 @@ export function registerStatsIpc(): void {
     })
   );
 
-  ipcMain.handle("ordly:stats:stockReport", async () =>
-    toResult(async () => {
-      const session = requireSession();
-      return apiRequest(session.baseUrl, session.token, "/api/v1/stock/report");
-    })
-  );
-
-  ipcMain.handle("ordly:stats:shoppingList", async () =>
-    toResult(async () => {
-      const session = requireSession();
-      return apiRequest(session.baseUrl, session.token, "/api/v1/stock/shopping-list");
-    })
-  );
-
   ipcMain.handle("ordly:stats:dashboard", async () =>
     toResult(async () => {
       const session = requireSession();

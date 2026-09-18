@@ -2,8 +2,8 @@
  * Paleta polecen (Ctrl+K) wg sekcji 4.5 i 9.1 pkt 4.
  *
  * Paleta nie tylko nawiguje - realnie SZUKA: po numerze zamowienia,
- * nazwie kupujacego, SKU i nazwie produktu, i otwiera konkretny rekord.
- * Zamowienia leca do `/api/v1/orders/search` na Pi, produkty sa
+ * nazwie kupujacego, nazwie i sygnaturze oferty, i otwiera konkretny
+ * rekord. Zamowienia leca do `/api/v1/orders/search` na Pi, oferty sa
  * filtrowane po stronie aplikacji z juz pobranej listy magazynu.
  *
  * Zadnej akcji bez pokrycia w backendzie - patrz
@@ -14,12 +14,13 @@ import { useQuery } from "@tanstack/react-query";
 import { BoxIcon, GearIcon, GridIcon, RefreshIcon, SearchIcon } from "../icons";
 import { BACKSTAGE_NAV, MAIN_NAV, type ViewId } from "./Sidebar";
 import { useSync } from "../lib/sync";
+import { offerKey } from "../screens/MagazynScreen";
 import { formatCurrency } from "../lib/format";
 
 export type PaletteTarget =
   | { kind: "view"; view: ViewId }
   | { kind: "order"; externalId: string }
-  | { kind: "product"; sku: string };
+  | { kind: "offer"; offerKey: string };
 
 interface PaletteEntry {
   id: string;
@@ -70,11 +71,11 @@ export function CommandPalette({ open, onClose, onSelect }: CommandPaletteProps)
     },
   });
 
-  const stockQuery = useQuery({
-    queryKey: ["stock"],
+  const offersQuery = useQuery({
+    queryKey: ["offers"],
     enabled: open,
     queryFn: async () => {
-      const result = await window.ordly.stock.list();
+      const result = await window.ordly.stock.offers();
       if (!result.ok) throw new Error(result.message);
       return result.data;
     },
@@ -106,22 +107,22 @@ export function CommandPalette({ open, onClose, onSelect }: CommandPaletteProps)
       target: { kind: "order", externalId: order.external_id },
     }));
 
-    const products: PaletteEntry[] =
+    const offers: PaletteEntry[] =
       needle.length >= 2
-        ? (stockQuery.data ?? [])
+        ? (offersQuery.data ?? [])
             .filter(
-              (item) =>
-                item.sku.toLowerCase().includes(needle) ||
-                item.name.toLowerCase().includes(needle)
+              (offer) =>
+                offer.name.toLowerCase().includes(needle) ||
+                (offer.signature ?? "").toLowerCase().includes(needle)
             )
             .slice(0, 6)
-            .map((item) => ({
-              id: `product:${item.sku}`,
-              group: "Produkty",
-              label: item.name,
-              hint: item.sku,
+            .map((offer) => ({
+              id: `offer:${offerKey(offer)}`,
+              group: "Oferty",
+              label: offer.name,
+              hint: offer.signature ?? offer.external_id,
               icon: <GridIcon />,
-              target: { kind: "product" as const, sku: item.sku },
+              target: { kind: "offer" as const, offerKey: offerKey(offer) },
             }))
         : [];
 
@@ -138,8 +139,8 @@ export function CommandPalette({ open, onClose, onSelect }: CommandPaletteProps)
       ] satisfies PaletteEntry[]
     ).filter((entry) => needle === "" || entry.label.toLowerCase().includes(needle));
 
-    return [...screens, ...orders, ...products, ...actions];
-  }, [debounced, ordersQuery.data, stockQuery.data]);
+    return [...screens, ...orders, ...offers, ...actions];
+  }, [debounced, ordersQuery.data, offersQuery.data]);
 
   React.useEffect(() => {
     setCursor(0);

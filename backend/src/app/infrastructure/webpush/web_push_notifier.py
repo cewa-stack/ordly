@@ -157,12 +157,6 @@ class WebPushNotifier(Notifier):
             )
         )
 
-    async def notify_low_stock(self, name: str, sku: str, stock: int, min_stock: int) -> None:
-        """Niski stan - katalog, pozycja „Niski stan"."""
-        await self._send(
-            push_payload.low_stock(name=name, sku=sku, stock=stock, min_stock=min_stock)
-        )
-
     async def notify_shipping_reminder(self, data: ShippingReminderData) -> None:
         """Zaległe pakowanie - katalog, pozycja „Zaległe pakowanie"."""
         if data.new_count == 0:
@@ -230,14 +224,6 @@ class WebPushNotifier(Notifier):
                 issue_id=notice.issue_id,
                 badge=1,
             )
-        )
-
-    async def notify_unmatched_products(
-        self, reference: str, product_names: list[str]
-    ) -> None:
-        """Sprzedaż poza magazynem - katalog, pozycja „Sprzedaż poza magazynem"."""
-        await self._send(
-            push_payload.unmatched_products(reference=reference, product_names=product_names)
         )
 
     async def notify_sync_failed(self, channel: str, retry_in_minutes: int) -> None:

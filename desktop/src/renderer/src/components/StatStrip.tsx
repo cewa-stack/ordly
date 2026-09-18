@@ -103,7 +103,7 @@ interface StatStripProps {
 export function StatStrip({ dashboard, openIssues, loading }: StatStripProps) {
   const ordersToday = useCountUp(dashboard?.orders_today ?? 0);
   const revenueToday = useCountUp(dashboard?.revenue_today ?? 0);
-  const lowStock = useCountUp(dashboard?.low_stock_count ?? 0);
+  const toShip = useCountUp(dashboard?.orders_to_ship ?? 0);
   const issues = useCountUp(openIssues);
 
   if (loading) {
@@ -135,10 +135,10 @@ export function StatStrip({ dashboard, openIssues, loading }: StatStripProps) {
         <Sparkline series={dashboard?.revenue_last_7_days ?? []} />
       </Stat>
       <Stat
-        label="Niski stan"
-        value={String(Math.round(lowStock))}
-        tone={lowStock > 0 ? "warn" : "plain"}
-        delta="produkty"
+        label="Do wysyłki"
+        value={String(Math.round(toShip))}
+        tone={toShip > 0 ? "warn" : "plain"}
+        delta="zamówienia"
       />
       <Stat
         label="Czeka na odpowiedź"

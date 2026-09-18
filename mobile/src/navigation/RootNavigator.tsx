@@ -2,8 +2,7 @@
  * Stos główny. Kolejność ekranów odpowiada stanowi z AuthProvider:
  * brak sesji -> Login, sesja zablokowana biometrią -> Lock, świeże
  * logowanie na sprzęcie z biometrią -> BiometricOptIn (raz), inaczej Main.
- * OrderDetail/StockItem/IssueDetail/MailDetail/Settings są pushowane NAD
- * tabami.
+ * OrderDetail/IssueDetail/MailDetail/Settings są pushowane NAD tabami.
  */
 import * as React from "react";
 import { createNativeStackNavigator } from "@react-navigation/native-stack";
@@ -15,7 +14,6 @@ import { LockScreen } from "@/screens/LockScreen";
 import { BiometricOptInScreen } from "@/screens/BiometricOptInScreen";
 import { OrderDetailScreen } from "@/screens/OrderDetailScreen";
 import { SettingsScreen } from "@/screens/SettingsScreen";
-import { StockItemScreen } from "@/screens/StockItemScreen";
 import { IssueDetailScreen } from "@/screens/IssueDetailScreen";
 import { MailDetailScreen } from "@/screens/MailDetailScreen";
 import { MainShell } from "./MainShell";
@@ -59,11 +57,6 @@ export function RootNavigator() {
             name="OrderDetail"
             component={OrderDetailScreen}
             options={{ title: "Zamówienie" }}
-          />
-          <Stack.Screen
-            name="StockItem"
-            component={StockItemScreen}
-            options={{ title: "Produkt" }}
           />
           <Stack.Screen
             name="IssueDetail"

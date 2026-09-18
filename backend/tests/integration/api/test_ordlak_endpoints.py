@@ -20,9 +20,9 @@ from app.api.dependencies import get_container, get_session
 from app.api.endpoints import ordlak as ordlak_endpoints
 from app.core.config import MailWatchSettings, OrdlakSettings
 from app.services.dashboard_service import DashboardService
-from app.services.inventory_service import InventoryService
 from app.services.issues_service import IssuesService
 from app.services.mailbox_service import MailboxService
+from app.services.offer_catalog_service import OfferCatalogService
 from app.services.ordlak_assistant_service import OrdlakAssistantService
 from app.services.returns_service import ReturnsService
 from app.services.search_service import SearchService
@@ -33,9 +33,9 @@ from tests.fakes.fake_anthropic import (
     TextBlock,
     ToolUseBlock,
 )
-from tests.fakes.fake_inventory_repository import FakeInventoryRepository
 from tests.fakes.fake_mail_repository import FakeMailRepository
 from tests.fakes.fake_marketplace_plugin import FakeMarketplacePlugin
+from tests.fakes.fake_offer_catalog_repository import FakeOfferCatalogRepository
 from tests.fakes.fake_order_repository import FakeOrderRepository
 from tests.fakes.fake_ordlak_conversation_repository import (
     FakeOrdlakConversationRepository,
@@ -51,7 +51,7 @@ class _StubContainer:
 
     def __init__(self, configured: bool = True) -> None:
         self.orders = FakeOrderRepository()
-        self.inventory = FakeInventoryRepository()
+        self.catalog = FakeOfferCatalogRepository()
         self.returns = FakeReturnRepository()
         self.plugin = FakeMarketplacePlugin()
         self.mail = FakeMailRepository()
@@ -75,9 +75,11 @@ class _StubContainer:
         return OrdlakAssistantService(
             settings=self.settings,
             order_repository=self.orders,
-            inventory_service=InventoryService(self.inventory),
+            offer_catalog_service=OfferCatalogService(
+                plugin=self.plugin, catalog_repository=self.catalog
+            ),
             returns_service=ReturnsService(self.returns),
-            dashboard_service=DashboardService(self.orders, self.inventory),
+            dashboard_service=DashboardService(self.orders),
             health_service=StubHealthService(),
             search_service=SearchService(self.orders),
             issues_service=IssuesService(self.plugin),

@@ -23,8 +23,6 @@ const EVENT_DOT: Record<string, string> = {
   OrderCancelled: "bg-coral",
   OrderPackingStarted: "bg-amber",
   OrderReturnCreated: "bg-violet",
-  LowStockDetected: "bg-coral",
-  StockSynchronized: "bg-slate-dim",
   AllegroLokalnieEventDetected: "bg-teal-deep",
   OlxEventDetected: "bg-violet",
   DisputeNoticeDetected: "bg-coral",
@@ -35,8 +33,6 @@ const EVENT_LABEL: Record<string, string> = {
   OrderCancelled: "Anulowane zamówienie",
   OrderPackingStarted: "Rozpoczęto pakowanie",
   OrderReturnCreated: "Nowy zwrot",
-  LowStockDetected: "Niski stan magazynowy",
-  StockSynchronized: "Magazyn zaktualizowany",
   AllegroLokalnieEventDetected: "Mail z Allegro Lokalnie",
   OlxEventDetected: "Mail z OLX",
   DisputeNoticeDetected: "Nowa dyskusja",
@@ -117,6 +113,15 @@ export function StartScreen({ onNavigate }: { onNavigate: (view: ViewId) => void
     retry: false,
   });
 
+  const offersQuery = useQuery({
+    queryKey: ["offers"],
+    queryFn: async () => {
+      const result = await window.ordly.stock.offers();
+      if (!result.ok) throw new Error(result.message);
+      return result.data;
+    },
+  });
+
   const eventsQuery = useQuery({
     queryKey: ["events"],
     queryFn: async () => {
@@ -134,7 +139,7 @@ export function StartScreen({ onNavigate }: { onNavigate: (view: ViewId) => void
   const dashboard = dashboardQuery.data;
   const pendingOrders = (ordersQuery.data ?? []).filter(isPendingOrder);
   const openIssues = (issuesQuery.data ?? []).filter((issue) => issue.chat_active);
-  const lowStock = dashboard?.low_stock_count ?? 0;
+  const offerCount = (offersQuery.data ?? []).length;
 
   // "Dziś w systemie" znaczy DZIŚ - dziennik zwraca ostatnie wpisy bez
   // wzgledu na date, wiec rano lista pokazywala jeszcze wczorajszy wieczor.
@@ -143,8 +148,7 @@ export function StartScreen({ onNavigate }: { onNavigate: (view: ViewId) => void
   );
 
   // Najpilniejsza rzecz - kolejnosc odzwierciedla realny koszt zwloki:
-  // niezapakowane zamowienie kosztuje najwiecej, potem czekajacy klient,
-  // na koncu magazyn (ktory da sie uzupelnic jutro).
+  // niezapakowane zamowienie kosztuje najwiecej, potem czekajacy klient.
   const headline =
     pendingOrders.length > 0
       ? `${formatPlural(pendingOrders.length, [
@@ -158,27 +162,21 @@ export function StartScreen({ onNavigate }: { onNavigate: (view: ViewId) => void
             "klientów czeka",
             "klientów czeka",
           ])} na odpowiedź`
-        : lowStock > 0
-          ? `${formatPlural(lowStock, ["produkt", "produkty", "produktów"])} poniżej progu`
-          : "Wszystko obsłużone";
+        : "Wszystko obsłużone";
 
   const subline =
     pendingOrders.length > 0
       ? "Otwórz zamówienia, spakuj i oznacz je jako gotowe do wysyłki."
       : openIssues.length > 0
         ? "Odpowiedz na otwarte dyskusje, zanim kupujący zdąży się zniecierpliwić."
-        : lowStock > 0
-          ? "Ordi przygotował listę zakupów - wyślij zamówienie do hurtowni."
-          : "Zero zaległości. Ordi pilnuje kanałów i da znać, gdy coś się pojawi.";
+        : "Zero zaległości. Ordi pilnuje kanałów i da znać, gdy coś się pojawi.";
 
   const primaryAction: { label: string; go: ViewId } =
     pendingOrders.length > 0
       ? { label: "Otwórz zamówienia", go: "zamowienia" }
       : openIssues.length > 0
         ? { label: "Otwórz dyskusje", go: "dyskusje" }
-        : lowStock > 0
-          ? { label: "Otwórz magazyn", go: "magazyn" }
-          : { label: "Zobacz statystyki", go: "statystyki" };
+        : { label: "Zobacz statystyki", go: "statystyki" };
 
   return (
     <div className="flex min-h-0 flex-1 flex-col gap-[22px] overflow-y-auto p-6">
@@ -217,8 +215,8 @@ export function StartScreen({ onNavigate }: { onNavigate: (view: ViewId) => void
         <ShortcutCard
           icon={<GridIcon size={16} />}
           tint="coral"
-          value={String(lowStock)}
-          caption="Produkty poniżej progu"
+          value={String(offerCount)}
+          caption="Oferty wystawione na marketplace'ach"
           onClick={() => onNavigate("magazyn")}
         />
         <ShortcutCard

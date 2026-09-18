@@ -37,11 +37,6 @@ class Notifier(ABC):
         raise NotImplementedError
 
     @abstractmethod
-    async def notify_low_stock(self, name: str, sku: str, stock: int, min_stock: int) -> None:
-        """Wysyła ostrzeżenie o osiągnięciu minimalnego stanu magazynowego."""
-        raise NotImplementedError
-
-    @abstractmethod
     async def notify_shipping_reminder(self, data: ShippingReminderData) -> None:
         """Wysyła przypomnienie o zamówieniach wymagających dziś wysyłki (20:00)."""
         raise NotImplementedError
@@ -100,24 +95,6 @@ class Notifier(ABC):
         await self.send_text(
             f"Nowa dyskusja: {notice.buyer_login}"
             + (f" - {notice.reason}" if notice.reason else "")
-        )
-
-    async def notify_unmatched_products(
-        self, reference: str, product_names: list[str]
-    ) -> None:
-        """
-        Ostrzega, że sprzedane pozycje nie mają powiązania z magazynem,
-        więc stany się nie zmieniły.
-
-        Ma domyślną implementację opartą o `send_text` - jak
-        `notify_sync_failed` - żeby nowy kanał powiadomień nie musiał od
-        razu mieć własnego formatowania. Oba istniejące kanały ją
-        nadpisują: Telegram bogatym układem HTML z komendą do skopiowania,
-        Web Push pozycją z katalogu `push_payload`.
-        """
-        await self.send_text(
-            f"Sprzedaż poza magazynem: zamówienie {reference} zawiera pozycje bez "
-            f"powiązania z magazynem ({', '.join(product_names)}) - stan bez zmian."
         )
 
     async def notify_sync_failed(self, channel: str, retry_in_minutes: int) -> None:

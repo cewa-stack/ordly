@@ -1,8 +1,8 @@
 # Ordlak — asystent ORDLY
 
 Ordlak to czat wbudowany w ORDLY, który odpowiada na pytania o własny
-sklep: ile się sprzedało, co ma niski stan, co czeka na wysyłkę, jakie dni
-sprzedażowe się zbliżają. Jedna zakładka w pasku bocznym, jeden ekran.
+sklep: ile się sprzedało, ile czego zostało na półce, co czeka na wysyłkę,
+jakie dni sprzedażowe się zbliżają. Jedna zakładka w pasku bocznym, jeden ekran.
 
 > **Historia:** do 6 września 2026 Ordlak był generatorem ofert Allegro
 > (tytuł, opis HTML i cena z notatki + zdjęć). Generator został **usunięty
@@ -45,9 +45,7 @@ Wszystkie w `backend/src/app/services/ordlak_assistant_service.py`
 | Narzędzie | Co czyta | Źródło |
 |---|---|---|
 | `podsumowanie_sprzedazy` | zamówienia, przychód, kanały, topka produktów, przychód dzień po dniu | `OrderRepository` |
-| `niskie_stany` | pozycje na progu minimalnym lub poniżej | `InventoryService.get_shopping_list` |
-| `magazyn` | stan magazynowy, z opcjonalnym szukaniem po nazwie/SKU | `InventoryService.get_stock_overview` |
-| `prognoza_zapasow` | na ile dni starczy zapasu, wartość magazynu, produkty bez sprzedaży | `InventoryService.get_report` |
+| `magazyn` | wystawione oferty i ręcznie wpisana ilość przy każdej, z opcjonalnym szukaniem po nazwie lub sygnaturze | `OfferCatalogService.get_offers` |
 | `ostatnie_zamowienia` | ostatnie zamówienia albo tylko czekające na wysyłkę | `OrderRepository` |
 | `zwroty` | ostatnie zwroty klientów | `ReturnsService` |
 | `kalendarz_sprzedazowy` | nadchodzące dni sprzedażowe i święta w Polsce | `domain/sales_calendar.py` |

@@ -10,10 +10,12 @@ dostaje bogaty format i że push nie dostaje go nigdy.
 
 from __future__ import annotations
 
+from datetime import datetime
 from decimal import Decimal
 
 import pytest
 
+from app.domain.entities.olx_event import OlxEvent
 from app.infrastructure.telegram.telegram_notifier import TelegramNotifier
 from app.infrastructure.webpush import push_payload
 
@@ -34,38 +36,45 @@ class TestTelegramZachowujeFormat:
     Zmiana dotyczyła WYŁĄCZNIE kanału Web Push.
     """
 
-    @pytest.mark.asyncio
-    async def test_ostrzezenie_o_magazynie_ma_pogrubienie_i_komende(self):
+    @staticmethod
+    async def _wyslij_olx(listing_title: str) -> str:
         bot = FakeBotZWiadomosciami()
         notifier = TelegramNotifier(bot, admin_chat_id=1)  # type: ignore[arg-type]
 
-        await notifier.notify_unmatched_products(
-            "b2784ef0-a0c0-11f1", ["Butelki PET 30 ml", "Nakrętki DIN18"]
+        await notifier.notify_olx_event(
+            OlxEvent(
+                message_id="<olx-1@olx.pl>",
+                event_type="new_order",
+                subject="Wiadomości dotyczące ogłoszeń",
+                snippet="Płatność została dokonana",
+                received_at=datetime(2026, 9, 13, 10, 0),
+                listing_title=listing_title,
+            )
         )
 
         assert len(bot.messages) == 1
-        text = bot.messages[0]
-        assert "<b>Sprzedaż poza magazynem</b>" in text
-        assert "<code>/stock link [oferta] [SKU] [ilość]</code>" in text
-        assert "• Butelki PET 30 ml" in text
-        assert "• Nakrętki DIN18" in text
-        assert "b2784ef0-a0c0-11f1" in text
+        return bot.messages[0]
 
     @pytest.mark.asyncio
-    async def test_nazwa_produktu_ze_znakiem_mniejszosci_jest_escapowana(self):
+    async def test_sprzedaz_z_olx_ma_pogrubienie_i_wyjasnienie(self):
+        text = await self._wyslij_olx("Butelki PET 30 ml")
+
+        assert "<b>Sprzedano — OLX</b>" in text
+        assert "<b>Nie ma tego w zamówieniach</b>" in text
+        assert "<i>" in text
+        assert "Butelki PET 30 ml" in text
+
+    @pytest.mark.asyncio
+    async def test_nazwa_ogloszenia_ze_znakiem_mniejszosci_jest_escapowana(self):
         """
-        Bot wysyła z `parse_mode=HTML` - surowy `<` w nazwie produktu
+        Bot wysyła z `parse_mode=HTML` - surowy `<` w tytule ogłoszenia
         wywróciłby parsowanie po stronie Telegrama i wiadomość by nie
-        doszła w ogóle.
+        doszła w ogóle. Realne tytuły z OLX bywają pełne interpunkcji.
         """
-        bot = FakeBotZWiadomosciami()
-        notifier = TelegramNotifier(bot, admin_chat_id=1)  # type: ignore[arg-type]
+        text = await self._wyslij_olx("Butelka <30 ml>")
 
-        await notifier.notify_unmatched_products("ref", ["Butelka <30 ml>"])
-
-        text = bot.messages[0]
         assert "&lt;30 ml&gt;" in text
-        assert "<30 ml>" not in text
+        assert "Butelka <30 ml>" not in text
 
 
 class TestPushNigdyNieDostajeHtml:
@@ -89,7 +98,6 @@ class TestPushNigdyNieDostajeHtml:
                 total_amount=Decimal("100.00"),
                 currency="PLN",
             ),
-            push_payload.low_stock(name="A", sku="S", stock=1, min_stock=10),
             push_payload.new_dispute(
                 buyer_login="a", reason="niezgodny z opisem", respond_by=None, issue_id="i"
             ),
@@ -97,7 +105,6 @@ class TestPushNigdyNieDostajeHtml:
             push_payload.pending_packing(count=3, oldest_since="wczoraj"),
             push_payload.sync_failed(channel="allegro", retry_in_minutes=5),
             push_payload.wholesaler_confirmed(wholesaler_name="Pako", items_summary="A"),
-            push_payload.unmatched_products(reference="r", product_names=["A"]),
             push_payload.allegro_lokalnie_event(
                 event_type="new_order",
                 listing_title="A",

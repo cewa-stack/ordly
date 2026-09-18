@@ -64,7 +64,6 @@ export const BACKSTAGE_NAV: NavItemDef[] = [
 export interface NavCounts {
   zamowienia?: number;
   dyskusje?: { value: number; alert: boolean };
-  magazyn?: { value: number; alert: boolean };
   poczta?: number;
   zwroty?: number;
 }
@@ -123,8 +122,6 @@ export function Sidebar({ active, onSelect, counts }: SidebarProps) {
         return { value: counts.zamowienia, alert: false };
       case "dyskusje":
         return { value: counts.dyskusje?.value, alert: counts.dyskusje?.alert ?? false };
-      case "magazyn":
-        return { value: counts.magazyn?.value, alert: counts.magazyn?.alert ?? false };
       case "poczta":
         return { value: counts.poczta, alert: false };
       case "zwroty":

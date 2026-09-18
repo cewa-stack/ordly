@@ -88,15 +88,6 @@ class TestKatalogTresci:
         assert "Allegro 2" in payload.body
         assert "1 218,40 zł" in payload.body
 
-    def test_niski_stan_mowi_ile_zostalo_przy_jakim_progu(self):
-        payload = push_payload.low_stock(
-            name="Etui na kable", sku="ETU-014", stock=3, min_stock=20
-        )
-
-        assert payload.title == "Niski stan"
-        assert payload.body == "Etui na kable — 3 szt. (próg 20)"
-        assert payload.url == "/stock/ETU-014"
-
     def test_nowa_dyskusja_mowi_kto_o_co_i_do_kiedy(self):
         payload = push_payload.new_dispute(
             buyer_login="Kupiec99",
@@ -247,17 +238,21 @@ class TestSerializacja:
         assert data["url"] == "/returns/A87990ff"
         assert data["title"] == "Nowy zwrot"
 
-    def test_rozne_niskie_stany_nie_zastepuja_sie_nawzajem(self):
+    def test_rozne_zwroty_nie_zastepuja_sie_nawzajem(self):
         """
         `tag` w Web Push ZASTĘPUJE poprzednie powiadomienie, więc dwa
-        różne produkty muszą mieć różne klucze - inaczej ostrzeżenie
-        o drugim SKU skasowałoby to o pierwszym.
+        różne zdarzenia muszą mieć różne klucze - inaczej drugi zwrot
+        skasowałby z ekranu blokady powiadomienie o pierwszym.
         """
         first = json.loads(
-            push_payload.low_stock(name="A", sku="PET30", stock=1, min_stock=10).to_json()
+            push_payload.new_return(
+                external_id="A87990ff", products_summary="A", reason="rozmiar"
+            ).to_json()
         )
         second = json.loads(
-            push_payload.low_stock(name="B", sku="KRO60", stock=2, min_stock=10).to_json()
+            push_payload.new_return(
+                external_id="B12345cc", products_summary="B", reason="rozmiar"
+            ).to_json()
         )
 
         assert first["tag"] != second["tag"]
@@ -480,56 +475,6 @@ class TestSiatkaBezpieczenstwa:
         assert push_payload.strip_html(tekst) == tekst
 
 
-class TestSprzedazPozaMagazynem:
-    """Nowa pozycja katalogu - zdarzenie, które wywołało całe zgłoszenie."""
-
-    def test_tytul_mowi_co_sie_stalo_a_tresc_ktorej_pozycji_dotyczy(self):
-        payload = push_payload.unmatched_products(
-            reference="b2784ef0-a0c0-11f1-ae34-979fa0b8ac2d",
-            product_names=[
-                "Butelki PET 30 ml z zakrętką",
-                "Nakrętki DIN18 czarne",
-                "Kroplomierze LDPE",
-            ],
-        )
-
-        assert payload.title == "Sprzedaż poza magazynem"
-        assert payload.body == "Butelki PET 30 ml z zakrętką +2 poz. — stan bez zmian"
-
-    def test_prowadzi_do_zamowienia_a_nie_do_ustawien(self):
-        """
-        Poprzednio szło to przez `send_text`, który zawsze otwiera
-        `/settings` - czyli ekran niezwiązany ze zdarzeniem.
-        """
-        payload = push_payload.unmatched_products(
-            reference="b2784ef0-a0c0", product_names=["Butelki PET"]
-        )
-
-        assert payload.url == "/orders/b2784ef0-a0c0"
-        assert payload.thread == "stock"
-
-    def test_jedna_pozycja_nie_dostaje_licznika(self):
-        payload = push_payload.unmatched_products(
-            reference="x", product_names=["Butelki PET 30 ml"]
-        )
-
-        assert payload.body == "Butelki PET 30 ml — stan bez zmian"
-
-    def test_brak_pozycji_nie_wywala_buildera(self):
-        payload = push_payload.unmatched_products(reference="x", product_names=[])
-
-        assert "brak danych" in payload.body
-
-    def test_tresc_nie_zawiera_znacznikow_html(self):
-        """Sedno zgłoszenia: na ekranie blokady nie ma prawa być `<b>`."""
-        payload = push_payload.unmatched_products(
-            reference="b2784ef0", product_names=["Butelki PET 30 ml"]
-        )
-
-        assert "<" not in payload.title
-        assert "<" not in payload.body
-
-
 class TestTytulyMieszczaSieNaEkranieBlokady:
     """
     iOS ucina tytuł powiadomienia do JEDNEJ linii. Przy dymku 347 pt
@@ -548,7 +493,6 @@ class TestTytulyMieszczaSieNaEkranieBlokady:
                 products=[(50, "Butelki PET 30 ml")],
                 external_id="x",
             ),
-            push_payload.low_stock(name="A", sku="S", stock=1, min_stock=10),
             push_payload.new_dispute(
                 buyer_login="a", reason="b", respond_by=None, issue_id="i"
             ),
@@ -557,7 +501,6 @@ class TestTytulyMieszczaSieNaEkranieBlokady:
             push_payload.sync_failed(channel="allegro", retry_in_minutes=5),
             push_payload.mailbox_unavailable(login_rejected=True, retry_in_minutes=5),
             push_payload.mailbox_unavailable(login_rejected=False, retry_in_minutes=5),
-            push_payload.unmatched_products(reference="r", product_names=["A"]),
             push_payload.allegro_lokalnie_event(
                 event_type="new_order",
                 listing_title="A",
@@ -582,7 +525,6 @@ class TestOlx:
 
     Sprzedaż z OLX NIE staje się zamówieniem - mail nie podaje kwoty
     (patrz `domain/entities/olx_event.py`), więc zostaje powiadomieniem.
-    Treść musi to powiedzieć wprost, bo magazyn trzeba poprawić ręcznie.
     """
 
     @staticmethod
@@ -602,16 +544,11 @@ class TestOlx:
         assert payload.title == "Nowa wiadomość · OLX"
         assert len(payload.title) <= 24
 
-    def test_sprzedaz_mowi_wprost_ze_stan_sie_nie_zmienil(self):
-        """
-        Jedyne miejsce, w którym ta informacja dociera na ekran blokady.
-        Bez niej sprzedaż z OLX wyglądałaby jak zwykłe zamówienie, po
-        którym magazyn schodzi sam - a tu nie schodzi.
-        """
+    def test_sprzedaz_mowi_czego_dotyczy(self):
+        """Tytuł niesie kanał, treść - pozycję, której sprzedaż dotyczy."""
         payload = self._payload("new_order")
 
         assert payload.title == "Sprzedano · OLX"
-        assert payload.body.endswith("stan bez zmian")
         assert "Butelki PET" in payload.body
 
     def test_sprzedaz_nie_udaje_nowego_zamowienia(self):

@@ -6,11 +6,14 @@
  * zamiast udawac integracje. Dane trzymane sa lokalnie na komputerze
  * przez main proces, nie na Pi.
  *
- * NAPRAWA PRZY OKAZJI: poprzednia wersja robila `useQuery` z kluczem
- * `["stock"]`, ale zwracala `Map<string, number>` zamiast `StockItem[]`.
- * Ten sam klucz co ekran Magazyn oznacza WSPOLNY wpis w cache - kto
- * pobral pierwszy, ten narzucal ksztalt danych drugiemu. Teraz mapa
- * powstaje przez `select`, ktory nie dotyka tego, co siedzi w cache.
+ * Kolumna "Stan w magazynie" zestawia oferte OLX z ofercia z Magazynu
+ * po SYGNATURZE - to jedyne wspolne pole, bo oferta OLX zyje tylko tutaj,
+ * a oferty z marketplace'ow maja wlasne numery.
+ *
+ * Mapa sygnatur powstaje przez `select`, ktory przeksztalca dane wydane
+ * z cache, a nie te w cache - ekran Magazyn dalej dostaje pod kluczem
+ * `["offers"]` swoja tablice. Wczesniej ten ekran nadpisywal wspolny
+ * wpis mapa i kto pobral pierwszy, ten narzucal ksztalt danych drugiemu.
  */
 import * as React from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
@@ -107,7 +110,7 @@ function OfferFormModal({ offer, onClose }: { offer: OlxOffer | null; onClose: (
           />
         </label>
         <label className="flex flex-col gap-1.5">
-          <span className="o-eyebrow">Powiązane SKU</span>
+          <span className="o-eyebrow">Sygnatura oferty w magazynie</span>
           <input
             value={linkedSku}
             onChange={(e) => setLinkedSku(e.target.value)}
@@ -131,16 +134,24 @@ export function OlxScreen() {
     queryFn: () => window.ordly.olx.list(),
   });
 
-  const stockBySku = useQuery({
-    queryKey: ["stock"],
+  const stockBySignature = useQuery({
+    queryKey: ["offers"],
     queryFn: async () => {
-      const result = await window.ordly.stock.list();
+      const result = await window.ordly.stock.offers();
       if (!result.ok) throw new Error(result.message);
       return result.data;
     },
     // `select` przeksztalca dane WYDANE z cache, nie te w cache - dzieki
     // temu ekran Magazyn dalej dostaje pod tym kluczem swoja tablice.
-    select: (items) => new Map(items.map((item) => [item.sku, item.stock])),
+    //
+    // Oferta bez wpisanego stanu nie trafia do mapy: `null` znaczy
+    // "nigdy nie liczono" i nie ma sensu porownywac go ze stanem na OLX.
+    select: (offers) =>
+      new Map(
+        offers
+          .filter((offer) => offer.signature !== null && offer.quantity_on_hand !== null)
+          .map((offer) => [offer.signature as string, offer.quantity_on_hand as number])
+      ),
   });
 
   const deleteMutation = useMutation({
@@ -218,7 +229,7 @@ export function OlxScreen() {
             <tbody>
               {offers.map((offer) => {
                 const warehouseStock = offer.linkedSku
-                  ? stockBySku.data?.get(offer.linkedSku)
+                  ? stockBySignature.data?.get(offer.linkedSku)
                   : undefined;
                 const mismatch =
                   warehouseStock !== undefined && warehouseStock !== offer.stock;

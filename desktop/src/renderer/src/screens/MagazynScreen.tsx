@@ -1,68 +1,48 @@
 /**
- * Magazyn - tabela Produkt · SKU · Zapas · Korekta · Status (sekcja 4.4).
+ * Magazyn - lista ofert wystawionych na marketplace'ach.
  *
- * Wiersze ponizej progu maja wsuniety pasek `--coral` na lewej krawedzi
- * i ikone Ordiego 22 px w pozie `think` przy nazwie. To jedyny wyjatek
- * od "reguly jednego Ordiego" - tutaj Ordi jest ETYKIETA, nie
- * wskaznikiem stanu (sekcja 3.3).
+ * Ilosc wisi WPROST na ofercie: nie ma osobnych produktow, receptur ani
+ * powiazan. Sprzedaz niczego nie zdejmuje - stan zmienia sie wylacznie
+ * recznie, bo tylko czlowiek widzi, co naprawde lezy na polce.
  *
- * Nowosc wobec poprzedniej wersji: formularz produktu (sekcja 9.1 pkt 6)
- * i historia ruchow magazynowych - wczesniej byl tylko stepper korekty.
+ * Dwie liczby stoja obok siebie celowo. "Wystawione" przychodzi z API
+ * marketplace i mowi, ile sztuk obiecuje oferta kupujacym. "Na polce"
+ * wpisuje sie tutaj. Rozjazd miedzy nimi jest informacja, nie bledem.
  *
- * Produkty glowne i podprodukty: butelka 10 ml sprzedaje sie zawsze
- * z nakretka i kroplomierzem, wiec te dwa sa jej PODPRODUKTAMI. Glowna
- * lista pokazuje wtedy sama butelke - nakretka i kroplomierz siedza pod
- * strzalka rozwijania, zeby nie zasmiecac widoku trzema wierszami o tym
- * samym. Filtry "Ponizej progu" i "Zerowy stan" celowo lamia te zasade
- * i pokazuja podprodukty wprost: ich zadaniem jest znalezc to, co sie
- * konczy, a schowana nakretka skonczylaby sie po cichu.
- *
- * Warunki na `parent_sku` sa CELOWO luzne (`!item.parent_sku`), a nie
- * `=== null`: starszy backend tego pola w ogole nie zwraca, a wtedy
- * `undefined === null` jest falszem i cala lista magazynowa zniknelaby
- * z ekranu. Brak pola ma znaczyc "produkt samodzielny", bo dokladnie
- * tym byly wszystkie produkty przed ta zmiana.
+ * `quantity_on_hand === null` znaczy "nigdy nie liczono" i jest czym
+ * innym niz 0 ("policzylem, nie ma") - dlatego pusty stan pokazuje
+ * przycisk "Wpisz stan", a nie stepper od zera.
  */
 import * as React from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { ChevronIcon, ClockIcon, LinkIcon, PlusIcon, TrashIcon } from "../icons";
+import { ClockIcon, RefreshIcon, SearchIcon } from "../icons";
 import {
   Button,
-  Chip,
   EmptyState,
   ErrorState,
+  MarketplaceBadge,
   MiniButton,
-  Pill,
   SkeletonRows,
-  StockBar,
   Stepper,
 } from "../components/ui";
-import { ConfirmDialog, Modal } from "../components/Modal";
-import { Mascot } from "../components/Mascot";
-import { PowiazaniaOfertView, RecipeModal, type OfferTarget } from "./PowiazaniaOfertView";
-import { KatalogAllegroView } from "./KatalogAllegroView";
+import { Modal } from "../components/Modal";
 import { useToast } from "../lib/toast";
-import { formatDateTime, formatPlural, formatStock } from "../lib/format";
-import type { CatalogOffer, StockItem } from "../types/api";
+import { formatCurrency, formatDateTime, formatPlural } from "../lib/format";
+import type { MarketplaceOffer, OfferRef } from "../types/api";
 
-type StockFilter = "all" | "low" | "zero";
-type MagazynTab = "items" | "links" | "catalog";
-
-const STOCK_FILTER_LABEL: Record<StockFilter, string> = {
-  all: "Wszystkie",
-  low: "Poniżej progu",
-  zero: "Zerowy stan",
-};
-
-interface MagazynScreenProps {
-  focusSku: string | null;
-  onFocusHandled: () => void;
+/** Oferta nie ma jednego identyfikatora - kanal i numer dopiero razem. */
+export function offerKey(offer: { marketplace: string; external_id: string }): string {
+  return `${offer.marketplace}:${offer.external_id}`;
 }
 
-function statusPill(item: StockItem) {
-  if (item.status === "critical") return <Pill tone="pack">Brak</Pill>;
-  if (item.status === "warning") return <Pill tone="warn">Niski stan</Pill>;
-  return <Pill tone="done">W normie</Pill>;
+function toRef(offer: MarketplaceOffer): OfferRef {
+  return { marketplace: offer.marketplace, externalId: offer.external_id };
+}
+
+interface MagazynScreenProps {
+  /** Klucz oferty z palety polecen - wiersz podswietla sie i przewija. */
+  focusOffer: string | null;
+  onFocusHandled: () => void;
 }
 
 function Field({
@@ -83,95 +63,18 @@ function Field({
   );
 }
 
-function NewProductModal({ open, onClose }: { open: boolean; onClose: () => void }) {
-  const queryClient = useQueryClient();
-  const toast = useToast();
-  const [sku, setSku] = React.useState("");
-  const [name, setName] = React.useState("");
-  const [minStock, setMinStock] = React.useState("0");
-
-  const mutation = useMutation({
-    mutationFn: async () => {
-      const result = await window.ordly.stock.create({
-        sku: sku.trim(),
-        name: name.trim(),
-        min_stock: Number(minStock) || 0,
-      });
-      if (!result.ok) throw new Error(result.message);
-      return result.data;
-    },
-    onSuccess: (item) => {
-      void queryClient.invalidateQueries({ queryKey: ["stock"] });
-      void queryClient.invalidateQueries({ queryKey: ["dashboard"] });
-      toast.success("Dodano produkt", `${item.sku} · stan początkowy 0`);
-      setSku("");
-      setName("");
-      setMinStock("0");
-      onClose();
-    },
-    onError: (error) => {
-      toast.error(
-        "Nie udało się dodać produktu",
-        error instanceof Error ? error.message : "Sprawdź, czy SKU nie jest już zajęte."
-      );
-    },
-  });
-
-  const canSubmit = sku.trim().length > 0 && name.trim().length > 0;
-
-  return (
-    <Modal
-      open={open}
-      onClose={onClose}
-      title="Nowy produkt"
-      subtitle="Stan początkowy 0 - uzupełnisz go korektą"
-      width={460}
-      footer={
-        <>
-          <Button variant="ghost" onClick={onClose} disabled={mutation.isPending}>
-            Anuluj
-          </Button>
-          <Button onClick={() => mutation.mutate()} disabled={!canSubmit || mutation.isPending}>
-            {mutation.isPending ? "Dodaję…" : "Dodaj produkt"}
-          </Button>
-        </>
-      }
-    >
-      <div className="flex flex-col gap-3.5">
-        <Field label="SKU" hint="Unikalny identyfikator, np. PET30">
-          <input
-            value={sku}
-            onChange={(event) => setSku(event.target.value.toUpperCase())}
-            className="o-mono w-full rounded-sm border border-line bg-ink-raised px-3 py-2.5 text-[12.5px] text-white outline-none focus:border-teal-bright"
-          />
-        </Field>
-        <Field label="Nazwa" hint="Tak, jak nazywasz produkt na co dzień">
-          <input
-            value={name}
-            onChange={(event) => setName(event.target.value)}
-            className="w-full rounded-sm border border-line bg-ink-raised px-3 py-2.5 text-[12.5px] text-white outline-none focus:border-teal-bright"
-          />
-        </Field>
-        <Field label="Próg niskiego stanu" hint="Poniżej tej liczby Ordi zacznie ostrzegać">
-          <input
-            type="number"
-            min={0}
-            value={minStock}
-            onChange={(event) => setMinStock(event.target.value)}
-            className="o-mono w-full rounded-sm border border-line bg-ink-raised px-3 py-2.5 text-[12.5px] text-white outline-none focus:border-teal-bright"
-          />
-        </Field>
-      </div>
-    </Modal>
-  );
-}
-
-function HistoryModal({ sku, onClose }: { sku: string | null; onClose: () => void }) {
+function HistoryModal({
+  offer,
+  onClose,
+}: {
+  offer: MarketplaceOffer | null;
+  onClose: () => void;
+}) {
   const historyQuery = useQuery({
-    queryKey: ["stock-history", sku],
-    enabled: sku !== null,
+    queryKey: ["offer-history", offer ? offerKey(offer) : null],
+    enabled: offer !== null,
     queryFn: async () => {
-      const result = await window.ordly.stock.history(sku as string);
+      const result = await window.ordly.stock.history(toRef(offer as MarketplaceOffer));
       if (!result.ok) throw new Error(result.message);
       return result.data;
     },
@@ -179,16 +82,16 @@ function HistoryModal({ sku, onClose }: { sku: string | null; onClose: () => voi
 
   return (
     <Modal
-      open={sku !== null}
+      open={offer !== null}
       onClose={onClose}
-      title="Historia zmian"
-      subtitle={sku ?? ""}
+      title="Historia stanu"
+      subtitle={offer?.name ?? ""}
       width={520}
     >
       {historyQuery.isLoading && <span className="o-skeleton-bar h-24 w-full" />}
       {historyQuery.data?.length === 0 && (
         <p className="text-[12.5px] text-slate-dim">
-          Brak zapisanych ruchów dla tego produktu.
+          Stan tej oferty nie był jeszcze wpisywany.
         </p>
       )}
       <div className="flex flex-col">
@@ -200,12 +103,24 @@ function HistoryModal({ sku, onClose }: { sku: string | null; onClose: () => voi
             <span className="o-mono w-[100px] shrink-0 text-[10.5px] text-slate-dim">
               {formatDateTime(movement.occurred_at)}
             </span>
+            {/* Pierwszy wpis nie ma "o ile" - nie bylo od czego liczyc. */}
             <span
               className={`o-mono w-12 shrink-0 text-right ${
-                movement.change < 0 ? "text-coral" : "text-teal-bright"
+                movement.change === null
+                  ? "text-slate-dim"
+                  : movement.change < 0
+                    ? "text-coral"
+                    : "text-teal-bright"
               }`}
             >
-              {movement.change > 0 ? `+${movement.change}` : movement.change}
+              {movement.change === null
+                ? "—"
+                : movement.change > 0
+                  ? `+${movement.change}`
+                  : movement.change}
+            </span>
+            <span className="o-mono w-14 shrink-0 text-right text-white">
+              {movement.quantity_after} szt.
             </span>
             <span className="min-w-0 flex-1 truncate text-slate">{movement.reason}</span>
           </div>
@@ -215,143 +130,93 @@ function HistoryModal({ sku, onClose }: { sku: string | null; onClose: () => voi
   );
 }
 
-type AdjustMode = "set" | "add" | "remove";
-
-const ADJUST_MODE_LABEL: Record<AdjustMode, string> = {
-  set: "Ustaw stan",
-  add: "Dostawa (+)",
-  remove: "Zdejmij (−)",
-};
-
-/** Domyslny powod wpisywany do historii, gdy uzytkownik nie poda swojego. */
-const ADJUST_MODE_REASON: Record<AdjustMode, string> = {
-  set: "Inwentaryzacja",
-  add: "Dostawa",
-  remove: "Korekta magazynowa",
-};
-
-const ADJUST_MODE_HINT: Record<AdjustMode, string> = {
-  set: "Stan po korekcie - tyle sztuk faktycznie leży na półce",
-  add: "Ile sztuk dochodzi do obecnego stanu",
-  remove: "Ile sztuk schodzi z obecnego stanu",
-};
+/** Powod wpisywany do historii, gdy uzytkownik nie poda swojego. */
+const DEFAULT_REASON = "Inwentaryzacja";
 
 /**
- * Reczna korekta stanu - wpisanie liczby zamiast klikania w "+".
+ * Reczny wpis stanu.
  *
- * Trzy tryby, bo backend ma trzy operacje (`set`, `add`, `remove`),
- * a kazda znaczy w historii co innego: inwentaryzacja ustala stan na
- * sztywno, dostawa go podnosi, zdjecie obniza. Samo "ustaw" wystarcza
- * technicznie, ale przy dostawie 500 butelek kazalo by liczyc w glowie
- * (120 + 500) i zostawialo w historii wpis, z ktorego nie wynika, ze to
- * byla dostawa.
- *
- * Podglad "120 -> 620 szt." jest czescia funkcji, nie ozdoba: tryb
- * "ustaw" nadpisuje prawdziwy stan bez pytania, wiec skutek musi byc
- * widoczny PRZED zapisem.
+ * Podglad "12 -> 40 szt." jest czescia funkcji, nie ozdoba: wpis
+ * nadpisuje poprzedni stan bez pytania, wiec skutek musi byc widoczny
+ * PRZED zapisem.
  */
-function StockAdjustModal({
-  item,
+function QuantityModal({
+  offer,
   onClose,
 }: {
-  item: StockItem | null;
+  offer: MarketplaceOffer | null;
   onClose: () => void;
 }) {
   const queryClient = useQueryClient();
   const toast = useToast();
-  const [mode, setMode] = React.useState<AdjustMode>("set");
   const [quantity, setQuantity] = React.useState("");
   const [reason, setReason] = React.useState("");
-
-  // Zaleznosc po SKU, nie po calym obiekcie: lista magazynowa odswieza
-  // sie w tle i podmienia referencje `item`, co przy `[item]` czyscilo by
-  // pole w trakcie wpisywania liczby.
-  const sku = item?.sku ?? null;
-  const stock = item?.stock ?? 0;
   const inputRef = React.useRef<HTMLInputElement>(null);
 
+  // Zaleznosc po kluczu, nie po calym obiekcie: lista odswieza sie w tle
+  // i podmienia referencje `offer`, co przy `[offer]` czyscilo by pole
+  // w trakcie wpisywania liczby.
+  const key = offer ? offerKey(offer) : null;
+  const current = offer?.quantity_on_hand ?? null;
+
   React.useEffect(() => {
-    if (sku === null) return;
-    setMode("set");
-    setQuantity(String(stock));
+    if (key === null) return;
+    setQuantity(current === null ? "" : String(current));
     setReason("");
-    // Fokus jawnie na pole liczby, a nie przez `autoFocus`: `Modal` po
-    // otwarciu ustawia fokus na PIERWSZYM elemencie dialogu, czyli na
-    // przelaczniku trybu. Efekt rodzica wykonuje sie po efekcie dziecka,
-    // wiec to ustawienie jest tym ostatnim - i liczbe da sie wpisac od
-    // razu, bez klikania w pole.
+    // Fokus jawnie na pole liczby: `Modal` po otwarciu ustawia fokus na
+    // pierwszym elemencie dialogu. Efekt rodzica idzie po efekcie
+    // dziecka, wiec to ustawienie jest tym ostatnim.
     inputRef.current?.focus();
     inputRef.current?.select();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [sku]);
+  }, [key]);
 
   const parsed = Number.parseInt(quantity, 10);
   const amount = Number.isNaN(parsed) ? null : parsed;
-  const nextStock =
-    amount === null
-      ? null
-      : mode === "set"
-        ? amount
-        : mode === "add"
-          ? stock + amount
-          : stock - amount;
 
   let problem: string | null = null;
   if (amount !== null && amount < 0) {
-    problem = "Ilość nie może być ujemna.";
-  } else if (nextStock !== null && nextStock < 0) {
-    problem = `Nie można zdjąć więcej, niż jest na stanie (${stock} szt.).`;
-  } else if (nextStock !== null && nextStock === stock) {
+    problem = "Stan nie może być ujemny.";
+  } else if (amount !== null && amount === current) {
     problem = "Ta wartość niczego nie zmienia.";
   }
 
-  const canSubmit = item !== null && amount !== null && problem === null;
+  const canSubmit = offer !== null && amount !== null && problem === null;
 
   const mutation = useMutation({
     mutationFn: async () => {
-      const result = await window.ordly.stock.adjust(item!.sku, {
-        op: mode,
-        quantity: amount!,
-        reason: reason.trim() || ADJUST_MODE_REASON[mode],
+      const result = await window.ordly.stock.setQuantity(toRef(offer as MarketplaceOffer), {
+        quantity: amount as number,
+        reason: reason.trim() || DEFAULT_REASON,
       });
       if (!result.ok) throw new Error(result.message);
-      return { updated: result.data, previous: stock };
+      return result.data;
     },
-    onSuccess: ({ updated, previous }) => {
-      void queryClient.invalidateQueries({ queryKey: ["stock"] });
-      void queryClient.invalidateQueries({ queryKey: ["stock-history"] });
-      void queryClient.invalidateQueries({ queryKey: ["dashboard"] });
+    onSuccess: (updated) => {
+      void queryClient.invalidateQueries({ queryKey: ["offers"] });
+      void queryClient.invalidateQueries({ queryKey: ["offer-history"] });
       toast.success(
-        "Stan zaktualizowany",
-        `${updated.sku} · ${previous} → ${updated.stock} szt.`
+        "Stan zapisany",
+        `${updated.name} · ${current === null ? "—" : `${current} szt.`} → ${
+          updated.quantity_on_hand ?? 0
+        } szt.`
       );
       onClose();
     },
     onError: (error) => {
       toast.error(
-        "Korekta nie przeszła",
+        "Nie udało się zapisać stanu",
         error instanceof Error ? error.message : "Odśwież listę i spróbuj ponownie."
       );
     },
   });
 
-  function changeMode(next: AdjustMode) {
-    setMode(next);
-    // "Ustaw" startuje od biezacego stanu (zwykle poprawia sie jedna
-    // cyfre), dostawa i zdjecie od pustego pola - tam wpisuje sie
-    // roznice, a podpowiedziana liczba bylaby zaproszeniem do pomylki.
-    setQuantity(next === "set" ? String(stock) : "");
-    // Po wyborze trybu i tak nastepnym krokiem jest wpisanie liczby.
-    inputRef.current?.focus();
-    inputRef.current?.select();
-  }
-
   return (
     <Modal
-      open={item !== null}
+      open={offer !== null}
       onClose={onClose}
-      title="Korekta stanu"
-      subtitle={item ? `${item.name} · ${item.sku}` : ""}
+      title="Stan na półce"
+      subtitle={offer?.name ?? ""}
       width={460}
       footer={
         <>
@@ -368,22 +233,7 @@ function StockAdjustModal({
       }
     >
       <div className="flex flex-col gap-3.5">
-        <div className="flex flex-wrap items-center gap-2">
-          {(["set", "add", "remove"] as const).map((option) => (
-            <Chip
-              key={option}
-              active={mode === option}
-              onClick={() => changeMode(option)}
-            >
-              {ADJUST_MODE_LABEL[option]}
-            </Chip>
-          ))}
-        </div>
-
-        <Field
-          label={mode === "set" ? "Nowy stan" : "Liczba sztuk"}
-          hint={ADJUST_MODE_HINT[mode]}
-        >
+        <Field label="Liczba sztuk" hint="Tyle sztuk faktycznie leży na półce">
           <input
             ref={inputRef}
             type="number"
@@ -401,11 +251,11 @@ function StockAdjustModal({
           />
         </Field>
 
-        <Field label="Powód" hint={`Trafia do historii. Puste = „${ADJUST_MODE_REASON[mode]}"`}>
+        <Field label="Powód" hint={`Trafia do historii. Puste = „${DEFAULT_REASON}”`}>
           <input
             value={reason}
             onChange={(event) => setReason(event.target.value)}
-            placeholder={ADJUST_MODE_REASON[mode]}
+            placeholder={DEFAULT_REASON}
             className="w-full rounded-sm border border-line bg-ink-raised px-3 py-2.5 text-[12.5px] text-white outline-none placeholder:text-slate-dim focus:border-teal-bright"
           />
         </Field>
@@ -413,16 +263,13 @@ function StockAdjustModal({
         <div className="rounded-sm border border-line bg-ink-raised px-3 py-2.5">
           {problem ? (
             <p className="text-[12px] text-coral">{problem}</p>
-          ) : nextStock === null ? (
+          ) : amount === null ? (
             <p className="text-[12px] text-slate-dim">Wpisz liczbę, żeby zobaczyć wynik.</p>
           ) : (
             <p className="o-mono text-[12.5px] text-slate">
-              {stock} szt. <span className="text-slate-dim">→</span>{" "}
-              <span className="text-teal-bright">{nextStock} szt.</span>
-              <span className="ml-2 text-[11px] text-slate-dim">
-                ({nextStock > stock ? "+" : ""}
-                {nextStock - stock})
-              </span>
+              {current === null ? "nie liczono" : `${current} szt.`}{" "}
+              <span className="text-slate-dim">→</span>{" "}
+              <span className="text-teal-bright">{amount} szt.</span>
             </p>
           )}
         </div>
@@ -431,716 +278,248 @@ function StockAdjustModal({
   );
 }
 
-/**
- * Potwierdzenie usuniecia pozycji magazynowej.
- *
- * Komunikat wylicza SKUTKI zamiast pytac "czy na pewno": stan, ktory
- * zniknie z ewidencji, podprodukty, ktore przestana schodzic razem
- * z produktem, i receptury ofert, z ktorych produkt wypadnie. To
- * jedyna operacja magazynowa bez sladu w historii - wpisy ruchow wisza
- * na SKU i znikaja razem z nim, wiec po fakcie nie ma juz gdzie tego
- * przeczytac.
- *
- * Liczba receptur idzie z tego samego zapytania, ktore karmi zakladke
- * "Powiazania ofert" (klucz `offer-recipes`), wiec zwykle siedzi juz
- * w cache. Kiedy jeszcze leci albo sie nie powiodlo, dialog mowi to
- * wprost - milczenie czytaloby sie jako "zadna receptura", a to
- * najgorszy moment na zgadywanie.
- */
-function DeleteProductDialog({
-  item,
-  subItems,
-  onClose,
-}: {
-  item: StockItem | null;
-  subItems: StockItem[];
-  onClose: () => void;
-}) {
+export function MagazynScreen({ focusOffer, onFocusHandled }: MagazynScreenProps) {
   const queryClient = useQueryClient();
   const toast = useToast();
-
-  const recipesQuery = useQuery({
-    queryKey: ["offer-recipes"],
-    enabled: item !== null,
-    queryFn: async () => {
-      const result = await window.ordly.stock.recipes();
-      if (!result.ok) throw new Error(result.message);
-      return result.data;
-    },
-  });
-
-  const recipeCount = React.useMemo(() => {
-    if (!item) return 0;
-    return (recipesQuery.data ?? []).filter((recipe) =>
-      recipe.components.some((component) => component.sku === item.sku)
-    ).length;
-  }, [item, recipesQuery.data]);
-
-  const mutation = useMutation({
-    mutationFn: async (sku: string) => {
-      const result = await window.ordly.stock.remove(sku);
-      if (!result.ok) throw new Error(result.message);
-      return result.data;
-    },
-    onSuccess: (deletion) => {
-      void queryClient.invalidateQueries({ queryKey: ["stock"] });
-      void queryClient.invalidateQueries({ queryKey: ["offer-recipes"] });
-      void queryClient.invalidateQueries({ queryKey: ["unmapped-offers"] });
-      void queryClient.invalidateQueries({ queryKey: ["dashboard"] });
-      const skutki = [`${deletion.sku} zniknął z magazynu`];
-      if (deletion.detached_sub_items.length > 0) {
-        skutki.push(
-          `odłączono ${formatPlural(deletion.detached_sub_items.length, [
-            "podprodukt",
-            "podprodukty",
-            "podproduktów",
-          ])}`
-        );
-      }
-      if (deletion.removed_offer_links > 0) {
-        skutki.push(
-          `wypadł z ${formatPlural(deletion.removed_offer_links, [
-            "receptury",
-            "receptur",
-            "receptur",
-          ])}`
-        );
-      }
-      toast.success("Usunięto produkt", skutki.join(" · "));
-      onClose();
-    },
-    onError: (error) => {
-      toast.error(
-        "Nie udało się usunąć produktu",
-        error instanceof Error ? error.message : "Odśwież listę i spróbuj ponownie."
-      );
-    },
-  });
-
-  const zdania: string[] = [];
-  if (item) {
-    zdania.push(
-      `„${item.name}" (${item.sku}) zniknie z magazynu razem z całą historią ruchów. Tego nie da się cofnąć.`
-    );
-    if (item.stock > 0) {
-      zdania.push(`Stan ${item.stock} szt. przestanie być liczony.`);
-    }
-    if (subItems.length > 0) {
-      const lista = subItems.map((sub) => sub.sku).join(", ");
-      zdania.push(
-        subItems.length === 1
-          ? `Podprodukt ${lista} zostanie w magazynie, ale przestanie schodzić razem z tym produktem.`
-          : `Podprodukty (${lista}) zostaną w magazynie, ale przestaną schodzić razem z tym produktem.`
-      );
-    }
-    if (item.parent_sku) {
-      zdania.push(`Produkt główny ${item.parent_sku} zostaje bez zmian.`);
-    }
-    if (recipesQuery.isLoading) {
-      zdania.push("Sprawdzam jeszcze, w ilu recepturach ofert ten produkt występuje…");
-    } else if (recipesQuery.isError) {
-      zdania.push(
-        "Nie udało się sprawdzić receptur ofert - jeśli produkt w którejś jest, wypadnie z niej razem z usunięciem."
-      );
-    } else if (recipeCount > 0) {
-      zdania.push(
-        `Produkt wypadnie z ${formatPlural(recipeCount, [
-          "receptury",
-          "receptur",
-          "receptur",
-        ])} ofert - ich sprzedaż przestanie ruszać magazyn.`
-      );
-    }
-  }
-
-  return (
-    <ConfirmDialog
-      open={item !== null}
-      title="Usunąć produkt z magazynu?"
-      message={zdania.join(" ")}
-      confirmLabel="Usuń produkt"
-      pending={mutation.isPending}
-      onConfirm={() => item && mutation.mutate(item.sku)}
-      onClose={onClose}
-    />
-  );
-}
-
-/**
- * Zarzadzanie podproduktami jednego produktu glownego.
- *
- * Dlaczego modal od strony PRODUKTU GLOWNEGO, a nie pole "produkt
- * glowny" w edycji podproduktu: gdy produkt zostanie podproduktem,
- * znika z glownej listy - nie byloby wiersza, z ktorego mozna by go
- * odwiazac. Stad oba kierunki (dodaj / odlacz) siedza tutaj, w jednym
- * miejscu, przy produkcie, ktory na liscie zostaje.
- *
- * Lista kandydatow jest filtrowana po tych samych regulach, ktore
- * egzekwuje backend (jeden poziom zagniezdzenia) - front tylko chowa
- * niedozwolone opcje, decyduje serwer.
- */
-function SubItemsModal({
-  parent,
-  items,
-  onClose,
-}: {
-  parent: StockItem | null;
-  items: StockItem[];
-  onClose: () => void;
-}) {
-  const queryClient = useQueryClient();
-  const toast = useToast();
-  const [pickedSku, setPickedSku] = React.useState("");
-
-  React.useEffect(() => {
-    setPickedSku("");
-  }, [parent?.sku]);
-
-  const subItems = React.useMemo(
-    () => (parent ? items.filter((item) => item.parent_sku === parent.sku) : []),
-    [items, parent]
-  );
-
-  const candidates = React.useMemo(() => {
-    if (!parent) return [];
-    const parents = new Set(
-      items.map((item) => item.parent_sku).filter((sku): sku is string => sku !== null)
-    );
-    return items.filter(
-      (item) =>
-        item.sku !== parent.sku && !item.parent_sku && !parents.has(item.sku)
-    );
-  }, [items, parent]);
-
-  const mutation = useMutation({
-    mutationFn: async ({ sku, parentSku }: { sku: string; parentSku: string | null }) => {
-      const result = await window.ordly.stock.setParent(sku, parentSku);
-      if (!result.ok) throw new Error(result.message);
-      return result.data;
-    },
-    onSuccess: (item) => {
-      void queryClient.invalidateQueries({ queryKey: ["stock"] });
-      setPickedSku("");
-      toast.success(
-        item.parent_sku ? "Dodano podprodukt" : "Odłączono podprodukt",
-        item.parent_sku
-          ? `${item.sku} będzie schodzić razem z ${item.parent_sku}`
-          : `${item.sku} jest znowu samodzielnym produktem`
-      );
-    },
-    onError: (error) => {
-      toast.error(
-        "Nie udało się zmienić powiązania",
-        error instanceof Error ? error.message : "Spróbuj ponownie."
-      );
-    },
-  });
-
-  return (
-    <Modal
-      open={parent !== null}
-      onClose={onClose}
-      title="Podprodukty"
-      subtitle={parent ? `${parent.name} · ${parent.sku}` : ""}
-      width={520}
-      footer={
-        <Button variant="ghost" onClick={onClose}>
-          Zamknij
-        </Button>
-      }
-    >
-      <div className="flex flex-col gap-4">
-        <p className="text-[12px] leading-relaxed text-slate-dim">
-          Podprodukty schodzą ze stanu razem z tym produktem, sztuka za sztukę, przy
-          każdej sprzedaży - niezależnie od oferty i serwisu. Ręczne korekty stanu
-          (dostawa, inwentaryzacja) ich nie ruszają.
-        </p>
-
-        <div className="flex flex-col">
-          {subItems.length === 0 && (
-            <p className="text-[12.5px] text-slate-dim">
-              Ten produkt nie ma jeszcze podproduktów.
-            </p>
-          )}
-          {subItems.map((item) => (
-            <div
-              key={item.sku}
-              className="flex items-center gap-3 border-b border-line py-2.5 text-[12.5px] last:border-b-0"
-            >
-              <span className="min-w-0 flex-1 truncate text-white">{item.name}</span>
-              <span className="o-mono shrink-0 text-[11px] text-slate-dim">{item.sku}</span>
-              <span className="o-mono w-16 shrink-0 text-right text-slate">
-                {item.stock} szt.
-              </span>
-              <MiniButton
-                onClick={() => mutation.mutate({ sku: item.sku, parentSku: null })}
-                disabled={mutation.isPending}
-              >
-                Odłącz
-              </MiniButton>
-            </div>
-          ))}
-        </div>
-
-        <div className="flex items-end gap-2 border-t border-line pt-4">
-          <Field
-            label="Dodaj podprodukt"
-            hint="Widać tylko produkty samodzielne - zagnieżdżenie jest jednopoziomowe"
-          >
-            <select
-              value={pickedSku}
-              onChange={(event) => setPickedSku(event.target.value)}
-              className="w-full rounded-sm border border-line bg-ink-raised px-3 py-2.5 text-[12.5px] text-white outline-none focus:border-teal-bright"
-            >
-              <option value="">Wybierz produkt…</option>
-              {candidates.map((item) => (
-                <option key={item.sku} value={item.sku}>
-                  {item.name} ({item.sku})
-                </option>
-              ))}
-            </select>
-          </Field>
-          <div className="pb-[22px]">
-            <Button
-              onClick={() =>
-                mutation.mutate({ sku: pickedSku, parentSku: parent?.sku ?? null })
-              }
-              disabled={pickedSku === "" || mutation.isPending}
-            >
-              Dodaj
-            </Button>
-          </div>
-        </div>
-      </div>
-    </Modal>
-  );
-}
-
-/**
- * Przelacznik "Produkty / Powiazania ofert". Licznik przy powiazaniach
- * jest istotny: oferta bez receptury sprzedaje sie, nie ruszajac stanow,
- * a to widac dopiero po tym, ze magazyn stoi w miejscu.
- */
-function TabBar({
-  tab,
-  onChange,
-  unmappedCount,
-}: {
-  tab: MagazynTab;
-  onChange: (tab: MagazynTab) => void;
-  unmappedCount: number;
-}) {
-  return (
-    <div className="flex items-center gap-2 border-b border-line px-[22px] py-[9px]">
-      <Chip active={tab === "items"} onClick={() => onChange("items")}>
-        Produkty
-      </Chip>
-      <Chip active={tab === "links"} onClick={() => onChange("links")}>
-        Powiązania ofert
-        {unmappedCount > 0 && (
-          <span className="o-mono ml-1.5 rounded-[5px] bg-[rgba(255,133,99,.16)] px-1.5 py-[1px] text-[10px] text-coral">
-            {unmappedCount}
-          </span>
-        )}
-      </Chip>
-      <Chip active={tab === "catalog"} onClick={() => onChange("catalog")}>
-        Asortyment Allegro
-      </Chip>
-    </div>
-  );
-}
-
-export function MagazynScreen({ focusSku, onFocusHandled }: MagazynScreenProps) {
-  const queryClient = useQueryClient();
-  const toast = useToast();
-  const [tab, setTab] = React.useState<MagazynTab>("items");
-  const [catalogEditing, setCatalogEditing] = React.useState<OfferTarget | null>(null);
-  const [filter, setFilter] = React.useState<StockFilter>("all");
-  const [newOpen, setNewOpen] = React.useState(false);
-  const [historySku, setHistorySku] = React.useState<string | null>(null);
-  const [subItemsSku, setSubItemsSku] = React.useState<string | null>(null);
-  const [deleteSku, setDeleteSku] = React.useState<string | null>(null);
-  const [adjustSku, setAdjustSku] = React.useState<string | null>(null);
-  const [expanded, setExpanded] = React.useState<Set<string>>(new Set());
-  const [highlightSku, setHighlightSku] = React.useState<string | null>(null);
-  const rowRefs = React.useRef<Record<string, HTMLTableRowElement | null>>({});
+  const [search, setSearch] = React.useState("");
+  const [historyKey, setHistoryKey] = React.useState<string | null>(null);
+  const [quantityKey, setQuantityKey] = React.useState<string | null>(null);
+  const [highlight, setHighlight] = React.useState<string | null>(null);
+  const rowRefs = React.useRef<Record<string, HTMLDivElement | null>>({});
 
   const { data, isLoading, isError, error, refetch } = useQuery({
-    queryKey: ["stock"],
+    queryKey: ["offers"],
     queryFn: async () => {
-      const result = await window.ordly.stock.list();
+      const result = await window.ordly.stock.offers();
       if (!result.ok) throw new Error(result.message);
       return result.data;
     },
   });
 
-  // Licznik na zakladce - jedyny sygnal, ze sprzedaz omija magazyn.
-  const unmappedQuery = useQuery({
-    queryKey: ["unmapped-offers"],
-    queryFn: async () => {
-      const result = await window.ordly.stock.unmappedOffers();
+  const offers = React.useMemo(() => data ?? [], [data]);
+
+  const syncMutation = useMutation({
+    mutationFn: async () => {
+      const result = await window.ordly.stock.sync();
       if (!result.ok) throw new Error(result.message);
       return result.data;
     },
+    onSuccess: (summary) => {
+      void queryClient.invalidateQueries({ queryKey: ["offers"] });
+      // Same liczby, nie "gotowe": po synchronizacji czlowiek chce
+      // wiedziec, czy to, co przed chwila wystawil, faktycznie doszlo.
+      const parts = [formatPlural(summary.fetched, ["oferta", "oferty", "ofert"])];
+      if (summary.added > 0) parts.push(`+${summary.added} nowych`);
+      if (summary.removed > 0) parts.push(`−${summary.removed} zniknęło`);
+      toast.success("Katalog pobrany", parts.join(" · "));
+    },
+    onError: (mutationError) => {
+      toast.error(
+        "Nie udało się pobrać katalogu",
+        mutationError instanceof Error
+          ? mutationError.message
+          : "Sprawdź połączenie z Allegro w Ustawieniach."
+      );
+    },
   });
-  const unmappedCount = unmappedQuery.data?.length ?? 0;
 
-  const adjustMutation = useMutation({
-    mutationFn: async ({ sku, delta }: { sku: string; delta: number }) => {
-      const result = await window.ordly.stock.adjust(sku, {
-        op: delta > 0 ? "add" : "remove",
-        quantity: Math.abs(delta),
-        reason: "Korekta z aplikacji desktopowej",
+  /** Klikniecie w "+"/"−" przy stepperze - zapis bez otwierania modala. */
+  const stepMutation = useMutation({
+    mutationFn: async ({ offer, next }: { offer: MarketplaceOffer; next: number }) => {
+      const result = await window.ordly.stock.setQuantity(toRef(offer), {
+        quantity: next,
+        reason: "Korekta ręczna",
       });
       if (!result.ok) throw new Error(result.message);
       return result.data;
     },
     onSuccess: () => {
-      void queryClient.invalidateQueries({ queryKey: ["stock"] });
-      void queryClient.invalidateQueries({ queryKey: ["dashboard"] });
+      void queryClient.invalidateQueries({ queryKey: ["offers"] });
+      void queryClient.invalidateQueries({ queryKey: ["offer-history"] });
     },
-    onError: (error) => {
+    onError: (mutationError) => {
       toast.error(
-        "Korekta nie przeszła",
-        error instanceof Error ? error.message : "Odśwież listę i spróbuj ponownie."
+        "Nie udało się zapisać stanu",
+        mutationError instanceof Error
+          ? mutationError.message
+          : "Odśwież listę i spróbuj ponownie."
       );
     },
   });
 
-  // Wejscie z palety polecen - przewin do produktu i podswietl go.
   React.useEffect(() => {
-    if (!focusSku) return;
-    setFilter("all");
-    setHighlightSku(focusSku);
-    onFocusHandled();
+    if (!focusOffer) return;
+    setHighlight(focusOffer);
     const scrollTimer = window.setTimeout(() => {
-      rowRefs.current[focusSku]?.scrollIntoView({ block: "center" });
+      rowRefs.current[focusOffer]?.scrollIntoView({ block: "center" });
     }, 60);
-    const clearTimer = window.setTimeout(() => setHighlightSku(null), 2400);
+    const clearTimer = window.setTimeout(() => setHighlight(null), 2200);
+    onFocusHandled();
     return () => {
       window.clearTimeout(scrollTimer);
       window.clearTimeout(clearTimer);
     };
-  }, [focusSku, onFocusHandled]);
+  }, [focusOffer, onFocusHandled]);
 
-  const items = React.useMemo(() => data ?? [], [data]);
-
-  /** Podprodukty pogrupowane po SKU produktu glownego. */
-  const subItemsByParent = React.useMemo(() => {
-    const grouped = new Map<string, StockItem[]>();
-    for (const item of items) {
-      if (!item.parent_sku) continue;
-      const bucket = grouped.get(item.parent_sku);
-      if (bucket) bucket.push(item);
-      else grouped.set(item.parent_sku, [item]);
-    }
-    return grouped;
-  }, [items]);
-
-  // "Wszystkie" pokazuje hierarchie (same produkty glowne i samodzielne).
-  // Filtry problemow pokazuja wszystko, co pasuje - lacznie z
-  // podproduktami, bo po to sie ich uzywa.
-  const visible =
-    filter === "all"
-      ? items.filter((item) => !item.parent_sku)
-      : items.filter((item) =>
-          filter === "low" ? item.is_low_stock : item.stock === 0
-        );
-
-  const subItemsParent =
-    subItemsSku === null ? null : (items.find((i) => i.sku === subItemsSku) ?? null);
-
-  const deleteTarget =
-    deleteSku === null ? null : (items.find((i) => i.sku === deleteSku) ?? null);
-
-  const adjustTarget =
-    adjustSku === null ? null : (items.find((i) => i.sku === adjustSku) ?? null);
-
-  function toggleExpanded(sku: string) {
-    setExpanded((previous) => {
-      const next = new Set(previous);
-      if (next.has(sku)) next.delete(sku);
-      else next.add(sku);
-      return next;
-    });
-  }
-
-  if (tab === "links") {
-    return (
-      <div className="flex min-h-0 flex-1 flex-col">
-        <TabBar tab={tab} onChange={setTab} unmappedCount={unmappedCount} />
-        <PowiazaniaOfertView />
-      </div>
+  const visible = React.useMemo(() => {
+    const needle = search.trim().toLowerCase();
+    if (!needle) return offers;
+    return offers.filter(
+      (offer) =>
+        offer.name.toLowerCase().includes(needle) ||
+        offer.external_id.toLowerCase().includes(needle) ||
+        (offer.signature ?? "").toLowerCase().includes(needle)
     );
-  }
+  }, [offers, search]);
 
-  if (tab === "catalog") {
-    // Edytor receptury zywi sie lista produktow magazynowych, ktora ten
-    // ekran i tak juz ma - dlatego modal stoi tutaj, a nie w widoku
-    // katalogu, ktory musialby pobrac ja drugi raz.
-    return (
-      <div className="flex min-h-0 flex-1 flex-col">
-        <TabBar tab={tab} onChange={setTab} unmappedCount={unmappedCount} />
-        <KatalogAllegroView
-          onLinkOffer={(offer: CatalogOffer) =>
-            setCatalogEditing({
-              marketplace: offer.marketplace,
-              externalProductId: offer.external_id,
-              offerName: offer.name,
-              components: offer.components.map((component) => ({
-                sku: component.sku,
-                quantity: component.quantity,
-              })),
-            })
-          }
-        />
-        <RecipeModal
-          target={catalogEditing}
-          stock={items}
-          onClose={() => setCatalogEditing(null)}
-        />
-      </div>
-    );
-  }
+  const historyOffer = offers.find((offer) => offerKey(offer) === historyKey) ?? null;
+  const quantityOffer = offers.find((offer) => offerKey(offer) === quantityKey) ?? null;
+
+  // Znaczniki z API sa w ISO ze strefa "Z", wiec najswiezszy jest
+  // najwiekszy leksykograficznie - nie ma po co parsowac calej listy.
+  const lastSynced = offers.reduce<string | null>(
+    (newest, offer) =>
+      offer.synced_at !== null && (newest === null || offer.synced_at > newest)
+        ? offer.synced_at
+        : newest,
+    null
+  );
 
   if (isError) {
     return (
-      <div className="flex min-h-0 flex-1 flex-col">
-        <TabBar tab={tab} onChange={setTab} unmappedCount={unmappedCount} />
-        <ErrorState
-          title="Nie udało się pobrać magazynu"
-          detail={`Pi nie odpowiedziało na zapytanie o stan magazynowy. ${
-            error instanceof Error ? error.message : ""
-          }`}
-          onRetry={() => void refetch()}
-        />
-      </div>
+      <ErrorState
+        title="Nie udało się pobrać ofert"
+        detail={`Pi nie odpowiedziało na zapytanie o listę ofert. ${
+          error instanceof Error ? error.message : ""
+        }`}
+        onRetry={() => void refetch()}
+      />
     );
   }
 
   return (
     <div className="flex min-h-0 flex-1 flex-col">
-      <TabBar tab={tab} onChange={setTab} unmappedCount={unmappedCount} />
       <div className="flex flex-wrap items-center gap-2 border-b border-line px-[22px] py-[11px]">
-        {(["all", "low", "zero"] as const).map((option) => (
-          <Chip key={option} active={filter === option} onClick={() => setFilter(option)}>
-            {STOCK_FILTER_LABEL[option]}
-          </Chip>
-        ))}
-        <div className="ml-auto">
-          <MiniButton icon={<PlusIcon size={13} />} onClick={() => setNewOpen(true)}>
-            Nowy produkt
-          </MiniButton>
+        <div className="relative min-w-0 flex-1">
+          <SearchIcon
+            size={13}
+            className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-dim"
+          />
+          <input
+            value={search}
+            onChange={(event) => setSearch(event.target.value)}
+            placeholder="Szukaj po nazwie, numerze oferty lub sygnaturze…"
+            aria-label="Szukaj w ofertach"
+            className="w-full rounded-[7px] border border-line bg-ink-raised py-[5px] pl-7 pr-3 text-[11.5px] text-white outline-none placeholder:text-slate-dim focus:border-teal-bright"
+          />
         </div>
+
+        <span className="o-mono text-[10.5px] text-slate-dim">
+          {lastSynced ? `Pobrano ${formatDateTime(lastSynced)}` : "Katalog jeszcze niepobrany"}
+        </span>
+
+        <Button
+          icon={<RefreshIcon size={13} />}
+          onClick={() => syncMutation.mutate()}
+          disabled={syncMutation.isPending}
+        >
+          {syncMutation.isPending ? "Pobieram…" : "Synchronizuj"}
+        </Button>
       </div>
 
-      <div className="min-h-0 flex-1 overflow-y-auto">
+      <div className="min-h-0 flex-1 overflow-y-auto px-[22px] py-4">
         {isLoading && <SkeletonRows rows={6} />}
-        {!isLoading && visible.length === 0 && (
+
+        {!isLoading && offers.length === 0 && (
           <EmptyState
-            pose={filter === "all" ? "idle" : "happy"}
-            title={filter === "all" ? "Magazyn jest pusty" : "Nic w tym filtrze"}
-            description={
-              filter === "all"
-                ? "Dodaj pierwszy produkt, żeby Ordi mógł pilnować jego stanu."
-                : "Żaden produkt nie spełnia tego warunku - to dobra wiadomość."
-            }
+            pose="idle"
+            title="Nie ma jeszcze żadnych ofert"
+            description="Kliknij „Synchronizuj”, żeby pobrać to, co masz wystawione na marketplace'ach."
           />
         )}
+
+        {!isLoading && offers.length > 0 && visible.length === 0 && (
+          <EmptyState
+            pose="think"
+            title="Nic nie pasuje do wyszukiwania"
+            description="Zmień frazę albo wyczyść pole wyszukiwania."
+          />
+        )}
+
         {!isLoading && visible.length > 0 && (
-          <table className="w-full border-collapse">
-            <thead>
-              <tr>
-                {["Produkt", "SKU", "Zapas", "Korekta", "Status", "Akcje"].map(
-                  (header, index, all) => (
-                    <th
-                      key={header}
-                      className={`o-mono sticky top-0 z-[2] border-b border-line bg-panel py-[11px] text-left text-[9.5px] uppercase tracking-[.11em] text-slate-dim ${
-                        index === 0 || index === all.length - 1 ? "px-[22px]" : "px-3"
-                      }`}
-                    >
-                      {header}
-                    </th>
-                  )
-                )}
-              </tr>
-            </thead>
-            <tbody>
-              {visible.map((item) => {
-                const max = item.max_stock ?? Math.max(item.min_stock * 2, item.stock, 1);
-                const subItems = subItemsByParent.get(item.sku) ?? [];
-                const isExpanded = expanded.has(item.sku);
-                return (
-                  <React.Fragment key={item.sku}>
-                  <tr
-                    ref={(element) => {
-                      rowRefs.current[item.sku] = element;
-                    }}
-                    className={`transition-colors duration-150 ease-ordly hover:bg-panel-2 ${
-                      highlightSku === item.sku ? "bg-teal-dim" : ""
-                    }`}
-                  >
-                    <td
-                      className={`border-b border-line px-[22px] py-3 text-[13px] text-white ${
-                        item.is_low_stock ? "shadow-[inset_3px_0_0_var(--coral)]" : ""
-                      }`}
-                    >
-                      <span className="flex items-center gap-2.5">
-                        {subItems.length > 0 ? (
-                          <button
-                            type="button"
-                            onClick={() => toggleExpanded(item.sku)}
-                            aria-expanded={isExpanded}
-                            aria-label={
-                              isExpanded
-                                ? `Zwiń podprodukty ${item.name}`
-                                : `Rozwiń podprodukty ${item.name}`
-                            }
-                            className="flex h-5 w-5 shrink-0 items-center justify-center rounded-[4px] text-slate-dim transition-colors duration-150 ease-ordly hover:bg-panel-2 hover:text-white"
-                          >
-                            <ChevronIcon
-                              size={13}
-                              className={`transition-transform duration-150 ease-ordly ${
-                                isExpanded ? "rotate-90" : ""
-                              }`}
-                            />
-                          </button>
-                        ) : (
-                          <span className="w-5 shrink-0" />
-                        )}
-                        {item.is_low_stock && <Mascot pose="think" size={22} floaty={false} />}
-                        {item.name}
-                        {subItems.length > 0 && (
-                          <span className="o-mono shrink-0 rounded-[5px] bg-teal-dim px-1.5 py-[1px] text-[10px] text-teal-bright">
-                            +
-                            {formatPlural(subItems.length, [
-                              "podprodukt",
-                              "podprodukty",
-                              "podproduktów",
-                            ])}
-                          </span>
-                        )}
-                        {item.parent_sku ? (
-                          <span className="o-mono shrink-0 text-[10px] text-slate-dim">
-                            podprodukt {item.parent_sku}
-                          </span>
-                        ) : null}
-                      </span>
-                    </td>
-                    <td className="o-mono border-b border-line px-3 py-3 text-[12px] text-slate">
-                      {item.sku}
-                    </td>
-                    <td className="border-b border-line px-3 py-3">
-                      <span className="flex items-center gap-2.5">
-                        <StockBar value={item.stock} max={max} low={item.is_low_stock} />
-                        <span className="o-mono text-[12px] text-slate">
-                          {formatStock(item.stock, max)}
-                        </span>
-                      </span>
-                    </td>
-                    <td className="border-b border-line px-3 py-3">
+          <div className="flex flex-col gap-2">
+            {visible.map((offer) => {
+              const key = offerKey(offer);
+              const onHand = offer.quantity_on_hand;
+              return (
+                <div
+                  key={key}
+                  ref={(element) => {
+                    rowRefs.current[key] = element;
+                  }}
+                  className={`flex items-center gap-3 rounded-lg border border-line px-3.5 py-3 transition-colors duration-150 ease-ordly ${
+                    highlight === key ? "bg-teal-dim" : "bg-panel-2"
+                  }`}
+                >
+                  {offer.image_url ? (
+                    <img
+                      src={offer.image_url}
+                      alt=""
+                      className="h-10 w-10 shrink-0 rounded-md border border-line object-cover"
+                    />
+                  ) : (
+                    <div className="h-10 w-10 shrink-0 rounded-md border border-line bg-ink-raised" />
+                  )}
+
+                  <MarketplaceBadge marketplace={offer.marketplace} />
+
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate text-[13px] text-white">{offer.name}</p>
+                    <p className="o-mono mt-1 truncate text-[10.5px] text-slate-dim">
+                      {offer.external_id}
+                      {offer.signature ? ` · sygn. ${offer.signature}` : ""} · wystawione{" "}
+                      {offer.available_stock} szt.
+                    </p>
+                  </div>
+
+                  {/* Oferta bez ceny to na Allegro wariant z cennikiem -
+                      kreska mowi "tu nie ma jednej kwoty", a nie "0 zl". */}
+                  <span className="o-mono w-[88px] shrink-0 text-right text-[12.5px] text-white">
+                    {offer.price === null ? "—" : formatCurrency(offer.price)}
+                  </span>
+
+                  <div className="w-[118px] shrink-0 text-right">
+                    {onHand === null ? (
+                      <MiniButton onClick={() => setQuantityKey(key)}>Wpisz stan</MiniButton>
+                    ) : (
                       <Stepper
-                        value={item.stock}
-                        disabled={adjustMutation.isPending}
-                        onDecrease={() => adjustMutation.mutate({ sku: item.sku, delta: -1 })}
-                        onIncrease={() => adjustMutation.mutate({ sku: item.sku, delta: 1 })}
-                        onEdit={() => setAdjustSku(item.sku)}
+                        value={onHand}
+                        disabled={stepMutation.isPending}
+                        onDecrease={() =>
+                          stepMutation.mutate({ offer, next: Math.max(0, onHand - 1) })
+                        }
+                        onIncrease={() => stepMutation.mutate({ offer, next: onHand + 1 })}
+                        onEdit={() => setQuantityKey(key)}
                       />
-                    </td>
-                    <td className="border-b border-line px-3 py-3">{statusPill(item)}</td>
-                    <td className="border-b border-line px-[22px] py-3 text-right">
-                      <span className="flex items-center justify-end gap-1.5">
-                        {!item.parent_sku && (
-                          <MiniButton
-                            icon={<LinkIcon size={13} />}
-                            onClick={() => setSubItemsSku(item.sku)}
-                          >
-                            Podprodukty
-                          </MiniButton>
-                        )}
-                        <MiniButton
-                          icon={<ClockIcon size={13} />}
-                          onClick={() => setHistorySku(item.sku)}
-                        >
-                          Historia
-                        </MiniButton>
-                        <MiniButton
-                          icon={<TrashIcon size={13} />}
-                          aria-label={`Usuń produkt ${item.name}`}
-                          onClick={() => setDeleteSku(item.sku)}
-                          className="hover:!border-coral hover:!text-coral"
-                        >
-                          Usuń
-                        </MiniButton>
-                      </span>
-                    </td>
-                  </tr>
-                  {isExpanded &&
-                    subItems.map((sub) => (
-                      <tr key={sub.sku} className="bg-panel-2/40">
-                        <td className="border-b border-line py-2.5 pl-[52px] pr-[22px] text-[12.5px] text-slate">
-                          <span className="flex items-center gap-2.5">
-                            {sub.is_low_stock && (
-                              <Mascot pose="think" size={18} floaty={false} />
-                            )}
-                            {sub.name}
-                          </span>
-                        </td>
-                        <td className="o-mono border-b border-line px-3 py-2.5 text-[11.5px] text-slate-dim">
-                          {sub.sku}
-                        </td>
-                        <td className="o-mono border-b border-line px-3 py-2.5 text-[11.5px] text-slate">
-                          <button
-                            type="button"
-                            onClick={() => setAdjustSku(sub.sku)}
-                            title="Kliknij, żeby wpisać stan ręcznie"
-                            aria-label={`Wpisz stan ręcznie dla ${sub.name} (teraz ${sub.stock})`}
-                            className="underline decoration-line-strong decoration-dotted underline-offset-[3px] transition-colors hover:text-teal-bright hover:decoration-teal-bright"
-                          >
-                            {sub.stock} szt.
-                          </button>
-                        </td>
-                        <td
-                          className="border-b border-line px-3 py-2.5 text-[11px] text-slate-dim"
-                          colSpan={2}
-                        >
-                          Schodzi razem z „{item.name}"
-                        </td>
-                        <td className="border-b border-line px-[22px] py-2.5 text-right">
-                          <span className="flex items-center justify-end">
-                            <MiniButton
-                              icon={<TrashIcon size={13} />}
-                              aria-label={`Usuń podprodukt ${sub.name}`}
-                              onClick={() => setDeleteSku(sub.sku)}
-                              className="hover:!border-coral hover:!text-coral"
-                            >
-                              Usuń
-                            </MiniButton>
-                          </span>
-                        </td>
-                      </tr>
-                    ))}
-                  </React.Fragment>
-                );
-              })}
-            </tbody>
-          </table>
+                    )}
+                  </div>
+
+                  <MiniButton
+                    icon={<ClockIcon size={13} />}
+                    aria-label={`Historia stanu ${offer.name}`}
+                    onClick={() => setHistoryKey(key)}
+                  >
+                    Historia
+                  </MiniButton>
+                </div>
+              );
+            })}
+          </div>
         )}
       </div>
 
-      <NewProductModal open={newOpen} onClose={() => setNewOpen(false)} />
-      <HistoryModal sku={historySku} onClose={() => setHistorySku(null)} />
-      <SubItemsModal
-        parent={subItemsParent}
-        items={items}
-        onClose={() => setSubItemsSku(null)}
-      />
-      <StockAdjustModal item={adjustTarget} onClose={() => setAdjustSku(null)} />
-      <DeleteProductDialog
-        item={deleteTarget}
-        subItems={deleteTarget ? (subItemsByParent.get(deleteTarget.sku) ?? []) : []}
-        onClose={() => setDeleteSku(null)}
-      />
+      <HistoryModal offer={historyOffer} onClose={() => setHistoryKey(null)} />
+      <QuantityModal offer={quantityOffer} onClose={() => setQuantityKey(null)} />
     </div>
   );
 }

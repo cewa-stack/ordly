@@ -18,7 +18,6 @@ class FakeNotifier(Notifier):
         self.sent_cancellations: list[Order] = []
         self.sent_returns: list[OrderReturn] = []
         self.sent_texts: list[str] = []
-        self.sent_low_stock: list[tuple[str, str, int, int]] = []
         self.sent_reminders: list[ShippingReminderData] = []
         self.sent_active_orders: list[list[Order]] = []
         self.sent_allegro_lokalnie: list[AllegroLokalnieEvent] = []
@@ -33,9 +32,6 @@ class FakeNotifier(Notifier):
 
     async def notify_order_return(self, order_return: OrderReturn) -> None:
         self.sent_returns.append(order_return)
-
-    async def notify_low_stock(self, name: str, sku: str, stock: int, min_stock: int) -> None:
-        self.sent_low_stock.append((name, sku, stock, min_stock))
 
     async def notify_shipping_reminder(self, data: ShippingReminderData) -> None:
         self.sent_reminders.append(data)

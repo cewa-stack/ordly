@@ -5,7 +5,6 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from datetime import date, timedelta
 
-from app.domain.interfaces.inventory_repository import InventoryRepository
 from app.domain.interfaces.order_repository import OrderRepository
 from app.utils.time import local_midnight_utc, local_today
 
@@ -19,7 +18,6 @@ class DashboardSummary:
     orders_today: int
     revenue_today: float
     orders_to_ship: int
-    low_stock_count: int
     revenue_last_7_days: tuple[float, ...] = field(default_factory=tuple)
     trend_percent: float | None = None
 
@@ -51,30 +49,24 @@ async def revenue_by_local_day(
 
 class DashboardService:
     """
-    Łączy dane zamówień i magazynu w jedno podsumowanie.
+    Składa dane zamówień w jedno podsumowanie.
 
-    Istnieje wyłącznie dla ekranu Start aplikacji mobilnej - komendy
-    Telegram (/stats, /stock) pobierają te same dane osobno, więc nie
-    duplikuje logiki, tylko składa wyniki dwóch repozytoriów w jedną
-    odpowiedź zamiast kilku kolejnych zapytań z telefonu.
+    Istnieje wyłącznie dla ekranu Start aplikacji mobilnej - komenda
+    /stats bota pobiera te same dane osobno, więc nie duplikuje logiki,
+    tylko zbiera wyniki kilku zapytań w jedną odpowiedź zamiast kilku
+    kolejnych rundek z telefonu.
     """
 
-    def __init__(
-        self,
-        order_repository: OrderRepository,
-        inventory_repository: InventoryRepository,
-    ) -> None:
+    def __init__(self, order_repository: OrderRepository) -> None:
         self._order_repository = order_repository
-        self._inventory_repository = inventory_repository
 
     async def get_summary(self) -> DashboardSummary:
-        """Oblicza podsumowanie dzisiejszej sprzedaży, wysyłek i niskich stanów."""
+        """Oblicza podsumowanie dzisiejszej sprzedaży i wysyłek."""
         today = local_today()
         today_start = local_midnight_utc(today)
 
         orders_today = await self._order_repository.count_since(today_start)
         unshipped_today = await self._order_repository.get_unshipped_since(today_start)
-        low_stock_items = await self._inventory_repository.get_low_stock()
 
         series = tuple(
             amount
@@ -88,7 +80,6 @@ class DashboardService:
             orders_today=orders_today,
             revenue_today=series[-1],
             orders_to_ship=len(unshipped_today),
-            low_stock_count=len(low_stock_items),
             revenue_last_7_days=series,
             trend_percent=trend_percent,
         )

@@ -17,7 +17,6 @@ import type { RootStackParamList } from "@/navigation/types";
 
 export type PushTarget =
   | { screen: "OrderDetail"; params: RootStackParamList["OrderDetail"] }
-  | { screen: "StockItem"; params: RootStackParamList["StockItem"] }
   | { screen: "IssueDetail"; params: RootStackParamList["IssueDetail"] }
   | { screen: "MailDetail"; params: RootStackParamList["MailDetail"] }
   | { screen: "Settings"; params: undefined }
@@ -47,9 +46,10 @@ export function resolvePushTarget(url: string): PushTarget | null {
       : { screen: "MainTab", params: { tab: "Orders" } };
   }
   if (head === "stock") {
-    return id
-      ? { screen: "StockItem", params: { sku: id } }
-      : { screen: "MainTab", params: { tab: "Stock" } };
+    // Magazyn jest wyłącznie listą - nie ma ekranu pojedynczej oferty,
+    // bo ilość wpisuje się na desktopie. Ewentualny identyfikator
+    // w ścieżce ignorujemy, zamiast rzucać użytkownika donikąd.
+    return { screen: "MainTab", params: { tab: "Stock" } };
   }
   if (head === "issues") {
     return id

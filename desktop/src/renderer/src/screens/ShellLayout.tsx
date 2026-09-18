@@ -68,7 +68,7 @@ export function ShellLayout() {
   const [view, setView] = React.useState<ViewId>("start");
   const [paletteOpen, setPaletteOpen] = React.useState(false);
   const [focusOrderId, setFocusOrderId] = React.useState<string | null>(null);
-  const [focusSku, setFocusSku] = React.useState<string | null>(null);
+  const [focusOffer, setFocusOffer] = React.useState<string | null>(null);
   const { session } = useAuth();
   const { sync } = useSync();
 
@@ -125,8 +125,6 @@ export function ShellLayout() {
   const openIssues = (issuesQuery.data ?? []).filter((issue) => issue.chat_active);
   const unreadMail = (mailQuery.data ?? []).filter((message) => !message.is_read);
   const pendingOrders = (ordersQuery.data ?? []).filter(isPendingOrder);
-  const lowStockCount = dashboardQuery.data?.low_stock_count ?? 0;
-
   // Licznik zwrotow to te, ktore jeszcze czekaja na ruch. Wczesniej liczyl
   // wszystkie pobrane (do 50) - razem z zamknietymi - i wisial na stale.
   const openReturns = (returnsQuery.data ?? []).filter(
@@ -136,7 +134,6 @@ export function ShellLayout() {
   const counts: NavCounts = {
     zamowienia: pendingOrders.length,
     dyskusje: { value: openIssues.length, alert: openIssues.length > 0 },
-    magazyn: { value: lowStockCount, alert: lowStockCount > 0 },
     poczta: unreadMail.length,
     zwroty: openReturns.length,
   };
@@ -215,7 +212,7 @@ export function ShellLayout() {
       setView("zamowienia");
       return;
     }
-    setFocusSku(target.sku);
+    setFocusOffer(target.offerKey);
     setView("magazyn");
   }, []);
 
@@ -231,9 +228,7 @@ export function ShellLayout() {
       "otwarte sprawy",
       "otwartych spraw",
     ]),
-    magazyn: dashboardQuery.data
-      ? `${formatPlural(lowStockCount, ["pozycja", "pozycje", "pozycji"])} poniżej progu`
-      : "Wczytuję stan magazynu…",
+    magazyn: "Wystawione oferty · stan wpisujesz ręcznie",
     poczta: "Skrzynka główna · IMAP",
     zwroty: formatPlural(openReturns.length, [
       "zwrot do obsłużenia",
@@ -302,7 +297,10 @@ export function ShellLayout() {
             )}
             {view === "dyskusje" && <DiscussionsScreen />}
             {view === "magazyn" && (
-              <MagazynScreen focusSku={focusSku} onFocusHandled={() => setFocusSku(null)} />
+              <MagazynScreen
+                focusOffer={focusOffer}
+                onFocusHandled={() => setFocusOffer(null)}
+              />
             )}
             {view === "poczta" && <MailboxScreen />}
             {view === "zwroty" && <ReturnsScreen />}

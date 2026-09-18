@@ -142,16 +142,6 @@ class BackupCreated(DomainEvent):
 
 
 @dataclass(frozen=True, slots=True)
-class LowStockDetected(DomainEvent):
-    """Emitowane, gdy produkt magazynowy osiągnie minimalny stan po synchronizacji."""
-
-    sku: str
-    name: str
-    stock: int
-    min_stock: int
-
-
-@dataclass(frozen=True, slots=True)
 class SyncStarted(DomainEvent):
     """Emitowane na początku każdej synchronizacji zamówień."""
 

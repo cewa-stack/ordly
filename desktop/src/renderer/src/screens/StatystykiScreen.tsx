@@ -155,15 +155,6 @@ export function StatystykiScreen() {
     },
   });
 
-  const reportQuery = useQuery({
-    queryKey: ["stock-report"],
-    queryFn: async () => {
-      const result = await window.ordly.stats.stockReport();
-      if (!result.ok) throw new Error(result.message);
-      return result.data;
-    },
-  });
-
   if (statsQuery.isError) {
     return (
       <ErrorState
@@ -253,34 +244,6 @@ export function StatystykiScreen() {
           ))
         )}
       </div>
-
-      {reportQuery.data && (
-        <div className="flex flex-col gap-2.5 rounded-md border border-line bg-panel-2 p-[18px]">
-          <h4 className="text-[13px] font-semibold">Prognoza wyczerpania zapasu</h4>
-          {reportQuery.data.forecasts.length === 0 ? (
-            <p className="text-[12px] text-slate-dim">
-              Za mało historii sprzedaży, żeby cokolwiek prognozować.
-            </p>
-          ) : (
-            reportQuery.data.forecasts.slice(0, 6).map((forecast) => (
-              <div
-                key={forecast.sku}
-                className="flex items-center gap-3 border-b border-line py-2 text-[12.5px] last:border-b-0"
-              >
-                <span className="min-w-0 flex-1 truncate text-white">{forecast.name}</span>
-                <span className="o-mono shrink-0 text-slate">{forecast.stock} szt.</span>
-                <span
-                  className={`o-mono w-[90px] shrink-0 text-right ${
-                    forecast.days_left <= 7 ? "text-coral" : "text-slate"
-                  }`}
-                >
-                  {forecast.days_left} dni
-                </span>
-              </div>
-            ))
-          )}
-        </div>
-      )}
     </div>
   );
 }

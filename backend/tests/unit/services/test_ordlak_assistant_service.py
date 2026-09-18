@@ -20,16 +20,16 @@ from pydantic import SecretStr
 
 from app.core.config import MailWatchSettings, OrdlakSettings
 from app.domain.entities.customer import Customer
-from app.domain.entities.inventory_item import InventoryItem
 from app.domain.entities.issue import Issue, IssueMessage
 from app.domain.entities.mail_message import MailMessage
+from app.domain.entities.marketplace_offer import MarketplaceOffer
 from app.domain.entities.order import Order
 from app.domain.entities.order_return import OrderReturn
 from app.domain.entities.product import Product
 from app.services.dashboard_service import DashboardService
-from app.services.inventory_service import InventoryService
 from app.services.issues_service import IssuesService
 from app.services.mailbox_service import MailboxService
+from app.services.offer_catalog_service import OfferCatalogService
 from app.services.ordlak_assistant_service import (
     MAX_HISTORY_TURNS,
     MAX_TOOL_ROUNDS,
@@ -51,9 +51,9 @@ from tests.fakes.fake_anthropic import (
     ThinkingBlock,
     ToolUseBlock,
 )
-from tests.fakes.fake_inventory_repository import FakeInventoryRepository
 from tests.fakes.fake_mail_repository import FakeMailRepository
 from tests.fakes.fake_marketplace_plugin import FakeMarketplacePlugin
+from tests.fakes.fake_offer_catalog_repository import FakeOfferCatalogRepository
 from tests.fakes.fake_order_repository import FakeOrderRepository
 from tests.fakes.fake_ordlak_conversation_repository import (
     FakeOrdlakConversationRepository,
@@ -80,7 +80,7 @@ class Harness:
     service: OrdlakAssistantService
     client: FakeAnthropic
     orders: FakeOrderRepository
-    inventory: FakeInventoryRepository
+    catalog: FakeOfferCatalogRepository
     returns: FakeReturnRepository
     plugin: FakeMarketplacePlugin
     mail: FakeMailRepository
@@ -94,7 +94,7 @@ def _build(
 ) -> Harness:
     anthropic = client or FakeAnthropic()
     orders = FakeOrderRepository()
-    inventory = FakeInventoryRepository()
+    catalog = FakeOfferCatalogRepository()
     returns = FakeReturnRepository()
     plugin = FakeMarketplacePlugin()
     mail = FakeMailRepository()
@@ -111,9 +111,9 @@ def _build(
     service = OrdlakAssistantService(
         settings=settings,
         order_repository=orders,
-        inventory_service=InventoryService(inventory),
+        offer_catalog_service=OfferCatalogService(plugin=plugin, catalog_repository=catalog),
         returns_service=ReturnsService(returns),
-        dashboard_service=DashboardService(orders, inventory),
+        dashboard_service=DashboardService(orders),
         health_service=StubHealthService(),  # type: ignore[arg-type]
         search_service=SearchService(orders),
         issues_service=IssuesService(plugin),
@@ -123,7 +123,7 @@ def _build(
         # "nie skonfigurowano" dokładnie jak na prawdziwym Pi.
         client_factory=(lambda: anthropic) if configured else None,
     )
-    return Harness(service, anthropic, orders, inventory, returns, plugin, mail, conversations)
+    return Harness(service, anthropic, orders, catalog, returns, plugin, mail, conversations)
 
 
 def _order(
@@ -155,8 +155,27 @@ def _order(
     )
 
 
-def _item(sku: str, name: str, stock: int, min_stock: int = 0) -> InventoryItem:
-    return InventoryItem(sku=sku, name=name, stock=stock, min_stock=min_stock)
+def _offer(
+    external_id: str,
+    name: str,
+    signature: str | None = None,
+    quantity_on_hand: int | None = None,
+) -> MarketplaceOffer:
+    return MarketplaceOffer(
+        marketplace="allegro",
+        external_id=external_id,
+        name=name,
+        signature=signature,
+        available_stock=1,
+        price=Decimal("19.99"),
+        quantity_on_hand=quantity_on_hand,
+        synced_at=utc_now(),
+    )
+
+
+def _put(harness: Harness, offer: MarketplaceOffer) -> None:
+    """Wkłada ofertę wprost do katalogu, z pominięciem synchronizacji."""
+    harness.catalog.offers[("allegro", offer.external_id)] = offer
 
 
 async def _ask(harness: Harness, question: str = "Jak leci?") -> Any:
@@ -195,17 +214,17 @@ class TestPetlaRozmowy:
         harness = _build(
             FakeAnthropic(
                 [
-                    FakeResponse([ToolUseBlock("niskie_stany")], stop_reason="tool_use"),
-                    FakeResponse([TextBlock("Brakuje butelek.")]),
+                    FakeResponse([ToolUseBlock("magazyn")], stop_reason="tool_use"),
+                    FakeResponse([TextBlock("Zostały dwie butelki.")]),
                 ]
             )
         )
-        harness.inventory.items["PET30"] = _item("PET30", "Butelka PET 30ml", 2, min_stock=10)
+        _put(harness, _offer("111", "Butelka PET 30ml", quantity_on_hand=2))
 
-        answer = await _ask(harness, "Co ma niski stan?")
+        answer = await _ask(harness, "Ile mam butelek?")
 
-        assert answer.reply == "Brakuje butelek."
-        assert answer.used_tools == ("niskie_stany",)
+        assert answer.reply == "Zostały dwie butelki."
+        assert answer.used_tools == ("magazyn",)
         assert "Butelka PET 30ml" in _tool_results(harness.client.calls[1])[0]
 
     async def test_kilka_narzedzi_w_jednej_turze_daje_kilka_wynikow(self):
@@ -214,7 +233,7 @@ class TestPetlaRozmowy:
                 [
                     FakeResponse(
                         [
-                            ToolUseBlock("niskie_stany", id="t1"),
+                            ToolUseBlock("magazyn", id="t1"),
                             ToolUseBlock("stan_systemu", id="t2"),
                         ],
                         stop_reason="tool_use",
@@ -226,7 +245,7 @@ class TestPetlaRozmowy:
 
         answer = await _ask(harness)
 
-        assert answer.used_tools == ("niskie_stany", "stan_systemu")
+        assert answer.used_tools == ("magazyn", "stan_systemu")
         assert len(_tool_results(harness.client.calls[1])) == 2
 
     async def test_bloki_myslenia_wracaja_do_modelu_z_podpisem(self):
@@ -240,7 +259,7 @@ class TestPetlaRozmowy:
                     FakeResponse(
                         [
                             ThinkingBlock("Sprawdzę magazyn.", signature="sig-abc"),
-                            ToolUseBlock("niskie_stany"),
+                            ToolUseBlock("magazyn"),
                         ],
                         stop_reason="tool_use",
                     ),
@@ -312,7 +331,7 @@ class TestPetlaRozmowy:
     async def test_model_ktory_w_kolko_pyta_o_dane_konczy_sie_bledem(self):
         harness = _build(
             FakeAnthropic(
-                [FakeResponse([ToolUseBlock("niskie_stany")], stop_reason="tool_use")]
+                [FakeResponse([ToolUseBlock("magazyn")], stop_reason="tool_use")]
             )
         )
 
@@ -417,19 +436,42 @@ class TestPodsumowanieSprzedazy:
 
 
 class TestMagazyn:
-    async def test_szuka_po_nazwie_i_po_sku(self):
+    async def test_szuka_po_nazwie_i_po_sygnaturze(self):
+        """Fraza trafia tak samo w nazwę oferty, jak i w sygnaturę sprzedawcy."""
         harness = _build(_with_tool("magazyn", {"szukaj": "pet30"}))
-        harness.inventory.items["PET30"] = _item("PET30", "Butelka PET 30ml", 5)
-        harness.inventory.items["KROPL"] = _item("KROPL", "Kroplomierz", 40)
+        _put(harness, _offer("111", "Butelka PET30 do liquidów", signature="BUT"))
+        _put(harness, _offer("222", "Kroplomierz", signature="PET30"))
+        _put(harness, _offer("333", "Nakrętka", signature="NAK"))
 
         result = await _run_tool(harness)
 
-        assert "Butelka PET 30ml" in result
-        assert "Kroplomierz" not in result
+        assert "Butelka PET30 do liquidów" in result
+        assert "Kroplomierz" in result
+        assert "Nakrętka" not in result
+
+    async def test_pokazuje_recznie_wpisana_ilosc(self):
+        harness = _build(_with_tool("magazyn"))
+        _put(harness, _offer("111", "Butelka PET 30ml", quantity_on_hand=5))
+
+        result = await _run_tool(harness)
+
+        assert "na polce 5 szt." in result
+
+    async def test_nigdy_nieliczona_oferta_nie_udaje_zera(self):
+        """
+        "Nie policzono" i "policzone, nie ma" to dwie różne odpowiedzi -
+        model nie może zamienić pierwszej w drugą.
+        """
+        harness = _build(_with_tool("magazyn"))
+        _put(harness, _offer("111", "Butelka PET 30ml"))
+
+        result = await _run_tool(harness)
+
+        assert "na polce nie policzono" in result
 
     async def test_brak_dopasowania_mowi_czego_szukano(self):
         harness = _build(_with_tool("magazyn", {"szukaj": "rower"}))
-        harness.inventory.items["PET30"] = _item("PET30", "Butelka PET 30ml", 5)
+        _put(harness, _offer("111", "Butelka PET 30ml"))
 
         result = await _run_tool(harness)
 
@@ -438,44 +480,21 @@ class TestMagazyn:
     async def test_dluga_lista_jest_ucinana_z_informacja_ile_zostalo(self):
         harness = _build(_with_tool("magazyn", {"limit": 2}))
         for index in range(5):
-            harness.inventory.items[f"SKU{index}"] = _item(
-                f"SKU{index}", f"Produkt {index}", 1
-            )
+            _put(harness, _offer(str(index), f"Produkt {index}"))
 
         result = await _run_tool(harness)
 
-        assert "oraz 3 dalszych pozycji" in result
+        assert "oraz 3 dalszych ofert" in result
 
     async def test_limit_spoza_zakresu_schodzi_do_wartosci_granicznej(self):
         """Model bywa hojny z liczbami - 5000 pozycji nie ma trafić do promptu."""
         harness = _build(_with_tool("magazyn", {"limit": 5000}))
         for index in range(70):
-            harness.inventory.items[f"SKU{index}"] = _item(
-                f"SKU{index}", f"Produkt {index}", 1
-            )
+            _put(harness, _offer(str(index), f"Produkt {index:02d}"))
 
         result = await _run_tool(harness)
 
-        assert "oraz 10 dalszych pozycji" in result
-
-
-class TestNiskieStany:
-    async def test_zaznacza_pozycje_ponizej_progu(self):
-        harness = _build(_with_tool("niskie_stany"))
-        harness.inventory.items["PET30"] = _item("PET30", "Butelka PET 30ml", 2, min_stock=10)
-
-        result = await _run_tool(harness)
-
-        assert "PONIZEJ PROGU" in result
-        assert "prog 10" in result
-
-    async def test_pelny_magazyn_mowi_ze_nie_ma_brakow(self):
-        harness = _build(_with_tool("niskie_stany"))
-        harness.inventory.items["PET30"] = _item("PET30", "Butelka PET 30ml", 99, min_stock=10)
-
-        result = await _run_tool(harness)
-
-        assert "Zadna pozycja nie jest ponizej progu" in result
+        assert "oraz 10 dalszych ofert" in result
 
 
 class TestZamowieniaIZwroty:
@@ -519,14 +538,12 @@ class TestKalendarzISystem:
         await harness.orders.save(
             _order("DZIS", utc_now(), "150.00", fulfillment_status="NEW")
         )
-        harness.inventory.items["PET30"] = _item("PET30", "Butelka PET 30ml", 1, min_stock=10)
 
         result = await _run_tool(harness)
 
         assert "5 minut temu" in result
         assert "Zamowienia dzis: 1" in result
         assert "Czeka na wysylke: 1" in result
-        assert "Ponizej progu w magazynie: 1" in result
 
 
 # ----------------------------------------------------------------------
@@ -791,12 +808,12 @@ class TestZapisRozmowy:
         wracając do wątku sprzed tygodnia trzeba widzieć narzędzia, które
         wtedy dały te liczby.
         """
-        harness = _build(_with_tool("niskie_stany"))
+        harness = _build(_with_tool("magazyn"))
 
-        result = await harness.service.ask("Co ma niski stan?")
+        result = await harness.service.ask("Ile mam butelek?")
 
         odpowiedz = harness.conversations.conversations[result.conversation_id].messages[1]
-        assert odpowiedz.used_tools == ("niskie_stany",)
+        assert odpowiedz.used_tools == ("magazyn",)
 
     async def test_kolejne_pytanie_dokleja_sie_do_tego_samego_watku(self):
         harness = _build()

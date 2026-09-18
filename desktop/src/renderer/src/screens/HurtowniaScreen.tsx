@@ -1,14 +1,14 @@
 /**
  * Hurtownie - siatka 3 kolumn (sekcja 4.4). Karta: znak literowy, nazwa,
- * liczba powiazanych produktow, przycisk "Napisz zamówienie".
+ * liczba zapisanych pozycji, przycisk "Napisz zamówienie".
+ *
+ * Kazda hurtownia ma WLASNA liste pozycji, wpisywana recznie tutaj. To
+ * nie ma zwiazku z Magazynem: kupuje sie surowce i opakowania, a sprzedaje
+ * gotowe oferty, wiec proba wiazania jednego z drugim po SKU tylko myli.
  *
  * Koncepcja pokazuje na karcie "czas dostawy" - ORDLY tego nie ma
- * w danych, wiec zamiast wymyslonej liczby dni karta pokazuje realny
- * fakt: ile powiazanych produktow jest teraz ponizej progu.
- *
- * Licznik "ponizej progu" NIE jest warunkiem wyslania maila - to tylko
- * informacja. Zamowienie da sie napisac zawsze, bo do hurtowni pisze sie
- * tez wtedy, gdy magazyn jest pelny.
+ * w danych, wiec zamiast wymyslonej liczby dni karta pokazuje realny fakt:
+ * ile pozycji ma zapisana lista.
  */
 import * as React from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
@@ -23,8 +23,8 @@ import {
 import { ConfirmDialog, Modal } from "../components/Modal";
 import { WholesalerOrderModal } from "../components/WholesalerOrderModal";
 import { useToast } from "../lib/toast";
-import { formatDateTime } from "../lib/format";
-import type { StockItem, Wholesaler } from "../types/api";
+import { formatDateTime, formatPlural } from "../lib/format";
+import type { Wholesaler, WholesalerItem } from "../types/api";
 
 const inputClass =
   "w-full rounded-sm border border-line bg-ink-raised px-3 py-2.5 text-[12.5px] text-white outline-none focus:border-teal-bright";
@@ -41,7 +41,16 @@ function WholesalerFormModal({
   const [name, setName] = React.useState(wholesaler?.name ?? "");
   const [email, setEmail] = React.useState(wholesaler?.email ?? "");
   const [contactPerson, setContactPerson] = React.useState(wholesaler?.contactPerson ?? "");
-  const [skus, setSkus] = React.useState(wholesaler?.linkedSkus.join(", ") ?? "");
+  // Pusty wiersz na koncu, zeby dopisanie pozycji nie wymagalo najpierw
+  // klikniecia "Dodaj pozycję" - pusta nazwa i tak wypada przy zapisie.
+  const [items, setItems] = React.useState<WholesalerItem[]>([
+    ...(wholesaler?.items ?? []),
+    { name: "", quantity: 1 },
+  ]);
+
+  function patchItem(index: number, patch: Partial<WholesalerItem>) {
+    setItems((prev) => prev.map((item, i) => (i === index ? { ...item, ...patch } : item)));
+  }
 
   const saveMutation = useMutation({
     mutationFn: () =>
@@ -50,10 +59,9 @@ function WholesalerFormModal({
         name: name.trim(),
         email: email.trim(),
         contactPerson: contactPerson.trim() || undefined,
-        linkedSkus: skus
-          .split(",")
-          .map((sku) => sku.trim().toUpperCase())
-          .filter(Boolean),
+        items: items
+          .filter((item) => item.name.trim().length > 0)
+          .map((item) => ({ name: item.name.trim(), quantity: Math.max(1, item.quantity) })),
       }),
     onSuccess: (saved) => {
       void queryClient.invalidateQueries({ queryKey: ["wholesalers"] });
@@ -105,19 +113,47 @@ function WholesalerFormModal({
             className={inputClass}
           />
         </label>
-        <label className="flex flex-col gap-1.5">
-          <span className="o-eyebrow">Powiązane SKU</span>
-          <input
-            value={skus}
-            onChange={(e) => setSkus(e.target.value)}
-            placeholder="PET30, MIXBOX - po przecinku"
-            className={`${inputClass} o-mono`}
-          />
+        <div className="flex flex-col gap-1.5">
+          <span className="o-eyebrow">Co się tu zamawia</span>
+          {items.map((item, index) => (
+            <div key={index} className="flex gap-2">
+              <input
+                value={item.name}
+                onChange={(e) => patchItem(index, { name: e.target.value })}
+                placeholder="Nazwa pozycji"
+                className={inputClass}
+              />
+              <input
+                type="number"
+                min={1}
+                value={item.quantity}
+                onChange={(e) =>
+                  patchItem(index, { quantity: Math.max(1, Number(e.target.value) || 1) })
+                }
+                aria-label="Ilość"
+                className={`${inputClass} o-mono !w-[76px] shrink-0 text-center`}
+              />
+              <MiniButton
+                className="!px-2 hover:!text-coral"
+                onClick={() => setItems((prev) => prev.filter((_, i) => i !== index))}
+                aria-label="Usuń pozycję"
+              >
+                <TrashIcon size={13} />
+              </MiniButton>
+            </div>
+          ))}
+          <MiniButton
+            className="self-start"
+            icon={<PlusIcon size={13} />}
+            onClick={() => setItems((prev) => [...prev, { name: "", quantity: 1 }])}
+          >
+            Dodaj pozycję
+          </MiniButton>
           <span className="text-[11px] text-slate-dim">
-            To asortyment tej hurtowni. Pozycje poniżej progu ORDLY zaznaczy w mailu
-            sam, resztę dodasz jednym kliknięciem.
+            Lista tej hurtowni - co u niej kupujesz i ile zwykle bierzesz. Przy pisaniu
+            maila wszystko jest zaznaczone, odznaczasz to, czego akurat nie trzeba.
           </span>
-        </label>
+        </div>
       </div>
     </Modal>
   );
@@ -140,15 +176,6 @@ export function HurtowniaScreen() {
     queryFn: () => window.ordly.wholesalers.history(),
   });
 
-  const stockQuery = useQuery({
-    queryKey: ["stock"],
-    queryFn: async () => {
-      const result = await window.ordly.stock.list();
-      if (!result.ok) throw new Error(result.message);
-      return result.data;
-    },
-  });
-
   const deleteMutation = useMutation({
     mutationFn: (id: string) => window.ordly.wholesalers.delete(id),
     onSuccess: () => {
@@ -157,51 +184,6 @@ export function HurtowniaScreen() {
       toast.success("Usunięto hurtownię", "Historia wysłanych zamówień zostaje.");
     },
   });
-
-  const stock = React.useMemo(() => stockQuery.data ?? [], [stockQuery.data]);
-
-  /**
-   * Asortyment hurtowni: produkty powiazane z nia przez SKU. Bez powiazan
-   * hurtownia nie ma wlasnego asortymentu, wiec kandydatami sa wszystkie
-   * pozycje magazynu - uzytkownik zaznacza w mailu to, czego potrzebuje.
-   *
-   * Ponizej progu na gorze listy, bo to one sa powodem zamowienia.
-   */
-  function catalogFor(wholesaler: Wholesaler): StockItem[] {
-    const pool =
-      wholesaler.linkedSkus.length === 0
-        ? stock
-        : stock.filter((item) => wholesaler.linkedSkus.includes(item.sku));
-    return [...pool].sort(
-      (a, b) =>
-        Number(b.is_low_stock) - Number(a.is_low_stock) || a.name.localeCompare(b.name, "pl")
-    );
-  }
-
-  /** Produkty ponizej progu w asortymencie hurtowni - licznik na karcie. */
-  function lowStockFor(wholesaler: Wholesaler): StockItem[] {
-    return catalogFor(wholesaler).filter((item) => item.is_low_stock);
-  }
-
-  const orderingCatalog = React.useMemo(
-    () => (ordering ? catalogFor(ordering) : []),
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [ordering, stock]
-  );
-
-  /**
-   * Co zaznaczyc od razu: braki. Gdy nic nie brakuje, a hurtownia ma jawnie
-   * powiazane SKU - zaznaczamy caly jej asortyment (to jest jej lista
-   * zakupowa). Przy braku powiazan pula to caly magazyn, wiec zaznaczanie
-   * wszystkiego byloby bez sensu i uzytkownik wybiera sam.
-   */
-  const orderingSelection = React.useMemo(() => {
-    if (!ordering) return [];
-    const low = orderingCatalog.filter((item) => item.is_low_stock);
-    if (low.length > 0) return low.map((item) => item.sku);
-    if (ordering.linkedSkus.length > 0) return orderingCatalog.map((item) => item.sku);
-    return [];
-  }, [ordering, orderingCatalog]);
 
   return (
     <div className="flex min-h-0 flex-1 flex-col gap-3.5 overflow-y-auto p-[22px]">
@@ -221,60 +203,56 @@ export function HurtowniaScreen() {
         <EmptyState
           pose="think"
           title="Brak zapisanych hurtowni"
-          description="Dodaj pierwszą hurtownię, a Ordi przygotuje zamówienie z produktów poniżej progu."
+          description="Dodaj pierwszą hurtownię i wpisz, co się w niej zamawia - Ordi złoży z tego gotowego maila."
         />
       )}
 
       <div className="grid grid-cols-3 gap-3 max-[1100px]:grid-cols-2 max-[940px]:grid-cols-1">
-        {(wholesalersQuery.data ?? []).map((wholesaler) => {
-          const missing = lowStockFor(wholesaler);
-          return (
-            <div
-              key={wholesaler.id}
-              className="flex flex-col gap-[11px] rounded-md border border-line bg-panel-2 p-[17px] transition-[border-color,transform] duration-[180ms] ease-ordly hover:-translate-y-0.5 hover:border-line-strong"
-            >
-              <div className="flex items-start gap-2">
-                <span className="o-display flex h-[34px] w-[34px] items-center justify-center rounded-[10px] bg-panel-3 text-[13px] font-semibold text-teal-bright">
-                  {wholesaler.name.slice(0, 1).toUpperCase()}
-                </span>
-                <div className="ml-auto flex gap-1">
-                  <MiniButton
-                    className="!px-2"
-                    onClick={() => setEditing(wholesaler)}
-                    aria-label="Edytuj"
-                  >
-                    <PencilIcon size={13} />
-                  </MiniButton>
-                  <MiniButton
-                    className="!px-2 hover:!text-coral"
-                    onClick={() => setDeleting(wholesaler)}
-                    aria-label="Usuń"
-                  >
-                    <TrashIcon size={13} />
-                  </MiniButton>
-                </div>
+        {(wholesalersQuery.data ?? []).map((wholesaler) => (
+          <div
+            key={wholesaler.id}
+            className="flex flex-col gap-[11px] rounded-md border border-line bg-panel-2 p-[17px] transition-[border-color,transform] duration-[180ms] ease-ordly hover:-translate-y-0.5 hover:border-line-strong"
+          >
+            <div className="flex items-start gap-2">
+              <span className="o-display flex h-[34px] w-[34px] items-center justify-center rounded-[10px] bg-panel-3 text-[13px] font-semibold text-teal-bright">
+                {wholesaler.name.slice(0, 1).toUpperCase()}
+              </span>
+              <div className="ml-auto flex gap-1">
+                <MiniButton
+                  className="!px-2"
+                  onClick={() => setEditing(wholesaler)}
+                  aria-label="Edytuj"
+                >
+                  <PencilIcon size={13} />
+                </MiniButton>
+                <MiniButton
+                  className="!px-2 hover:!text-coral"
+                  onClick={() => setDeleting(wholesaler)}
+                  aria-label="Usuń"
+                >
+                  <TrashIcon size={13} />
+                </MiniButton>
               </div>
-              <h4 className="o-card-title truncate">{wholesaler.name}</h4>
-              <p className="o-mono truncate text-[10.5px] text-slate-dim">{wholesaler.email}</p>
-              <p className="o-mono text-[10.5px] text-slate-dim">
-                {wholesaler.linkedSkus.length} powiązanych SKU ·{" "}
-                <span className={missing.length > 0 ? "text-coral" : ""}>
-                  {missing.length} poniżej progu
-                </span>
-              </p>
-              {/* Przycisk jest zawsze aktywny - pelny magazyn nie jest powodem,
-                  zeby nie dalo sie napisac do hurtowni (zapytanie o cennik,
-                  termin, nowy produkt). Pozycje wybiera sie w modalu. */}
-              <Button
-                className="mt-1 !px-3 !py-2 !text-[11.5px]"
-                onClick={() => setOrdering(wholesaler)}
-                icon={<MailIcon size={13} />}
-              >
-                Napisz zamówienie
-              </Button>
             </div>
-          );
-        })}
+            <h4 className="o-card-title truncate">{wholesaler.name}</h4>
+            <p className="o-mono truncate text-[10.5px] text-slate-dim">{wholesaler.email}</p>
+            <p className="o-mono text-[10.5px] text-slate-dim">
+              {wholesaler.items.length === 0
+                ? "brak zapisanych pozycji"
+                : formatPlural(wholesaler.items.length, ["pozycja", "pozycje", "pozycji"])}
+            </p>
+            {/* Przycisk jest zawsze aktywny - pusta lista pozycji nie jest
+                powodem, zeby nie dalo sie napisac do hurtowni (zapytanie
+                o cennik, termin, nowy produkt). */}
+            <Button
+              className="mt-1 !px-3 !py-2 !text-[11.5px]"
+              onClick={() => setOrdering(wholesaler)}
+              icon={<MailIcon size={13} />}
+            >
+              Napisz zamówienie
+            </Button>
+          </div>
+        ))}
       </div>
 
       <div className="mt-4 flex flex-col gap-2">
@@ -311,8 +289,6 @@ export function HurtowniaScreen() {
       <WholesalerOrderModal
         open={ordering !== null}
         onClose={() => setOrdering(null)}
-        items={orderingCatalog}
-        initialSelection={orderingSelection}
         preselected={ordering}
       />
 

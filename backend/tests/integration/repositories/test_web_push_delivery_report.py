@@ -150,6 +150,6 @@ class TestSendTest:
         )
         monkeypatch.setattr(notifier_module, "local_now", lambda: datetime(2026, 9, 13, 23, 30))
 
-        await _notifier(session_scope).notify_low_stock("Butelka", "BUT-60", 1, 5)
+        await _notifier(session_scope).notify_sync_failed("allegro", 5)
 
         assert sent[0]["silent"] is True

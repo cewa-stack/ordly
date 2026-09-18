@@ -1,217 +1,119 @@
 /**
- * Magazyn — §7 specyfikacji: pasek mini-KPI (Produkty · Poniżej minimum ·
- * Wartość), wyszukiwarka, chipy filtrów, karty produktów z paskiem zapasu.
- * Dodawanie produktu przez bottom sheet (grabber, radius 24) z opcjonalnym
- * progiem alertu (min_stock).
+ * Magazyn — lista tego, co jest wystawione na marketplace'ach: miniatura,
+ * tytuł, kanał i cena. Telefon jest tu POGLĄDEM: pokazuje asortyment
+ * i pozwala dociągnąć nowe oferty, a ręczne liczenie sztuk zostaje na
+ * desktopie, gdzie jest klawiatura i czas.
+ *
+ * Katalog nie odświeża się sam. Nowa oferta powstaje wtedy, gdy człowiek
+ * ją wystawi, więc odpytywanie API marketplace w tle tylko zjadałoby
+ * limit zapytań - stąd jawny przycisk „Synchronizuj”.
  */
 import * as React from "react";
-import {
-  FlatList,
-  KeyboardAvoidingView,
-  Modal,
-  Platform,
-  Pressable,
-  RefreshControl,
-  StyleSheet,
-  Text,
-  TextInput,
-  View,
-} from "react-native";
-import { useNavigation } from "@react-navigation/native";
-import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
+import { FlatList, Pressable, RefreshControl, StyleSheet, Text, View } from "react-native";
 import { useQueryClient } from "@tanstack/react-query";
 
 import { colors } from "@/theme/colors";
 import { radii, spacing, typography } from "@/theme/typography";
-import {
-  useCreateStockItem,
-  useStock,
-  useStockReport,
-  useUnmappedOffers,
-} from "@/api/hooks";
+import { useOffers, useSyncCatalog } from "@/api/hooks";
 import { ApiError } from "@/api/client";
-import { StockRow } from "@/components/StockRow";
-import { FilterChip } from "@/components/FilterChip";
+import { OfferRow } from "@/components/OfferRow";
 import { SearchBar } from "@/components/SearchBar";
 import { EmptyState } from "@/components/EmptyState";
 import { ErrorState } from "@/components/ErrorState";
-import { TabHeading } from "@/components/TabHeading";
 import { ListEndNote } from "@/components/ListEndNote";
-import { PrimaryButton } from "@/components/PrimaryButton";
 import { Skeleton } from "@/components/Skeleton";
-import { BoxIcon, PlusIcon } from "@/icons";
-import { formatMoney } from "@/utils/format";
-import type { StockItem, UnmappedOffer } from "@/api/types";
-import type { RootStackParamList } from "@/navigation/types";
-
-type Filter = "all" | "low" | "no-sales";
+import { BoxIcon, SyncIcon } from "@/icons";
+import { formatDate, plural } from "@/utils/format";
+import type { MarketplaceOffer } from "@/api/types";
 
 export function StockScreen() {
-  const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const queryClient = useQueryClient();
-  const stock = useStock();
-  const report = useStockReport();
-  const unmapped = useUnmappedOffers();
-  const createItem = useCreateStockItem();
+  const offers = useOffers();
+  const sync = useSyncCatalog();
 
   const [query, setQuery] = React.useState("");
-  const [filter, setFilter] = React.useState<Filter>("all");
-  const [modalOpen, setModalOpen] = React.useState(false);
-  const [newSku, setNewSku] = React.useState("");
-  const [newName, setNewName] = React.useState("");
-  const [newMinStock, setNewMinStock] = React.useState("");
-  const [createError, setCreateError] = React.useState<string | null>(null);
+  const [syncNote, setSyncNote] = React.useState<string | null>(null);
+  const [syncError, setSyncError] = React.useState<string | null>(null);
 
-  const noSalesSkus = React.useMemo(
-    () => new Set((report.data?.items_without_sales ?? []).map((i: StockItem) => i.sku)),
-    [report.data]
-  );
+  const all: MarketplaceOffer[] = offers.data ?? [];
 
   const filtered = React.useMemo(() => {
-    let items: StockItem[] = stock.data ?? [];
-    if (filter === "low") {
-      items = items.filter((i: StockItem) => i.status !== "ok");
-    } else if (filter === "no-sales") {
-      items = items.filter((i: StockItem) => noSalesSkus.has(i.sku));
-    }
+    const items: MarketplaceOffer[] = offers.data ?? [];
     const q = query.trim().toLowerCase();
-    if (q) {
-      items = items.filter(
-        (i: StockItem) => i.name.toLowerCase().includes(q) || i.sku.toLowerCase().includes(q)
+    if (!q) return items;
+    return items.filter(
+      (offer) =>
+        offer.name.toLowerCase().includes(q) ||
+        (offer.signature ?? "").toLowerCase().includes(q)
+    );
+  }, [offers.data, query]);
+
+  async function handleSync() {
+    setSyncError(null);
+    setSyncNote(null);
+    try {
+      const result = await sync.mutateAsync();
+      // Same liczby, nie „gotowe”: po synchronizacji człowiek chce
+      // wiedzieć, czy to, co przed chwilą wystawił, faktycznie doszło.
+      const parts = [`${result.fetched} ${plural(result.fetched, "oferta", "oferty", "ofert")}`];
+      if (result.added > 0) parts.push(`+${result.added} nowych`);
+      if (result.removed > 0) parts.push(`−${result.removed} zniknęło`);
+      setSyncNote(parts.join(" · "));
+    } catch (error) {
+      setSyncError(
+        error instanceof ApiError ? error.message : "Nie udało się pobrać katalogu"
       );
     }
-    return items;
-  }, [stock.data, filter, query, noSalesSkus]);
-
-  async function onRefresh() {
-    await Promise.all([
-      queryClient.invalidateQueries({ queryKey: ["stock"] }),
-      queryClient.invalidateQueries({ queryKey: ["stock-report"] }),
-    ]);
   }
 
-  function closeModal() {
-    setModalOpen(false);
-    setCreateError(null);
-  }
+  // Znaczniki z API są w ISO ze strefą „Z”, więc najświeższy jest
+  // największy leksykograficznie - nie ma po co parsować całej listy.
+  const lastSynced = all.reduce<string | null>(
+    (newest, offer) =>
+      offer.synced_at !== null && (newest === null || offer.synced_at > newest)
+        ? offer.synced_at
+        : newest,
+    null
+  );
 
-  async function handleCreate() {
-    setCreateError(null);
-    if (!newSku.trim() || !newName.trim()) {
-      setCreateError("Podaj SKU i nazwę produktu");
-      return;
-    }
-    const minStock = newMinStock.trim() ? Number(newMinStock) : undefined;
-    if (minStock !== undefined && (!Number.isFinite(minStock) || minStock < 0)) {
-      setCreateError("Próg alertu musi być liczbą nieujemną");
-      return;
-    }
-    try {
-      await createItem.mutateAsync({
-        sku: newSku.trim(),
-        name: newName.trim(),
-        ...(minStock !== undefined ? { min_stock: minStock } : {}),
-      });
-      setModalOpen(false);
-      setNewSku("");
-      setNewName("");
-      setNewMinStock("");
-    } catch (error) {
-      setCreateError(error instanceof ApiError ? error.message : "Nie udało się dodać produktu");
-    }
-  }
-
-  function renderItem({ item }: { item: StockItem }) {
-    return (
-      <StockRow item={item} onPress={() => navigation.navigate("StockItem", { sku: item.sku })} />
-    );
-  }
-
-  const lowCount = report.data?.low_stock_items.length ?? 0;
-  const unmappedCount = unmapped.data?.length ?? 0;
-  const unmappedNames = (unmapped.data ?? [])
-    .slice(0, 2)
-    .map((offer: UnmappedOffer) => offer.name)
-    .join(", ");
-
-  // Wszystko, co stoi NAD listą, jedzie razem z nią przy przewijaniu.
-  // Wcześniej pasek KPI, ostrzeżenie o ofertach poza magazynem,
-  // wyszukiwarka i chipy filtrów były przyklejone do góry ekranu i na
-  // telefonie zabierały ok. 240 pt, a z ostrzeżeniem nawet 380 pt - na
-  // ekranie iPhone'a mini zostawało miejsce na dwie, trzy karty i lista
-  // ledwo dawała się przewijać. Teraz to `ListHeaderComponent`: przy
-  // pierwszym przewinięciu w dół znika i cały ekran należy do magazynu,
-  // a powrót na górę przywraca komplet.
-  //
-  // To ELEMENT, nie funkcja komponentu - inline'owa funkcja tworzyłaby
-  // przy każdym wpisanym znaku nowy typ komponentu, więc pole
-  // wyszukiwarki montowałoby się od nowa i gubiło fokus po pierwszej
-  // literze.
+  // Wszystko nad listą jedzie razem z nią przy przewijaniu - na telefonie
+  // przyklejony nagłówek zabierał tyle miejsca, że zostawało na dwie
+  // karty. To ELEMENT, nie funkcja komponentu: inline'owa funkcja
+  // tworzyłaby przy każdym wpisanym znaku nowy typ komponentu, więc pole
+  // wyszukiwarki montowałoby się od nowa i gubiło fokus po pierwszej literze.
   const listHeader = (
     <View>
-      {report.data ? (
-        <View style={styles.summary}>
-          <View style={styles.summaryCell}>
-            <Text style={styles.summaryValue}>{report.data.total_items}</Text>
-            <Text style={styles.summaryLabel}>Produkty</Text>
-          </View>
-          <View style={styles.summaryDivider} />
-          <View style={styles.summaryCell}>
-            <Text style={[styles.summaryValue, lowCount > 0 && { color: colors.warning }]}>
-              {lowCount}
-            </Text>
-            <Text style={styles.summaryLabel}>Poniżej minimum</Text>
-          </View>
-          <View style={styles.summaryDivider} />
-          <View style={styles.summaryCell}>
-            <Text style={styles.summaryValue} numberOfLines={1} adjustsFontSizeToFit>
-              {formatMoney(report.data.total_stock_value)}
-            </Text>
-            <Text style={styles.summaryLabel}>Wartość</Text>
-          </View>
-        </View>
-      ) : null}
-
-      {unmappedCount > 0 ? (
-        <View style={styles.warningCard}>
-          <Text style={styles.warningTitle}>
-            {unmappedCount === 1
-              ? "1 oferta sprzedaje się poza magazynem"
-              : `${unmappedCount} oferty sprzedają się poza magazynem`}
+      <View style={styles.syncCard}>
+        <View style={styles.syncInfo}>
+          <Text style={styles.syncCount}>
+            {all.length}{" "}
+            {plural(all.length, "oferta", "oferty", "ofert")}
           </Text>
-          <Text style={styles.warningBody}>
-            {unmappedNames}
-            {unmappedNames ? " — " : ""}
-            sprzedaż tych ofert nie zdejmuje nic ze stanów, bo nie mają przypisanych
-            składników. Powiązania ustawisz na desktopie: Magazyn → Powiązania ofert.
+          <Text style={styles.syncMeta} numberOfLines={1}>
+            {syncError ?? syncNote ?? (lastSynced ? `Pobrano ${formatDate(lastSynced)}` : "Katalog jeszcze niepobrany")}
           </Text>
         </View>
-      ) : null}
-
-      <View style={styles.searchWrap}>
-        <SearchBar value={query} onChangeText={setQuery} placeholder="Szukaj po SKU lub nazwie…" />
+        <Pressable
+          onPress={handleSync}
+          disabled={sync.isPending}
+          style={({ pressed }) => [
+            styles.syncButton,
+            (pressed || sync.isPending) && styles.syncButtonPressed,
+          ]}
+          accessibilityLabel="Pobierz katalog z marketplace"
+        >
+          <SyncIcon size={16} color={colors.onPrimary} />
+          <Text style={styles.syncButtonLabel}>
+            {sync.isPending ? "Pobieram…" : "Synchronizuj"}
+          </Text>
+        </Pressable>
       </View>
 
-      <View style={styles.filterRow}>
-        <FlatList
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          data={
-            [
-              { key: "all" as Filter, label: `Wszystkie · ${stock.data?.length ?? 0}` },
-              { key: "low" as Filter, label: `Niski stan · ${lowCount}` },
-              { key: "no-sales" as Filter, label: "Bez sprzedaży 30 dni" },
-            ] satisfies { key: Filter; label: string }[]
-          }
-          keyExtractor={(item) => item.key}
-          renderItem={({ item }) => (
-            <FilterChip
-              label={item.label}
-              active={filter === item.key}
-              onPress={() => setFilter(item.key)}
-            />
-          )}
-          ItemSeparatorComponent={() => <View style={{ width: spacing.sm }} />}
+      <View style={styles.searchWrap}>
+        <SearchBar
+          value={query}
+          onChangeText={setQuery}
+          placeholder="Szukaj po nazwie lub sygnaturze…"
         />
       </View>
     </View>
@@ -221,117 +123,53 @@ export function StockScreen() {
     <View style={styles.screen}>
       <View style={styles.header}>
         <Text style={styles.title}>Magazyn</Text>
-        <Pressable
-          onPress={() => setModalOpen(true)}
-          style={({ pressed }) => [styles.addButton, pressed && styles.addButtonPressed]}
-          hitSlop={8}
-        >
-          <PlusIcon size={18} color={colors.onPrimary} />
-        </Pressable>
       </View>
 
-      {stock.isPending ? (
+      {offers.isPending ? (
         <View style={styles.listPadding}>
           {listHeader}
-          <Skeleton height={76} radius={radii.lg} style={{ marginBottom: spacing.sm }} />
-          <Skeleton height={76} radius={radii.lg} />
+          <Skeleton height={80} radius={radii.lg} style={{ marginBottom: spacing.sm }} />
+          <Skeleton height={80} radius={radii.lg} />
         </View>
-      ) : stock.isError ? (
+      ) : offers.isError ? (
         <View style={styles.listPadding}>
           {listHeader}
-          <ErrorState onRetry={() => stock.refetch()} />
+          <ErrorState onRetry={() => offers.refetch()} />
         </View>
       ) : (
         <FlatList
           data={filtered}
-          keyExtractor={(item) => item.sku}
-          renderItem={renderItem}
+          keyExtractor={(offer) => `${offer.marketplace}:${offer.external_id}`}
+          renderItem={({ item }) => <OfferRow offer={item} />}
           contentContainerStyle={styles.listContent}
           ListHeaderComponent={listHeader}
-          // Stuknięcie w chip filtra albo w kartę przy otwartej klawiaturze
-          // ma zadziałać od razu, a nie dopiero po jej schowaniu.
           keyboardShouldPersistTaps="handled"
           keyboardDismissMode="on-drag"
           refreshControl={
             <RefreshControl
-              refreshing={stock.isRefetching}
-              onRefresh={onRefresh}
+              refreshing={offers.isRefetching}
+              onRefresh={() => queryClient.invalidateQueries({ queryKey: ["offers"] })}
               tintColor={colors.primary}
             />
           }
           ListFooterComponent={
-            (stock.data ?? []).length > 0 ? (
-              <ListEndNote text="To cały magazyn. Korektę stanu i progi ustawiasz na desktopie." />
+            filtered.length > 0 ? (
+              <ListEndNote text="To cały asortyment. Ilość sztuk na półce wpisujesz na desktopie." />
             ) : null
           }
           ListEmptyComponent={
             <EmptyState
               icon={<BoxIcon size={24} color={colors.textSecondary} />}
-              title={
-                query.trim() ? "Nie znaleziono produktu" : "Brak produktów spełniających filtr"
+              title={query.trim() ? "Nie znaleziono oferty" : "Katalog jest pusty"}
+              description={
+                query.trim()
+                  ? "Zmień frazę albo pobierz katalog na nowo."
+                  : "Naciśnij „Synchronizuj”, żeby pobrać swoje oferty z marketplace."
               }
-              description="Zmień filtr albo dodaj nowy produkt."
-              actionLabel="Dodaj produkt"
-              onAction={() => setModalOpen(true)}
             />
           }
         />
       )}
-
-      <Modal visible={modalOpen} animationType="slide" transparent onRequestClose={closeModal}>
-        <KeyboardAvoidingView
-          style={styles.modalBackdrop}
-          behavior={Platform.OS === "ios" ? "padding" : undefined}
-        >
-          <Pressable style={styles.modalScrim} onPress={closeModal} />
-          <View style={styles.modalCard}>
-            <View style={styles.grabber} />
-            <Text style={styles.modalTitle}>Nowy produkt</Text>
-            <TextInput
-              value={newSku}
-              onChangeText={setNewSku}
-              placeholder="SKU (np. PET60)"
-              placeholderTextColor={colors.textDim}
-              autoCapitalize="characters"
-              style={styles.modalInput}
-            />
-            <TextInput
-              value={newName}
-              onChangeText={setNewName}
-              placeholder="Nazwa (np. Butelka PET 60ml)"
-              placeholderTextColor={colors.textDim}
-              style={styles.modalInput}
-            />
-            <TextInput
-              value={newMinStock}
-              onChangeText={setNewMinStock}
-              placeholder="Próg alertu w szt. (opcjonalnie)"
-              placeholderTextColor={colors.textDim}
-              keyboardType="number-pad"
-              style={styles.modalInput}
-            />
-            {createError ? <Text style={styles.modalError}>{createError}</Text> : null}
-            <View style={styles.modalActions}>
-              <Pressable
-                onPress={closeModal}
-                style={({ pressed }) => [
-                  styles.modalButton,
-                  styles.modalButtonGhost,
-                  pressed && { opacity: 0.8 },
-                ]}
-              >
-                <Text style={styles.modalButtonGhostLabel}>Anuluj</Text>
-              </Pressable>
-              <PrimaryButton
-                label="Dodaj"
-                onPress={handleCreate}
-                loading={createItem.isPending}
-                style={styles.modalPrimaryButton}
-              />
-            </View>
-          </View>
-        </KeyboardAvoidingView>
-      </Modal>
     </View>
   );
 }
@@ -342,9 +180,6 @@ const styles = StyleSheet.create({
     backgroundColor: colors.background,
   },
   header: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
     paddingHorizontal: spacing.xl,
     paddingTop: spacing.lg,
   },
@@ -352,19 +187,10 @@ const styles = StyleSheet.create({
     ...typography.title1,
     color: colors.text,
   },
-  addButton: {
-    width: 40,
-    height: 40,
-    borderRadius: radii.full,
-    backgroundColor: colors.primary,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  addButtonPressed: {
-    opacity: 0.85,
-  },
-  summary: {
+  syncCard: {
     flexDirection: "row",
+    alignItems: "center",
+    gap: spacing.md,
     backgroundColor: colors.surface,
     borderWidth: 1,
     borderColor: colors.border,
@@ -373,48 +199,36 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.lg,
     marginTop: spacing.md,
   },
-  summaryCell: {
+  syncInfo: {
     flex: 1,
+    minWidth: 0,
   },
-  summaryValue: {
+  syncCount: {
     ...typography.statValue,
-    fontSize: 18,
     color: colors.text,
   },
-  summaryLabel: {
+  syncMeta: {
     ...typography.caption,
-    fontSize: 11,
     color: colors.textSecondary,
     marginTop: 2,
   },
-  summaryDivider: {
-    width: 1,
-    backgroundColor: colors.border,
-    marginHorizontal: spacing.md,
+  syncButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    height: 38,
+    paddingHorizontal: spacing.lg,
+    borderRadius: radii.full,
+    backgroundColor: colors.primary,
   },
-  warningCard: {
-    backgroundColor: colors.warningTint,
-    borderWidth: 1,
-    borderColor: colors.warning,
-    borderRadius: radii.lg,
-    padding: spacing.lg,
-    marginTop: spacing.md,
-    gap: spacing.xs,
+  syncButtonPressed: {
+    opacity: 0.85,
   },
-  warningTitle: {
-    ...typography.body,
-    fontWeight: "600",
-    color: colors.warning,
-  },
-  warningBody: {
-    ...typography.caption,
-    color: colors.textSecondary,
-    lineHeight: 17,
+  syncButtonLabel: {
+    ...typography.calloutSemibold,
+    color: colors.onPrimary,
   },
   searchWrap: {
-    paddingTop: spacing.md,
-  },
-  filterRow: {
     paddingVertical: spacing.md,
   },
   listPadding: {
@@ -423,79 +237,5 @@ const styles = StyleSheet.create({
   listContent: {
     paddingHorizontal: spacing.xl,
     paddingBottom: 96,
-  },
-  modalBackdrop: {
-    flex: 1,
-    justifyContent: "flex-end",
-  },
-  modalScrim: {
-    ...StyleSheet.absoluteFillObject,
-    backgroundColor: "rgba(0,0,0,0.55)",
-  },
-  modalCard: {
-    backgroundColor: colors.surface,
-    borderTopLeftRadius: radii.sheet,
-    borderTopRightRadius: radii.sheet,
-    borderWidth: 1,
-    borderColor: colors.border,
-    padding: spacing.xl,
-    paddingBottom: spacing.xxl,
-    gap: spacing.sm,
-  },
-  grabber: {
-    width: 36,
-    height: 4,
-    borderRadius: radii.full,
-    backgroundColor: colors.border,
-    alignSelf: "center",
-    marginBottom: spacing.sm,
-  },
-  modalTitle: {
-    ...typography.title2,
-    fontSize: 19,
-    lineHeight: 25,
-    color: colors.text,
-    marginBottom: spacing.xs,
-  },
-  modalInput: {
-    height: 52,
-    backgroundColor: colors.surfaceRaised,
-    borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: radii.md,
-    paddingHorizontal: spacing.lg,
-    color: colors.text,
-    fontSize: 15,
-  },
-  modalError: {
-    ...typography.caption,
-    color: colors.danger,
-  },
-  modalActions: {
-    flexDirection: "row",
-    gap: spacing.sm,
-    marginTop: spacing.sm,
-  },
-  modalButton: {
-    flex: 1,
-    height: 48,
-    backgroundColor: colors.primary,
-    borderRadius: radii.md,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  modalButtonGhost: {
-    backgroundColor: colors.surfaceRaised,
-    borderWidth: 1,
-    borderColor: colors.border,
-  },
-  modalButtonGhostLabel: {
-    fontSize: 15,
-    fontWeight: "600",
-    color: colors.textSecondary,
-  },
-  modalPrimaryButton: {
-    flex: 1,
-    height: 48,
   },
 });

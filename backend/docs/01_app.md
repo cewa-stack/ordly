@@ -97,19 +97,23 @@ BotFatherze). Brak/zły token → `401`. Zły format żądania → `422`
 | `/api/v1/orders/search` | GET `?q=` | `SearchService` | `/search` |
 | `/api/v1/orders/sync` | POST | `SyncOrdersService.sync_new_orders` | `/sync` |
 | `/api/v1/orders/{external_id}/tracking` | GET | `TrackingService` | `/tracking [numer]` |
-| `/api/v1/stock` | GET | `InventoryService.get_stock_overview` | `/stock` |
-| `/api/v1/stock` | POST | `InventoryService.create_item` | `/stock new` |
-| `/api/v1/stock/{sku}` | GET | `InventoryService` (nowa metoda `get_item`) | — |
-| `/api/v1/stock/{sku}/adjust` | POST `{op,quantity,reason?}` | `set_stock`/`add_stock`/`remove_stock`/`set_min_stock` | `/stock set|add|remove|min` |
-| `/api/v1/stock/{sku}/history` | GET | `InventoryService.get_history` | `/stock history` |
-| `/api/v1/stock/report` | GET | `InventoryService.get_report` | `/stock report` |
-| `/api/v1/stock/shopping-list` | GET | `InventoryService.get_shopping_list` | `/stock buy` |
-| `/api/v1/stock/links` | POST/DELETE | `InventoryService.link_offer`/`unlink_offer` | `/stock link|unlink` |
+| `/api/v1/stock/offers` | GET | `OfferCatalogService.get_offers` | `/stock` |
+| `/api/v1/stock/sync` | POST | `OfferCatalogService.sync` | — |
+| `/api/v1/stock/offers/{marketplace}/{external_id}/quantity` | PUT `{quantity,reason}` | `OfferCatalogService.set_quantity` | — |
+| `/api/v1/stock/offers/{marketplace}/{external_id}/history` | GET `?limit=` | `OfferCatalogService.get_history` | — |
 | `/api/v1/stats` | GET | `StatsService.get_summary` | `/stats` |
 | `/api/v1/logs` | GET `?limit=` | `EventsService.get_recent_events` | `/logs` |
 | `/api/v1/push/vapid-public-key` | GET | `WebPushSettings` (konfiguracja) | — (nowe, Web Push) |
 | `/api/v1/push/subscribe` | POST/DELETE | `PushSubscriptionRepository` | — (nowe, Web Push) |
 | `/api/v1/push/test` | POST | `WebPushNotifier` | — (nowe, Web Push) |
+
+**Magazyn to lista ofert, nie kartoteka produktów.** Pierwotny zakres
+(`/stock/{sku}`, progi, receptury, powiązania oferta↔produkt, automatyczne
+zdejmowanie przy sprzedaży) został usunięty — ilość wisi wprost na ofercie
+i zmienia się **wyłącznie ręcznie**. Powód: automatyczne odliczanie żyło
+z założenia, że każda sprzedana pozycja ma odpowiednik w magazynie, a przy
+realnym asortymencie (surowce, opakowania, zestawy) to założenie nie
+trzymało się i stan rozjeżdżał się po cichu.
 
 Pełne schematy request/response (Pydantic) żyją w kodzie
 (`app/api/schemas/`) — ten plik dokumentuje *zakres*, nie utrzymuje
@@ -206,24 +210,21 @@ miesza się z `uv`/`pytest` backendu.
 1. **Logowanie / parowanie** — pole na adres API (Tailscale) + token,
    zapisywane w `expo-secure-store`. Ekran pokazuje się tylko przy braku
    zapisanego tokena.
-2. **Start** (`/`) — hero sprzedaży dnia + sparkline + trend, dwie karty
-   (niski stan / do wysłania), status synchronizacji, podgląd ostatnich
-   zamówień, podgląd magazynu.
+2. **Start** (`/`) — hero sprzedaży dnia + sparkline + trend, karta "do
+   wysłania", status synchronizacji, podgląd ostatnich zamówień, podgląd
+   wystawionych ofert.
 3. **Zamówienia** — lista (nieskończone przewijanie / `limit`+`offset`),
    wyszukiwarka (`/orders/search`), pull-to-refresh, przycisk "Synchronizuj
    teraz".
 4. **Szczegóły zamówienia** — dane kupującego, produkty, status, przycisk
    "Sprawdź przesyłkę" (`/orders/{id}/tracking`, pobierane na żądanie, tak
    jak dziś w bocie — **nie** cache'ujemy statusu przesyłki trwale).
-5. **Magazyn** — pasek podsumowania (wartość, liczba produktów, poniżej
-   minimum), wyszukiwarka, filtry (Wszystkie / Niski stan / Bez sprzedaży /
-   Zestawy), lista produktów z paskiem stanu.
-6. **Szczegóły produktu magazynowego** — korekta stanu (set/add/remove),
-   ustawienie minimum, historia zmian, mapowania ofert (link/unlink).
-7. **Statystyki** — dziś / miesiąc / łącznie (`/stats`), raport magazynowy
-   (`/stock/report`): niski stan, prognoza wyczerpania, produkty bez
-   sprzedaży.
-8. **Ustawienia** — adres API, token (podgląd/zmiana), wylogowanie
+5. **Magazyn** — lista ofert wystawionych na marketplace'ach: miniatura,
+   tytuł, cena, ikona kanału. Wyszukiwarka i przycisk "Synchronizuj"
+   (`/stock/sync`), który dociąga nowo wystawione oferty. Na telefonie to
+   **czysty podgląd** — ilości wpisuje się na desktopie.
+6. **Statystyki** — dziś / miesiąc / łącznie (`/stats`).
+7. **Ustawienia** — adres API, token (podgląd/zmiana), wylogowanie
    (czyszczenie sesji — Keychain/Keystore na natywnych platformach,
    `localStorage` na webie, patrz §6.2), karta "Powiadomienia push"
    (włącz/wyłącz + testowa wysyłka, tylko web/PWA, patrz §5a), link do

@@ -1,7 +1,6 @@
 import type { Wholesaler } from "../types/api";
 
 export interface WholesalerOrderItem {
-  sku: string;
   name: string;
   quantity: number;
 }
@@ -29,7 +28,7 @@ export function buildWholesalerBody(wholesaler: Wholesaler, items: WholesalerOrd
   }
 
   const itemsList = items
-    .map((item) => `- ${item.name} (SKU: ${item.sku}) - ilość: ${item.quantity} szt.`)
+    .map((item) => `- ${item.name} - ilość: ${item.quantity} szt.`)
     .join("\n");
 
   return `${greeting}

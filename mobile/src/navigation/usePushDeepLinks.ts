@@ -32,9 +32,6 @@ export function usePushDeepLinks(enabled: boolean): void {
         case "OrderDetail":
           navigation.navigate("OrderDetail", target.params);
           return;
-        case "StockItem":
-          navigation.navigate("StockItem", target.params);
-          return;
         case "IssueDetail":
           navigation.navigate("IssueDetail", target.params);
           return;

@@ -13,6 +13,7 @@ import {
 
 import { api } from "./client";
 import type {
+  CatalogSync,
   Dashboard,
   EventLog,
   Health,
@@ -21,16 +22,12 @@ import type {
   MailBody,
   MailMessage,
   MailSource,
+  MarketplaceOffer,
   Order,
   PushSubscribeBody,
   ReturnItem,
   Shipment,
-  StockAdjustOp,
-  StockItem,
-  StockMovement,
-  StockReport,
   SyncResult,
-  UnmappedOffer,
   VapidStatus,
 } from "./types";
 
@@ -118,83 +115,27 @@ export function useTriggerSync() {
 // Magazyn
 // ---------------------------------------------------------------------
 
-export function useStock() {
+export function useOffers() {
   return useQuery({
-    queryKey: ["stock"],
-    queryFn: () => api.get<StockItem[]>("/api/v1/stock"),
-  });
-}
-
-export function useStockItem(sku: string | undefined) {
-  return useQuery({
-    queryKey: ["stock-item", sku],
-    queryFn: () => api.get<StockItem>(`/api/v1/stock/${encodeURIComponent(sku!)}`),
-    enabled: Boolean(sku),
-  });
-}
-
-export function useStockHistory(sku: string | undefined) {
-  return useQuery({
-    queryKey: ["stock-history", sku],
-    queryFn: () =>
-      api.get<StockMovement[]>(`/api/v1/stock/${encodeURIComponent(sku!)}/history`),
-    enabled: Boolean(sku),
-  });
-}
-
-export function useStockReport() {
-  return useQuery({
-    queryKey: ["stock-report"],
-    queryFn: () => api.get<StockReport>("/api/v1/stock/report"),
+    queryKey: ["offers"],
+    queryFn: () => api.get<MarketplaceOffer[]>("/api/v1/stock/offers"),
   });
 }
 
 /**
- * Oferty sprzedane bez powiązania z magazynem. Ich sprzedaż nie zmienia
- * stanów, więc bez tego ostrzeżenia magazyn po prostu „stoi w miejscu”.
+ * Pobranie katalogu z marketplace na żądanie ("Synchronizuj").
+ *
+ * Mutacja, nie query: to jedyny moment, w którym ORDLY odpytuje API
+ * marketplace o listę ofert. Automatyczne odświeżanie w tle zjadałoby
+ * limit zapytań, a nowa oferta pojawia się wtedy, gdy człowiek ją
+ * wystawi - i wtedy sam naciska przycisk.
  */
-export function useUnmappedOffers() {
-  return useQuery({
-    queryKey: ["unmapped-offers"],
-    queryFn: () => api.get<UnmappedOffer[]>("/api/v1/stock/offers/unmapped"),
-  });
-}
-
-export interface AdjustStockInput {
-  sku: string;
-  op: StockAdjustOp;
-  quantity: number;
-  reason?: string;
-}
-
-export function useAdjustStock() {
+export function useSyncCatalog() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: ({ sku, ...body }: AdjustStockInput) =>
-      api.post<StockItem>(`/api/v1/stock/${encodeURIComponent(sku)}/adjust`, body),
-    onSuccess: (_data, variables) => {
-      void queryClient.invalidateQueries({ queryKey: ["stock"] });
-      void queryClient.invalidateQueries({ queryKey: ["stock-item", variables.sku] });
-      void queryClient.invalidateQueries({ queryKey: ["stock-history", variables.sku] });
-      void queryClient.invalidateQueries({ queryKey: ["stock-report"] });
-      void queryClient.invalidateQueries({ queryKey: ["dashboard"] });
-    },
-  });
-}
-
-export interface CreateStockItemInput {
-  sku: string;
-  name: string;
-  min_stock?: number;
-}
-
-export function useCreateStockItem() {
-  const queryClient = useQueryClient();
-  return useMutation({
-    mutationFn: (body: CreateStockItemInput) =>
-      api.post<StockItem>("/api/v1/stock", body),
+    mutationFn: () => api.post<CatalogSync>("/api/v1/stock/sync"),
     onSuccess: () => {
-      void queryClient.invalidateQueries({ queryKey: ["stock"] });
+      void queryClient.invalidateQueries({ queryKey: ["offers"] });
     },
   });
 }

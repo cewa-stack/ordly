@@ -55,31 +55,15 @@ class DuplicateReturnError(DomainError):
         super().__init__(f"Zwrot {marketplace}/{external_id} już istnieje w bazie")
 
 
-class InventoryItemNotFoundError(DomainError):
-    """Produkt magazynowy o podanym SKU nie istnieje."""
+class OfferNotFoundError(DomainError):
+    """Oferty o podanym numerze nie ma w lokalnym katalogu."""
 
-    def __init__(self, sku: str) -> None:
-        self.sku = sku
-        super().__init__(f"Produkt o SKU '{sku}' nie istnieje w magazynie")
-
-
-class DuplicateInventoryItemError(DomainError):
-    """Produkt magazynowy o danym SKU już istnieje w bazie."""
-
-    def __init__(self, sku: str) -> None:
-        self.sku = sku
-        super().__init__(f"Produkt o SKU '{sku}' już istnieje w magazynie")
-
-
-class InsufficientStockError(DomainError):
-    """Ręczna operacja zdjęcia ze stanu przekracza dostępną ilość."""
-
-    def __init__(self, sku: str, requested: int, available: int) -> None:
-        self.sku = sku
-        self.requested = requested
-        self.available = available
+    def __init__(self, marketplace: str, external_id: str) -> None:
+        self.marketplace = marketplace
+        self.external_id = external_id
         super().__init__(
-            f"Nie można zdjąć {requested} szt. produktu '{sku}' - dostępne {available} szt."
+            f"Oferty {marketplace}/{external_id} nie ma w magazynie - "
+            "zsynchronizuj listę ofert"
         )
 
 

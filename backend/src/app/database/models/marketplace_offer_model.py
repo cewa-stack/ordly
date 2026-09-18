@@ -13,13 +13,14 @@ from app.database.base import Base, TimestampMixin
 
 class MarketplaceOfferModel(Base, TimestampMixin):
     """
-    Tabela `marketplace_offers`.
+    Tabela `marketplace_offers` - i zarazem cały magazyn ORDLY.
 
     Lokalna kopia asortymentu wystawionego na marketplace, odświeżana
-    przez `OfferCatalogService`. Celowo NIE ma klucza obcego do
-    `inventory_items` - powiązanie oferty z magazynem żyje w
-    `offer_links` i bywa wieloskładnikowe (butelka + nakrętka +
-    kroplomierz), więc kolumna "jeden do jednego" tylko by kłamała.
+    przez `OfferCatalogService`. Wszystko poza `quantity_on_hand`
+    pochodzi z API marketplace i przy każdej synchronizacji jest
+    nadpisywane; ilość wpisuje wyłącznie człowiek z aplikacji
+    desktopowej, więc synchronizacja ma jej NIE ruszać (patrz
+    `SqliteOfferCatalogRepository.upsert_all`).
     """
 
     __tablename__ = "marketplace_offers"
@@ -41,3 +42,8 @@ class MarketplaceOfferModel(Base, TimestampMixin):
     price: Mapped[Decimal | None] = mapped_column(nullable=True)
     image_url: Mapped[str | None] = mapped_column(String(500), nullable=True)
     synced_at: Mapped[datetime] = mapped_column(nullable=False)
+
+    #: Ilość na półce wpisana ręcznie. NULL znaczy "nigdy nie wpisano"
+    #: i jest czymś innym niż 0 ("sprawdziłem, nie ma") - interfejs
+    #: pokazuje w tym miejscu kreskę, a nie zero.
+    quantity_on_hand: Mapped[int | None] = mapped_column(nullable=True)

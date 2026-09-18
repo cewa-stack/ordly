@@ -41,8 +41,6 @@ const EVENT_LABEL: Record<string, string> = {
   OrderCancelled: "Anulowane zamówienie",
   OrderPackingStarted: "Rozpoczęto pakowanie",
   OrderReturnCreated: "Nowy zwrot",
-  LowStockDetected: "Niski stan magazynowy",
-  StockSynchronized: "Magazyn zaktualizowany",
   AllegroLokalnieEventDetected: "Mail z Allegro Lokalnie",
   OlxEventDetected: "Mail z OLX",
   DisputeNoticeDetected: "Nowa dyskusja",

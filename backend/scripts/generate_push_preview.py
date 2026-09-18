@@ -100,33 +100,6 @@ def _karty() -> list[Karta]:
             ),
         ),
         Karta(
-            builder="low_stock",
-            kiedy="Gdy stan produktu spadnie do progu minimalnego.",
-            payload=push_payload.low_stock(
-                name="Butelki PET 30 ml bursztynowe",
-                sku="PET30-BUR",
-                stock=14,
-                min_stock=20,
-            ),
-        ),
-        Karta(
-            builder="unmatched_products",
-            kiedy="Gdy sprzedana pozycja nie ma powiązania z magazynem.",
-            payload=push_payload.unmatched_products(
-                reference=_ZAMOWIENIE,
-                product_names=[
-                    "Butelki PET 30 ml z zakrętką",
-                    "Nakrętki DIN18 czarne z plombą",
-                    "Kroplomierze LDPE 0,8 mm",
-                ],
-            ),
-            uwaga=(
-                "To zdarzenie szło wcześniej na telefon wspólną ścieżką z Telegramem "
-                "i pokazywało dosłowne <b> oraz <code> na ekranie blokady. Telegram "
-                "nadal dostaje pełny format z komendą do skopiowania."
-            ),
-        ),
-        Karta(
             builder="new_dispute",
             kiedy="Gdy kupujący rozpocznie dyskusję (z powiadomienia e-mail Allegro).",
             payload=push_payload.new_dispute(

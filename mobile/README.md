@@ -77,7 +77,7 @@ mobile/
 │   ├── icons/               # zestaw ikon SVG 1:1 z 02_appdesign.md §4
 │   ├── navigation/          # RootNavigator (stack) + MainTabs (dolna nawigacja)
 │   ├── push/                # Web Push (rejestracja SW, subskrypcja) - tylko Platform.OS==="web"
-│   ├── screens/             # ekrany: Login, Home, Orders, OrderDetail, Stock, StockItem, Stats, Settings
+│   ├── screens/             # ekrany: Login, Orders, OrderDetail, Stock, Returns, Discussions, Mailbox, Settings
 │   ├── store/               # AuthProvider (sesja: adres API + token)
 │   ├── theme/                # tokeny kolorów i typografii (źródło: 02_appdesign.md)
 │   └── utils/                # formatowanie kwot/dat, secureStorage (native+web)

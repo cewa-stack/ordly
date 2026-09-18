@@ -1,7 +1,5 @@
 import type {
-  BackfillPlan,
   BridgeResult,
-  CatalogOffer,
   CatalogSyncResult,
   DashboardSummary,
   HealthStatus,
@@ -11,9 +9,9 @@ import type {
   MailboxStatus,
   MailMessage,
   MailSyncResult,
-  OfferImportResult,
-  OfferRecipe,
-  OfferRecipePayload,
+  MarketplaceOffer,
+  OfferMovement,
+  OfferQuantityPayload,
   OfferRef,
   OlxOffer,
   OrdlakChatReply,
@@ -25,15 +23,8 @@ import type {
   Session,
   Shipment,
   StatsSummary,
-  StockAdjustPayload,
-  StockCreatePayload,
-  StockDeletion,
-  StockItem,
-  StockMovement,
-  StockReport,
   SyncResult,
   SystemEvent,
-  UnmappedOffer,
   Wholesaler,
   WholesalerOrderRecord,
   WholesalerOrderSendPayload,
@@ -50,26 +41,13 @@ export interface OrdlyBridge {
     logout: () => Promise<void>;
   };
   stock: {
-    list: () => Promise<BridgeResult<StockItem[]>>;
-    create: (payload: StockCreatePayload) => Promise<BridgeResult<StockItem>>;
-    remove: (sku: string) => Promise<BridgeResult<StockDeletion>>;
-    history: (sku: string) => Promise<BridgeResult<StockMovement[]>>;
-    adjust: (sku: string, payload: StockAdjustPayload) => Promise<BridgeResult<StockItem>>;
-    subItems: (sku: string) => Promise<BridgeResult<StockItem[]>>;
-    setParent: (sku: string, parentSku: string | null) => Promise<BridgeResult<StockItem>>;
-    recipes: () => Promise<BridgeResult<OfferRecipe[]>>;
-    catalog: (onlyUnlinked?: boolean) => Promise<BridgeResult<CatalogOffer[]>>;
-    syncCatalog: () => Promise<BridgeResult<CatalogSyncResult>>;
-    relinkCatalog: () => Promise<BridgeResult<{ linked: number }>>;
-    importOffers: (externalIds: string[]) => Promise<BridgeResult<OfferImportResult>>;
-    unmappedOffers: () => Promise<BridgeResult<UnmappedOffer[]>>;
-    setRecipe: (
+    offers: () => Promise<BridgeResult<MarketplaceOffer[]>>;
+    sync: () => Promise<BridgeResult<CatalogSyncResult>>;
+    setQuantity: (
       offer: OfferRef,
-      payload: OfferRecipePayload
-    ) => Promise<BridgeResult<OfferRecipe>>;
-    deleteRecipe: (offer: OfferRef) => Promise<BridgeResult<{ removed: number }>>;
-    previewBackfill: (offer: OfferRef) => Promise<BridgeResult<BackfillPlan>>;
-    applyBackfill: (offer: OfferRef) => Promise<BridgeResult<BackfillPlan>>;
+      payload: OfferQuantityPayload
+    ) => Promise<BridgeResult<MarketplaceOffer>>;
+    history: (offer: OfferRef) => Promise<BridgeResult<OfferMovement[]>>;
   };
   orders: {
     list: () => Promise<BridgeResult<Order[]>>;
@@ -91,8 +69,6 @@ export interface OrdlyBridge {
   };
   stats: {
     get: () => Promise<BridgeResult<StatsSummary>>;
-    stockReport: () => Promise<BridgeResult<StockReport>>;
-    shoppingList: () => Promise<BridgeResult<StockItem[]>>;
     dashboard: () => Promise<BridgeResult<DashboardSummary>>;
     health: () => Promise<BridgeResult<HealthStatus>>;
     events: () => Promise<BridgeResult<SystemEvent[]>>;

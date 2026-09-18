@@ -23,16 +23,18 @@ ACTIVE_STATUSES: tuple[str, ...] = ("ACTIVE", "ACTIVATING")
 @dataclass(frozen=True, slots=True)
 class MarketplaceOffer:
     """
-    Oferta sprzedawcy pobrana z marketplace (asortyment, nie sprzedaż).
+    Oferta sprzedawcy pobrana z marketplace - jednostka magazynu ORDLY.
 
-    To jest brakujące ogniwo między magazynem a sprzedażą: receptury
-    dowiązuje się do `external_id`, a ten identyfikator do tej pory
-    dało się poznać wyłącznie z historii zamówień - czyli dopiero po
-    pierwszej sprzedaży, która magazynu już nie ruszyła.
+    Wszystkie pola poza `quantity_on_hand` pochodzą z API marketplace.
+    `available_stock` to liczba sztuk WYSTAWIONYCH w ofercie, czyli
+    deklaracja wobec kupujących; `quantity_on_hand` to liczba sztuk
+    leżących na półce, wpisywana ręcznie. Te dwie liczby rozjeżdżają się
+    na co dzień i mieszanie ich było głównym powodem, dla którego stany
+    w ORDLY nie zgadzały się z rzeczywistością.
 
-    `signature` to pole "sygnatura" z Allegro (`external.id`). Sprzedawca
-    wpisuje tam zwykle własne SKU, więc jest to jedyna wskazówka
-    pozwalająca powiązać ofertę z magazynem automatycznie.
+    `signature` to pole "sygnatura" z Allegro (`external.id`) - własne
+    SKU sprzedawcy. Zostaje jako informacja w interfejsie, bo pozwala
+    rozpoznać ofertę szybciej niż numer.
     """
 
     marketplace: str
@@ -45,3 +47,6 @@ class MarketplaceOffer:
     price: Decimal | None = None
     image_url: str | None = None
     synced_at: datetime | None = None
+
+    #: Ilość na półce. None = nigdy nie wpisano (interfejs pokazuje "—").
+    quantity_on_hand: int | None = None

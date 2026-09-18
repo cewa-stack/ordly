@@ -14,8 +14,6 @@
  */
 export type Money = number;
 
-export type StockStatus = "ok" | "warning" | "critical";
-
 export interface OrderProduct {
   external_id: string;
   name: string;
@@ -52,59 +50,34 @@ export interface SyncResult {
   new_returns_count: number;
 }
 
-export interface StockItem {
-  sku: string;
-  name: string;
-  stock: number;
-  min_stock: number;
-  max_stock: number | null;
-  ean: string | null;
-  category: string | null;
-  location: string | null;
-  purchase_cost: Money | null;
-  sale_price: Money | null;
-  stock_value: Money;
-  is_low_stock: boolean;
-  status: StockStatus;
-}
-
-export type StockAdjustOp = "set" | "add" | "remove" | "min";
-
-export interface StockMovement {
-  item_sku: string;
-  item_name: string;
-  change: number;
-  stock_after: number;
-  reason: string;
-  source: string;
-  reference: string | null;
-  occurred_at: string;
-}
-
-export interface ItemForecast {
-  sku: string;
-  name: string;
-  stock: number;
-  avg_daily_sales: number;
-  days_left: number;
-}
-
-export interface StockReport {
-  total_items: number;
-  total_stock_value: Money;
-  low_stock_items: StockItem[];
-  items_without_sales: StockItem[];
-  forecasts: ItemForecast[];
-  recent_movements: StockMovement[];
-}
-
-export interface UnmappedOffer {
+/**
+ * Oferta wystawiona na marketplace - jedna pozycja Magazynu.
+ *
+ * `available_stock` przychodzi z API marketplace i mówi, ile sztuk
+ * obiecuje oferta kupującym. `quantity_on_hand` wpisuje się ręcznie
+ * na desktopie i mówi, ile ich naprawdę leży na półce; `null` znaczy
+ * "nigdy nie liczono" i nie jest tym samym co 0.
+ */
+export interface MarketplaceOffer {
   marketplace: string;
-  external_product_id: string;
+  external_id: string;
   name: string;
-  sold_quantity: number;
-  orders_count: number;
-  last_sold_at: string;
+  signature: string | null;
+  status: string;
+  available_stock: number;
+  sold_count: number;
+  price: Money | null;
+  image_url: string | null;
+  synced_at: string | null;
+  quantity_on_hand: number | null;
+}
+
+export interface CatalogSync {
+  marketplace: string;
+  fetched: number;
+  added: number;
+  removed: number;
+  synced_at: string;
 }
 
 export interface Stats {
@@ -126,7 +99,6 @@ export interface Dashboard {
   orders_today: number;
   revenue_today: number;
   orders_to_ship: number;
-  low_stock_count: number;
   revenue_last_7_days: number[];
   trend_percent: number | null;
   last_sync_human: string;

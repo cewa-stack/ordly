@@ -66,12 +66,6 @@ class CompositeNotifier(Notifier):
         """Rozgłasza zwrot produktów do wszystkich kanałów."""
         await self._run_all([n.notify_order_return(order_return) for n in self._notifiers])
 
-    async def notify_low_stock(self, name: str, sku: str, stock: int, min_stock: int) -> None:
-        """Rozgłasza ostrzeżenie o niskim stanie magazynowym do wszystkich kanałów."""
-        await self._run_all(
-            [n.notify_low_stock(name, sku, stock, min_stock) for n in self._notifiers]
-        )
-
     async def notify_shipping_reminder(self, data: ShippingReminderData) -> None:
         """Rozgłasza przypomnienie o wysyłce do wszystkich kanałów."""
         await self._run_all([n.notify_shipping_reminder(data) for n in self._notifiers])
@@ -95,14 +89,6 @@ class CompositeNotifier(Notifier):
     async def notify_new_dispute(self, notice: DisputeNotice) -> None:
         """Rozgłasza informację o nowej dyskusji do wszystkich kanałów."""
         await self._run_all([n.notify_new_dispute(notice) for n in self._notifiers])
-
-    async def notify_unmatched_products(
-        self, reference: str, product_names: list[str]
-    ) -> None:
-        """Rozgłasza ostrzeżenie o sprzedaży bez powiązania z magazynem."""
-        await self._run_all(
-            [n.notify_unmatched_products(reference, product_names) for n in self._notifiers]
-        )
 
     async def notify_sync_failed(self, channel: str, retry_in_minutes: int) -> None:
         """Rozgłasza alert o niedostępnym kanale sprzedaży."""

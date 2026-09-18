@@ -12,23 +12,20 @@ from fastapi.responses import JSONResponse
 
 from app.domain.exceptions.domain_exceptions import (
     DomainError,
-    DuplicateInventoryItemError,
     DuplicateOrderError,
     DuplicateReturnError,
-    InsufficientStockError,
-    InventoryItemNotFoundError,
     MailboxNotConfiguredError,
     MailMessageNotFoundError,
     MailNotConfiguredError,
     MailSendError,
     MarketplaceUnavailableError,
+    OfferNotFoundError,
     OrderNotFoundError,
     ShipmentNotAvailableError,
 )
 
-_NOT_FOUND = (OrderNotFoundError, InventoryItemNotFoundError, MailMessageNotFoundError)
-_CONFLICT = (DuplicateOrderError, DuplicateReturnError, DuplicateInventoryItemError)
-_UNPROCESSABLE = (InsufficientStockError,)
+_NOT_FOUND = (OrderNotFoundError, OfferNotFoundError, MailMessageNotFoundError)
+_CONFLICT = (DuplicateOrderError, DuplicateReturnError)
 _UNAVAILABLE = (
     MarketplaceUnavailableError,
     ShipmentNotAvailableError,
@@ -44,8 +41,6 @@ def _status_code_for(exc: DomainError) -> int:
         return 404
     if isinstance(exc, _CONFLICT):
         return 409
-    if isinstance(exc, _UNPROCESSABLE):
-        return 422
     if isinstance(exc, _UNAVAILABLE):
         return 503
     return 500

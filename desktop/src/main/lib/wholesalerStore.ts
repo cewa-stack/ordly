@@ -8,12 +8,18 @@ import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { randomUUID } from "node:crypto";
 
+/** Pozycja asortymentu hurtowni - nazwa i ilosc, ktora zwykle sie bierze. */
+export interface WholesalerItem {
+  name: string;
+  quantity: number;
+}
+
 export interface Wholesaler {
   id: string;
   name: string;
   email: string;
   contactPerson?: string;
-  linkedSkus: string[];
+  items: WholesalerItem[];
 }
 
 export interface WholesalerOrderRecord {
@@ -49,8 +55,27 @@ function writeJsonArray<T>(path: string, items: T[]): void {
   writeFileSync(path, JSON.stringify(items, null, 2), "utf-8");
 }
 
+/**
+ * Plik na dysku moze pochodzic z wersji, w ktorej hurtownia trzymala
+ * `linkedSkus` wskazujace na produkty magazynowe. Tamtych produktow juz
+ * nie ma, a lista pozycji jest teraz wlasnoscia hurtowni - stara zawartosc
+ * czytamy jako puste pozycje zamiast wywracac ekran na `undefined.length`.
+ */
+function normalizeWholesaler(raw: Wholesaler): Wholesaler {
+  const items = Array.isArray(raw.items) ? raw.items : [];
+  return {
+    ...raw,
+    items: items
+      .filter((item) => typeof item?.name === "string" && item.name.trim().length > 0)
+      .map((item) => ({
+        name: item.name,
+        quantity: Number.isFinite(item.quantity) ? Math.max(1, Math.trunc(item.quantity)) : 1,
+      })),
+  };
+}
+
 export function listWholesalers(): Wholesaler[] {
-  return readJsonArray<Wholesaler>(wholesalersFilePath());
+  return readJsonArray<Wholesaler>(wholesalersFilePath()).map(normalizeWholesaler);
 }
 
 export function saveWholesaler(input: Omit<Wholesaler, "id"> & { id?: string }): Wholesaler {

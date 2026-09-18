@@ -20,7 +20,6 @@ export type RootStackParamList = {
   BiometricOptIn: undefined;
   Main: NavigatorScreenParams<MainTabParamList>;
   OrderDetail: { externalId: string };
-  StockItem: { sku: string };
   IssueDetail: { issueId: string };
   MailDetail: { messageId: string };
   Settings: undefined;
