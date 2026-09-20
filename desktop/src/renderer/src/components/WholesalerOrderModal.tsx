@@ -26,7 +26,7 @@ interface WholesalerOrderModalProps {
 }
 
 const inputClass =
-  "w-full rounded-sm border border-line bg-ink-raised px-3 py-2.5 text-[12.5px] text-white outline-none focus:border-teal-bright";
+  "w-full rounded-sm border border-line bg-base px-3 py-2.5 text-[12.5px] text-text outline-none focus:border-teal";
 
 export function WholesalerOrderModal({
   open,
@@ -216,10 +216,10 @@ export function WholesalerOrderModal({
         <div className="flex flex-col gap-2">
           <div className="flex items-center gap-2">
             <span className="o-eyebrow">Pozycje</span>
-            <span className="text-[10.5px] text-slate-dim">opcjonalne</span>
+            <span className="text-[10.5px] text-text-3">opcjonalne</span>
           </div>
           {items.length === 0 && (
-            <p className="text-[12px] leading-[1.6] text-slate-dim">
+            <p className="text-[12px] leading-[1.6] text-text-3">
               Ta hurtownia nie ma jeszcze zapisanych pozycji. Dopisz je w edycji hurtowni
               albo wyślij samą wiadomość - treść wpiszesz niżej.
             </p>
@@ -230,7 +230,7 @@ export function WholesalerOrderModal({
               <div
                 key={item.name}
                 className={`flex items-center gap-3 rounded-sm border px-3 py-2 transition-colors ${
-                  isChecked ? "border-line-strong bg-panel-3" : "border-line bg-panel-2"
+                  isChecked ? "border-line-2 bg-panel-3" : "border-line bg-panel-2"
                 }`}
               >
                 <input
@@ -242,7 +242,7 @@ export function WholesalerOrderModal({
                   aria-label={`Dodaj ${item.name} do zamówienia`}
                   className="h-[15px] w-[15px] shrink-0 accent-[var(--teal-bright)]"
                 />
-                <span className="min-w-0 flex-1 truncate text-[12.5px] text-white">
+                <span className="min-w-0 flex-1 truncate text-[12.5px] text-text">
                   {item.name}
                 </span>
                 <Stepper

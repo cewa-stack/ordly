@@ -18,10 +18,10 @@ const DAY_LABELS = ["pon", "wt", "śr", "czw", "pt", "sob", "ndz"];
 
 const CHANNEL_COLOR: Record<string, string> = {
   allegro: "var(--coral)",
-  allegro_lokalnie: "rgba(255,133,99,.55)",
+  allegro_lokalnie: "var(--chan-lokalnie-bar)",
   amazon: "var(--amber)",
   olx: "var(--violet)",
-  ebay: "var(--teal-bright)",
+  ebay: "var(--teal)",
 };
 
 /** Etykiety 7 dni wstecz, konczac na dzisiaj - zgodnie z kolejnoscia serii z backendu. */
@@ -60,11 +60,11 @@ function RevenueBars({ series }: { series: number[] }) {
               style={{
                 height: grown ? `${Math.max(2, (value / max) * 100)}%` : "0%",
                 background: isToday
-                  ? "linear-gradient(180deg, var(--coral), #C4533A)"
-                  : "linear-gradient(180deg, var(--teal-bright), var(--teal-deep))",
+                  ? "linear-gradient(180deg, var(--coral), var(--coral-deep))"
+                  : "linear-gradient(180deg, var(--teal), var(--teal-deep))",
               }}
             />
-            <span className="o-mono text-[9.5px] text-slate-dim">{labels[index]}</span>
+            <span className="o-mono text-[9.5px] text-text-3">{labels[index]}</span>
           </div>
         );
       })}
@@ -82,7 +82,7 @@ function ChannelDonut({ orders }: { orders: Order[] }) {
 
   if (total === 0) {
     return (
-      <p className="py-6 text-center text-[12px] text-slate-dim">
+      <p className="py-6 text-center text-[12px] text-text-3">
         Brak zamówień do podziału na kanały.
       </p>
     );
@@ -106,18 +106,18 @@ function ChannelDonut({ orders }: { orders: Order[] }) {
         <span className="absolute inset-[22px] rounded-full bg-panel-2" />
         <div className="absolute inset-0 z-[1] flex flex-col items-center justify-center">
           <span className="o-mono text-[19px] font-semibold">{total}</span>
-          <span className="text-[9.5px] text-slate-dim">zamówień</span>
+          <span className="text-[9.5px] text-text-3">zamówień</span>
         </div>
       </div>
       <div className="flex flex-col gap-2">
         {entries.map(([channel, count]) => (
-          <div key={channel} className="flex items-center gap-[9px] text-[12px] text-slate">
+          <div key={channel} className="flex items-center gap-[9px] text-[12px] text-text-2">
             <i
               className="h-2 w-2 shrink-0 rounded-[2.5px]"
               style={{ background: CHANNEL_COLOR[channel] ?? "var(--slate)" }}
             />
             <span className="capitalize">{channel}</span>
-            <span className="o-mono ml-auto text-[11px] text-white">
+            <span className="o-mono ml-auto text-[11px] text-text">
               {Math.round((count / total) * 100)}%
             </span>
           </div>
@@ -215,7 +215,7 @@ export function StatystykiScreen() {
         <div className="flex flex-col gap-[15px] rounded-md border border-line bg-panel-2 p-[18px]">
           <h4 className="text-[13px] font-semibold">Podział kanałów</h4>
           <ChannelDonut orders={orders} />
-          <p className="text-[10.5px] leading-[1.5] text-slate-dim">
+          <p className="text-[10.5px] leading-[1.5] text-text-3">
             Liczone z {orders.length} ostatnich zamówień pobranych z Pi.
           </p>
         </div>
@@ -225,7 +225,6 @@ export function StatystykiScreen() {
         <h4 className="text-[13px] font-semibold">Najczęściej sprzedawane</h4>
         {bestSellers.length === 0 ? (
           <EmptyState
-            pose="idle"
             title="Brak danych sprzedażowych"
             description="Gdy pojawią się zamówienia, Ordi policzy, co schodzi najlepiej."
           />
@@ -235,9 +234,9 @@ export function StatystykiScreen() {
               key={product.name}
               className="flex items-center gap-3 border-b border-line py-2 text-[12.5px] last:border-b-0"
             >
-              <span className="min-w-0 flex-1 truncate text-white">{product.name}</span>
-              <span className="o-mono shrink-0 text-slate">{product.quantity} szt.</span>
-              <span className="o-mono w-[90px] shrink-0 text-right text-teal-bright">
+              <span className="min-w-0 flex-1 truncate text-text">{product.name}</span>
+              <span className="o-mono shrink-0 text-text-2">{product.quantity} szt.</span>
+              <span className="o-mono w-[90px] shrink-0 text-right text-teal">
                 {formatCurrency(product.revenue)}
               </span>
             </div>
@@ -259,8 +258,8 @@ function SummaryTile({
 }) {
   return (
     <div className="flex flex-col gap-2 rounded-md border border-line bg-panel-2 p-4">
-      <span className="text-[11px] text-slate-dim">{label}</span>
-      <span className={`o-counter ${accent ? "text-teal-bright" : "text-white"}`}>{value}</span>
+      <span className="text-[11px] text-text-3">{label}</span>
+      <span className={`o-kpi ${accent ? "text-teal" : "text-text"}`}>{value}</span>
     </div>
   );
 }

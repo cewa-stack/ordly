@@ -58,7 +58,7 @@ function Field({
     <label className="flex flex-col gap-1.5">
       <span className="o-eyebrow">{label}</span>
       {children}
-      <span className="text-[11px] text-slate-dim">{hint}</span>
+      <span className="text-[11px] text-text-3">{hint}</span>
     </label>
   );
 }
@@ -90,7 +90,7 @@ function HistoryModal({
     >
       {historyQuery.isLoading && <span className="o-skeleton-bar h-24 w-full" />}
       {historyQuery.data?.length === 0 && (
-        <p className="text-[12.5px] text-slate-dim">
+        <p className="text-[12.5px] text-text-3">
           Stan tej oferty nie był jeszcze wpisywany.
         </p>
       )}
@@ -100,17 +100,17 @@ function HistoryModal({
             key={`${movement.occurred_at}-${index}`}
             className="flex items-center gap-3 border-b border-line py-2.5 text-[12.5px] last:border-b-0"
           >
-            <span className="o-mono w-[100px] shrink-0 text-[10.5px] text-slate-dim">
+            <span className="o-mono w-[100px] shrink-0 text-[10.5px] text-text-3">
               {formatDateTime(movement.occurred_at)}
             </span>
             {/* Pierwszy wpis nie ma "o ile" - nie bylo od czego liczyc. */}
             <span
               className={`o-mono w-12 shrink-0 text-right ${
                 movement.change === null
-                  ? "text-slate-dim"
+                  ? "text-text-3"
                   : movement.change < 0
                     ? "text-coral"
-                    : "text-teal-bright"
+                    : "text-teal"
               }`}
             >
               {movement.change === null
@@ -119,10 +119,10 @@ function HistoryModal({
                   ? `+${movement.change}`
                   : movement.change}
             </span>
-            <span className="o-mono w-14 shrink-0 text-right text-white">
+            <span className="o-mono w-14 shrink-0 text-right text-text">
               {movement.quantity_after} szt.
             </span>
-            <span className="min-w-0 flex-1 truncate text-slate">{movement.reason}</span>
+            <span className="min-w-0 flex-1 truncate text-text-2">{movement.reason}</span>
           </div>
         ))}
       </div>
@@ -247,7 +247,7 @@ function QuantityModal({
                 mutation.mutate();
               }
             }}
-            className="o-mono w-full rounded-sm border border-line bg-ink-raised px-3 py-2.5 text-[12.5px] text-white outline-none focus:border-teal-bright"
+            className="o-mono w-full rounded-sm border border-line bg-base px-3 py-2.5 text-[12.5px] text-text outline-none focus:border-teal"
           />
         </Field>
 
@@ -256,20 +256,20 @@ function QuantityModal({
             value={reason}
             onChange={(event) => setReason(event.target.value)}
             placeholder={DEFAULT_REASON}
-            className="w-full rounded-sm border border-line bg-ink-raised px-3 py-2.5 text-[12.5px] text-white outline-none placeholder:text-slate-dim focus:border-teal-bright"
+            className="w-full rounded-sm border border-line bg-base px-3 py-2.5 text-[12.5px] text-text outline-none placeholder:text-text-3 focus:border-teal"
           />
         </Field>
 
-        <div className="rounded-sm border border-line bg-ink-raised px-3 py-2.5">
+        <div className="rounded-sm border border-line bg-base px-3 py-2.5">
           {problem ? (
             <p className="text-[12px] text-coral">{problem}</p>
           ) : amount === null ? (
-            <p className="text-[12px] text-slate-dim">Wpisz liczbę, żeby zobaczyć wynik.</p>
+            <p className="text-[12px] text-text-3">Wpisz liczbę, żeby zobaczyć wynik.</p>
           ) : (
-            <p className="o-mono text-[12.5px] text-slate">
+            <p className="o-mono text-[12.5px] text-text-2">
               {current === null ? "nie liczono" : `${current} szt.`}{" "}
-              <span className="text-slate-dim">→</span>{" "}
-              <span className="text-teal-bright">{amount} szt.</span>
+              <span className="text-text-3">→</span>{" "}
+              <span className="text-teal">{amount} szt.</span>
             </p>
           )}
         </div>
@@ -403,18 +403,18 @@ export function MagazynScreen({ focusOffer, onFocusHandled }: MagazynScreenProps
         <div className="relative min-w-0 flex-1">
           <SearchIcon
             size={13}
-            className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-dim"
+            className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-text-3"
           />
           <input
             value={search}
             onChange={(event) => setSearch(event.target.value)}
             placeholder="Szukaj po nazwie, numerze oferty lub sygnaturze…"
             aria-label="Szukaj w ofertach"
-            className="w-full rounded-[7px] border border-line bg-ink-raised py-[5px] pl-7 pr-3 text-[11.5px] text-white outline-none placeholder:text-slate-dim focus:border-teal-bright"
+            className="w-full rounded-[7px] border border-line bg-base py-[5px] pl-7 pr-3 text-[11.5px] text-text outline-none placeholder:text-text-3 focus:border-teal"
           />
         </div>
 
-        <span className="o-mono text-[10.5px] text-slate-dim">
+        <span className="o-mono text-[10.5px] text-text-3">
           {lastSynced ? `Pobrano ${formatDateTime(lastSynced)}` : "Katalog jeszcze niepobrany"}
         </span>
 
@@ -432,7 +432,6 @@ export function MagazynScreen({ focusOffer, onFocusHandled }: MagazynScreenProps
 
         {!isLoading && offers.length === 0 && (
           <EmptyState
-            pose="idle"
             title="Nie ma jeszcze żadnych ofert"
             description="Kliknij „Synchronizuj”, żeby pobrać to, co masz wystawione na marketplace'ach."
           />
@@ -440,7 +439,6 @@ export function MagazynScreen({ focusOffer, onFocusHandled }: MagazynScreenProps
 
         {!isLoading && offers.length > 0 && visible.length === 0 && (
           <EmptyState
-            pose="think"
             title="Nic nie pasuje do wyszukiwania"
             description="Zmień frazę albo wyczyść pole wyszukiwania."
           />
@@ -458,7 +456,7 @@ export function MagazynScreen({ focusOffer, onFocusHandled }: MagazynScreenProps
                     rowRefs.current[key] = element;
                   }}
                   className={`flex items-center gap-3 rounded-lg border border-line px-3.5 py-3 transition-colors duration-150 ease-ordly ${
-                    highlight === key ? "bg-teal-dim" : "bg-panel-2"
+                    highlight === key ? "bg-teal-glow" : "bg-panel-2"
                   }`}
                 >
                   {offer.image_url ? (
@@ -468,14 +466,14 @@ export function MagazynScreen({ focusOffer, onFocusHandled }: MagazynScreenProps
                       className="h-10 w-10 shrink-0 rounded-md border border-line object-cover"
                     />
                   ) : (
-                    <div className="h-10 w-10 shrink-0 rounded-md border border-line bg-ink-raised" />
+                    <div className="h-10 w-10 shrink-0 rounded-md border border-line bg-base" />
                   )}
 
                   <MarketplaceBadge marketplace={offer.marketplace} />
 
                   <div className="min-w-0 flex-1">
-                    <p className="truncate text-[13px] text-white">{offer.name}</p>
-                    <p className="o-mono mt-1 truncate text-[10.5px] text-slate-dim">
+                    <p className="truncate text-[13px] text-text">{offer.name}</p>
+                    <p className="o-mono mt-1 truncate text-[10.5px] text-text-3">
                       {offer.external_id}
                       {offer.signature ? ` · sygn. ${offer.signature}` : ""} · wystawione{" "}
                       {offer.available_stock} szt.
@@ -484,7 +482,7 @@ export function MagazynScreen({ focusOffer, onFocusHandled }: MagazynScreenProps
 
                   {/* Oferta bez ceny to na Allegro wariant z cennikiem -
                       kreska mowi "tu nie ma jednej kwoty", a nie "0 zl". */}
-                  <span className="o-mono w-[88px] shrink-0 text-right text-[12.5px] text-white">
+                  <span className="o-mono w-[88px] shrink-0 text-right text-[12.5px] text-text">
                     {offer.price === null ? "—" : formatCurrency(offer.price)}
                   </span>
 

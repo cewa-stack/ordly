@@ -39,13 +39,18 @@ const STATUS_LABEL: Record<string, string> = {
   CLAIM_REJECTED: "Odrzucona",
 };
 
+/**
+ * Tony w jezyku z sekcji 7: `hot` wymaga dzialania, `go` jest w toku,
+ * `mute` jest zamkniete. "Nierozwiazana" zostaje `hot` - to jedyny
+ * status, ktory wyglada na zamkniety, a naprawde czeka na ruch.
+ */
 const STATUS_TONE: Record<string, PillTone> = {
-  DISPUTE_ONGOING: "pack",
-  DISPUTE_CLOSED: "done",
-  DISPUTE_UNRESOLVED: "warn",
-  CLAIM_SUBMITTED: "pack",
-  CLAIM_ACCEPTED: "new",
-  CLAIM_REJECTED: "warn",
+  DISPUTE_ONGOING: "hot",
+  DISPUTE_CLOSED: "mute",
+  DISPUTE_UNRESOLVED: "hot",
+  CLAIM_SUBMITTED: "hot",
+  CLAIM_ACCEPTED: "go",
+  CLAIM_REJECTED: "mute",
 };
 
 /** Szablony odpowiedzi - tresc wg regul tonu z sekcji 7.1: konkret, bez sprytu. */
@@ -166,8 +171,8 @@ function Conversation({ issue }: { issue: Issue }) {
             {STATUS_LABEL[issue.status] ?? issue.status}
           </Pill>
         </div>
-        <h3 className="o-section-title mt-1">{issue.subject ?? "Bez tematu"}</h3>
-        <p className="o-mono text-[11px] text-slate-dim">
+        <h3 className="o-screen-title mt-1">{issue.subject ?? "Bez tematu"}</h3>
+        <p className="o-mono text-[11px] text-text-3">
           {issue.buyer_login} · {issue.messages_count} wiadomości
         </p>
       </div>
@@ -193,12 +198,12 @@ function Conversation({ issue }: { issue: Issue }) {
               key={`${message.id}-${message.created_at}`}
               className={`max-w-[85%] rounded-md px-3.5 py-3 text-[12.5px] leading-[1.55] ${
                 isSeller
-                  ? "self-end rounded-tr-[4px] bg-teal-dim text-white"
-                  : "rounded-tl-[4px] bg-panel-2 text-white"
+                  ? "self-end rounded-tr-[4px] bg-teal-glow text-text"
+                  : "rounded-tl-[4px] bg-panel-2 text-text"
               }`}
             >
               <MessageBody text={message.text} />
-              <span className="o-mono mt-1.5 block text-[9.5px] text-slate-dim">
+              <span className="o-mono mt-1.5 block text-[9.5px] text-text-3">
                 {isSeller ? "Ty" : message.author_login} ·{" "}
                 {formatDateTime(message.created_at)}
               </span>
@@ -209,7 +214,7 @@ function Conversation({ issue }: { issue: Issue }) {
 
       <div className="relative shrink-0">
         {templatesOpen && (
-          <div className="absolute bottom-full left-0 right-0 z-10 mb-2 overflow-hidden rounded-md border border-line-strong bg-panel shadow-palette">
+          <div className="absolute bottom-full left-0 right-0 z-10 mb-2 overflow-hidden rounded-md border border-line-2 bg-panel shadow-palette">
             {TEMPLATES.map((template) => (
               <button
                 key={template.name}
@@ -217,7 +222,7 @@ function Conversation({ issue }: { issue: Issue }) {
                   setText(template.text);
                   setTemplatesOpen(false);
                 }}
-                className="block w-full border-b border-line px-3.5 py-2.5 text-left text-[12px] text-slate last:border-b-0 hover:bg-panel-2 hover:text-white"
+                className="block w-full border-b border-line px-3.5 py-2.5 text-left text-[12px] text-text-2 last:border-b-0 hover:bg-panel-2 hover:text-text"
               >
                 {template.name}
               </button>
@@ -225,14 +230,14 @@ function Conversation({ issue }: { issue: Issue }) {
           </div>
         )}
 
-        <div className="flex flex-col gap-2.5 rounded-md border border-line-strong bg-panel-2 px-3 py-3">
+        <div className="flex flex-col gap-2.5 rounded-md border border-line-2 bg-panel-2 px-3 py-3">
           <textarea
             value={text}
             onChange={(event) => setText(event.target.value)}
             placeholder="Napisz odpowiedź…"
             rows={3}
             disabled={!issue.chat_active}
-            className="resize-none bg-transparent text-[12.5px] leading-[1.55] text-white outline-none placeholder:text-slate-dim disabled:opacity-50"
+            className="resize-none bg-transparent text-[12.5px] leading-[1.55] text-text outline-none placeholder:text-text-3 disabled:opacity-50"
           />
           <div className="flex items-center gap-2">
             <IconButton
@@ -243,7 +248,7 @@ function Conversation({ issue }: { issue: Issue }) {
               <TemplateIcon size={14} />
             </IconButton>
             {!issue.chat_active && (
-              <span className="text-[10.5px] text-slate-dim">
+              <span className="text-[10.5px] text-text-3">
                 Wątek zamknięty przez Allegro
               </span>
             )}
@@ -289,7 +294,6 @@ export function DiscussionsScreen() {
         {isLoading && <SkeletonRows rows={5} />}
         {!isLoading && (data ?? []).length === 0 && (
           <EmptyState
-            pose="happy"
             title="Brak otwartych spraw"
             description="Zero dyskusji i reklamacji do obsłużenia - spokojnie."
           />
@@ -301,22 +305,22 @@ export function DiscussionsScreen() {
               key={issue.external_id}
               onClick={() => setSelectedId(issue.external_id)}
               className={`relative flex w-full items-start gap-3 border-b border-line px-[22px] py-[15px] text-left transition-colors duration-150 ease-ordly ${
-                isSelected ? "bg-teal-dim" : "hover:bg-panel-2"
+                isSelected ? "bg-teal-glow" : "hover:bg-panel-2"
               }`}
             >
               {isSelected && (
-                <span className="absolute bottom-0 left-0 top-0 w-[3px] bg-teal-bright" />
+                <span className="absolute bottom-0 left-0 top-0 w-[3px] bg-teal" />
               )}
               <InitialAvatar name={issue.buyer_login} />
               <span className="min-w-0 flex-1">
                 <span className="mb-1 flex items-center gap-2.5">
                   <span className="text-[13px] font-semibold">{issue.buyer_login}</span>
                   <MarketplaceBadge marketplace={issue.marketplace} />
-                  <span className="o-mono ml-auto text-[10px] text-slate-dim">
+                  <span className="o-mono ml-auto text-[10px] text-text-3">
                     {issue.last_message_at ? formatAge(issue.last_message_at) : "—"}
                   </span>
                 </span>
-                <span className="line-clamp-2 block text-[12.5px] leading-[1.5] text-slate">
+                <span className="line-clamp-2 block text-[12.5px] leading-[1.5] text-text-2">
                   {issuePreview(issue)}
                 </span>
               </span>
@@ -331,7 +335,7 @@ export function DiscussionsScreen() {
       {selected ? (
         <Conversation key={selected.external_id} issue={selected} />
       ) : (
-        <div className="flex items-center justify-center border-l border-line p-5 text-center text-[12.5px] text-slate-dim">
+        <div className="flex items-center justify-center border-l border-line p-5 text-center text-[12.5px] text-text-3">
           Wybierz wątek z listy, żeby zobaczyć rozmowę.
         </div>
       )}

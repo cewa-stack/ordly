@@ -201,30 +201,30 @@ export function CommandPalette({ open, onClose, onSelect }: CommandPaletteProps)
   return (
     <div
       className="fixed inset-0 z-[100] flex items-start justify-center pt-[14vh]"
-      style={{ background: "rgba(4,7,6,.72)", backdropFilter: "blur(7px)" }}
+      style={{ background: "var(--scrim)", backdropFilter: "blur(7px)" }}
       onClick={onClose}
       role="dialog"
       aria-modal="true"
       aria-label="Paleta poleceń"
     >
       <div
-        className="animate-cmd-in w-[min(540px,92vw)] overflow-hidden rounded-lg border border-line-strong bg-panel shadow-palette"
+        className="animate-cmd-in w-[min(540px,92vw)] overflow-hidden rounded-lg border border-line-2 bg-panel shadow-palette"
         onClick={(event) => event.stopPropagation()}
       >
         <div className="flex items-center gap-[11px] border-b border-line px-[17px] py-[15px]">
-          <SearchIcon size={16} className="text-slate-dim" />
+          <SearchIcon size={16} className="text-text-3" />
           <input
             ref={inputRef}
             value={query}
             onChange={(event) => setQuery(event.target.value)}
             placeholder="Szukaj zamówienia, produktu lub ekranu…"
-            className="flex-1 bg-transparent text-[14.5px] text-white outline-none placeholder:text-slate-dim"
+            className="flex-1 bg-transparent text-[14.5px] text-text outline-none placeholder:text-text-3"
           />
         </div>
 
         <div ref={listRef} className="max-h-[320px] overflow-y-auto p-[7px]">
           {entries.length === 0 ? (
-            <p className="px-4 py-7 text-center text-[12.5px] text-slate-dim">
+            <p className="px-4 py-7 text-center text-[12.5px] text-text-3">
               Nic nie pasuje do «{query}»
             </p>
           ) : (
@@ -234,7 +234,7 @@ export function CommandPalette({ open, onClose, onSelect }: CommandPaletteProps)
               return (
                 <React.Fragment key={entry.id}>
                   {showGroup && (
-                    <div className="o-mono px-2.5 pb-[5px] pt-2.5 text-[9.5px] uppercase tracking-[.12em] text-slate-dim">
+                    <div className="o-mono px-2.5 pb-[5px] pt-2.5 text-[9.5px] uppercase tracking-[.12em] text-text-3">
                       {entry.group}
                     </div>
                   )}
@@ -243,13 +243,13 @@ export function CommandPalette({ open, onClose, onSelect }: CommandPaletteProps)
                     onMouseEnter={() => setCursor(index)}
                     onClick={() => commit(entry)}
                     className={`flex w-full items-center gap-[11px] rounded-[9px] px-2.5 py-[9.5px] text-left text-[13.5px] transition-colors duration-100 ${
-                      index === cursor ? "bg-teal-dim text-teal-bright" : "text-slate"
+                      index === cursor ? "bg-teal-glow text-teal" : "text-text-2"
                     }`}
                   >
                     <span className="opacity-80">{entry.icon}</span>
                     <span className="min-w-0 flex-1 truncate">{entry.label}</span>
                     {entry.hint && (
-                      <span className="o-mono shrink-0 text-[9.5px] text-slate-dim">
+                      <span className="o-mono shrink-0 text-[9.5px] text-text-3">
                         {entry.hint}
                       </span>
                     )}
@@ -260,7 +260,7 @@ export function CommandPalette({ open, onClose, onSelect }: CommandPaletteProps)
           )}
         </div>
 
-        <div className="flex items-center gap-3.5 border-t border-line px-4 py-2.5 text-[10.5px] text-slate-dim">
+        <div className="flex items-center gap-3.5 border-t border-line px-4 py-2.5 text-[10.5px] text-text-3">
           <span className="flex items-center gap-1.5">
             <Kbd>↑</Kbd>
             <Kbd>↓</Kbd> nawigacja
@@ -280,7 +280,7 @@ export function CommandPalette({ open, onClose, onSelect }: CommandPaletteProps)
 
 function Kbd({ children }: { children: React.ReactNode }) {
   return (
-    <span className="o-mono rounded-[5px] border border-line-strong bg-ink-raised px-1.5 py-0.5 text-[10px] text-slate-dim">
+    <span className="o-mono rounded-[5px] border border-line-2 bg-base px-1.5 py-0.5 text-[10px] text-text-3">
       {children}
     </span>
   );

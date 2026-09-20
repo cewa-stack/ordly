@@ -1,8 +1,8 @@
 /**
- * Chrome okna, 40 px (sekcja 4.1). Okno jest bezramkowe
+ * Chrome okna - 38 px (sekcja 8 instrukcji). Okno jest bezramkowe
  * (main/index.ts: frame:false), wiec min/maks/zamknij rysujemy sami.
  *
- * Kropka "live" pulsuje tylko wtedy, gdy Pi faktycznie odpowiada -
+ * Kropka "live" swieci tylko wtedy, gdy Pi faktycznie odpowiada -
  * inaczej byloby to swiatelko, ktore zawsze swieci na zielono.
  */
 interface TitlebarProps {
@@ -12,26 +12,20 @@ interface TitlebarProps {
 
 export function Titlebar({ online, hostname }: TitlebarProps) {
   return (
-    <div className="app-region-drag flex h-10 shrink-0 items-center gap-2 border-b border-line bg-ink-raised px-4">
-      <span className="h-2.5 w-2.5 rounded-full bg-line-strong" />
-      <span className="h-2.5 w-2.5 rounded-full bg-line-strong" />
-      <span className="h-2.5 w-2.5 rounded-full bg-line-strong" />
-
-      <div className="o-mono mx-auto flex items-center gap-2 text-[11px] tracking-[.04em] text-slate-dim">
+    <div className="app-region-drag flex h-[38px] shrink-0 items-center gap-2 border-b border-line px-4">
+      <div className="o-mono mx-auto flex items-center gap-2 text-[10.5px] uppercase tracking-[.1em] text-text-3">
         <span
-          className={`h-[5px] w-[5px] rounded-full ${
-            online ? "animate-pulse-ring bg-teal-bright" : "bg-coral"
-          }`}
+          className={`h-[5px] w-[5px] rounded-full ${online ? "bg-teal" : "bg-coral"}`}
+          style={online ? { boxShadow: "0 0 0 4px var(--teal-glow)" } : undefined}
         />
-        ORDLY <b className="font-medium text-slate">—</b>{" "}
-        {online ? hostname : "brak połączenia z Pi"}
+        ORDLY · {online ? hostname : "brak połączenia z Pi"}
       </div>
 
-      <div className="app-region-no-drag flex items-center gap-4 text-slate-dim">
+      <div className="app-region-no-drag flex items-center gap-4 text-text-3">
         <button
           aria-label="Minimalizuj"
           onClick={() => void window.ordly.window.minimize()}
-          className="hover:text-white"
+          className="transition-colors duration-150 hover:text-text"
         >
           <svg width="11" height="11" viewBox="0 0 11 11">
             <line x1="1" y1="5.5" x2="10" y2="5.5" stroke="currentColor" strokeWidth="1.1" />
@@ -40,7 +34,7 @@ export function Titlebar({ online, hostname }: TitlebarProps) {
         <button
           aria-label="Maksymalizuj"
           onClick={() => void window.ordly.window.maximize()}
-          className="hover:text-white"
+          className="transition-colors duration-150 hover:text-text"
         >
           <svg width="11" height="11" viewBox="0 0 11 11">
             <rect
@@ -58,7 +52,7 @@ export function Titlebar({ online, hostname }: TitlebarProps) {
         <button
           aria-label="Zamknij"
           onClick={() => void window.ordly.window.close()}
-          className="hover:text-coral"
+          className="transition-colors duration-150 hover:text-coral"
         >
           <svg width="11" height="11" viewBox="0 0 11 11">
             <line x1="1" y1="1" x2="10" y2="10" stroke="currentColor" strokeWidth="1.1" />

@@ -31,12 +31,13 @@ const STATUS_LABEL: Record<string, string> = {
   REJECTED: "Odrzucony",
 };
 
+/** Tony wg sekcji 7 - zwrot zamkniety nie ma po co swiecic. */
 const STATUS_TONE: Record<string, PillTone> = {
-  CREATED: "pack",
-  COMMISSION_REFUND_CLAIMED: "warn",
-  COMMISSION_REFUNDED: "done",
-  CANCELLED: "done",
-  REJECTED: "done",
+  CREATED: "hot",
+  COMMISSION_REFUND_CLAIMED: "go",
+  COMMISSION_REFUNDED: "mute",
+  CANCELLED: "mute",
+  REJECTED: "mute",
 };
 
 const ALLEGRO_RETURNS_URL = "https://allegro.pl/moje-allegro/sprzedaz/zwroty";
@@ -70,7 +71,6 @@ export function ReturnsScreen() {
 
       {!isLoading && (data ?? []).length === 0 && (
         <EmptyState
-          pose="happy"
           title="Zero zwrotów"
           description="Wszystkie zamówienia idą gładko. Ordi da znać, gdy pojawi się nowy zwrot."
         />
@@ -83,8 +83,8 @@ export function ReturnsScreen() {
         >
           <MarketplaceBadge marketplace={item.marketplace} />
           <div className="min-w-0 flex-1">
-            <h4 className="o-card-title mb-1 truncate">{item.products_summary}</h4>
-            <p className="o-mono truncate text-[12px] text-slate-dim">
+            <h4 className="text-[13.5px] font-semibold mb-1 truncate">{item.products_summary}</h4>
+            <p className="o-mono truncate text-[12px] text-text-3">
               {item.buyer_login} · zgłoszony {formatAge(item.return_date)} ·{" "}
               {formatDateTime(item.return_date)}
             </p>
@@ -102,7 +102,7 @@ export function ReturnsScreen() {
       ))}
 
       {(data ?? []).length > 0 && (
-        <p className="pb-2 pt-1 text-[11.5px] leading-[1.6] text-slate-dim">
+        <p className="pb-2 pt-1 text-[11.5px] leading-[1.6] text-text-3">
           Decyzję o przyjęciu zwrotu i zwrocie pieniędzy podejmujesz w panelu Allegro - ORDLY
           pokazuje stan i pilnuje, żeby żaden zwrot Ci nie umknął.
         </p>

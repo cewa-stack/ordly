@@ -1,19 +1,20 @@
 /**
- * Fonty bundlowane lokalnie, nie z CDN - Content-Security-Policy w
+ * ORDLY Nokturn - warstwa wizualna desktopu.
+ *
+ * Fonty bundlowane lokalnie, nie z CDN: Content-Security-Policy w
  * index.html dopuszcza tylko 'self', a aplikacja desktopowa musi
  * wygladac tak samo bez internetu.
  *
- * Inter 450 ze specyfikacji nie istnieje jako waga statyczna - rola
- * "tekst wyrozniony" korzysta z 500.
+ * Bricolage Grotesque jest wariantowy i rejestruje sie pod nazwa
+ * "Bricolage Grotesque Variable" - nazwa bez "Variable" (ta ze
+ * specyfikacji) zostaje jako zapasowa, na wypadek podmiany paczki na
+ * wersje statyczna.
  */
-@import "@fontsource/space-grotesk/500.css";
-@import "@fontsource/space-grotesk/600.css";
-@import "@fontsource/space-grotesk/700.css";
-@import "@fontsource/inter/400.css";
-@import "@fontsource/inter/500.css";
-@import "@fontsource/inter/600.css";
-@import "@fontsource/inter/700.css";
-@import "@fontsource/jetbrains-mono/400.css";
+@import "@fontsource-variable/bricolage-grotesque/wght.css";
+@import "@fontsource/instrument-sans/400.css";
+@import "@fontsource/instrument-sans/500.css";
+@import "@fontsource/instrument-sans/600.css";
+@import "@fontsource/instrument-sans/700.css";
 @import "@fontsource/jetbrains-mono/500.css";
 @import "@fontsource/jetbrains-mono/600.css";
 
@@ -22,34 +23,67 @@
 @tailwind utilities;
 
 /**
- * Tokeny wizualne 1:1 z sekcja 2 specyfikacji. Zadnych "prawie takich
- * samych" odcieni - kazda wartosc pochodzi wprost z koncepcji.
+ * Tokeny 1:1 z sekcja 4 instrukcji Nokturn. To JEDYNE miejsce w
+ * rendererze (obok tailwind.config.ts) z wartosciami szesnastkowymi -
+ * zaden .tsx nie ma prawa wpisac koloru wprost.
  */
 :root {
-  --ink: #080c0b;
-  --ink-raised: #101614;
-  --panel: #141b19;
-  --panel-2: #1a2320;
-  --panel-3: #212b27;
+  /* atmosfera NOC */
+  --void: #060d0c; /* tlo okna */
+  --base: #0a1413; /* tlo obszaru roboczego */
+  --panel: #101d1b; /* karta, panel */
+  --panel-2: #162724; /* karta w karcie, aktywna pozycja nawigacji */
+  --panel-3: #1e332f; /* miniatura, tor paska postepu */
+  --line: rgba(214, 235, 228, 0.075);
+  --line-2: rgba(214, 235, 228, 0.15);
+  --text: #eaf3ef;
+  --text-2: #93a9a3;
+  --text-3: #6f8882;
 
-  --line: rgba(240, 244, 239, 0.075);
-  --line-strong: rgba(240, 244, 239, 0.145);
-
-  --teal: #3eaaaf;
-  --teal-bright: #5fd9cc;
+  /* SYGNALY - wspolne dla obu atmosfer */
+  --teal: #5fd9cc; /* akcja, teraz */
+  --teal-2: #3eaaaf; /* marka */
   --teal-deep: #1f7d80;
-  --teal-dim: rgba(95, 217, 204, 0.14);
+  --teal-glow: rgba(95, 217, 204, 0.16);
+  --coral: #ff8563; /* czeka na Ciebie */
+  --coral-glow: rgba(255, 133, 99, 0.14);
+  --amber: #f5c065; /* Amazon */
+  --violet: #a79bff; /* OLX */
 
-  --coral: #ff8563;
-  --coral-dim: rgba(255, 133, 99, 0.13);
-  --amber: #f5c065;
-  --violet: #a79bff;
+  /* Tla etykiet kanalow - przezroczystosci, wiec nie sa kolorami Tailwinda. */
+  --chan-allegro: rgba(255, 133, 99, 0.14);
+  --chan-lokalnie: rgba(255, 133, 99, 0.08);
+  --chan-lokalnie-tx: rgba(255, 133, 99, 0.72);
+  --chan-olx: rgba(167, 155, 255, 0.14);
+  --chan-amazon: rgba(245, 192, 101, 0.13);
+  /** Slupek "Allegro Lokalnie" na wykresie - musi byc kryjacy, nie tlem. */
+  --chan-lokalnie-bar: rgba(255, 133, 99, 0.55);
+  /* Ton "zamkniete" na pigulkach i wygaszonych etykietach. */
+  --mute-tint: rgba(147, 169, 163, 0.1);
 
-  --slate: #93a6a0;
-  --slate-dim: #5f726c;
-  --white: #f5f8f6;
+  /* Odcienie pochodne - zamiast wartosci wpisywanych w ekranach. */
+  --amber-soft: rgba(245, 192, 101, 0.08); /* tlo komorki kalendarza */
+  --coral-soft: rgba(255, 133, 99, 0.08); /* tlo notki ostrzegawczej */
+  --coral-line: rgba(255, 133, 99, 0.3); /* obwodka notki ostrzegawczej */
+  --coral-deep: #c4533a; /* dolny koniec gradientu slupka */
+  --teal-2-glow: rgba(62, 170, 175, 0.16); /* posiata ekranu logowania */
+  --on-teal: #042320; /* tekst na wypelnieniu teal */
+  --on-coral: #2a0d05; /* tekst na wypelnieniu koralowym */
+  --scrim: rgba(4, 7, 6, 0.72); /* przyciemnienie pod modalem i paleta */
 
+  /* ksztalt */
+  --r-xs: 7px;
+  --r-sm: 10px;
+  --r-md: 14px;
+  --r-lg: 20px;
+  --r-xl: 28px;
+  --r-pill: 999px;
   --ease: cubic-bezier(0.22, 0.61, 0.36, 1);
+
+  --f-display: "Bricolage Grotesque Variable", "Bricolage Grotesque", "Space Grotesk",
+    system-ui, sans-serif;
+  --f-sans: "Instrument Sans", system-ui, sans-serif;
+  --f-mono: "JetBrains Mono", ui-monospace, monospace;
 }
 
 html,
@@ -59,17 +93,40 @@ body,
 }
 
 body {
-  background: var(--ink);
-  color: var(--white);
-  font-family: Inter, "Segoe UI", system-ui, sans-serif;
+  background: var(--void);
+  color: var(--text);
+  font-family: var(--f-sans);
+  font-size: 13px;
   -webkit-font-smoothing: antialiased;
   text-rendering: optimizeLegibility;
   overflow: hidden;
 }
 
-/* Widoczny fokus klawiatury - kryterium odbioru 10.2. */
+/**
+ * Swiatlo ma kierunek (zasada 1): jedna posiata u gory po lewej, druga -
+ * slabsza i chlodniejsza - u gory po prawej. Rysowana RAZ, nad tlem okna
+ * i pod cala aplikacja, zeby zadna karta nie potrzebowala wlasnego
+ * gradientowego zmywu.
+ */
+body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 0;
+  background:
+    radial-gradient(900px 460px at 18% -8%, rgba(31, 125, 128, 0.22), transparent 62%),
+    radial-gradient(700px 400px at 88% 2%, rgba(126, 139, 255, 0.1), transparent 60%);
+}
+
+#root {
+  position: relative;
+  z-index: 1;
+}
+
+/* Widoczny fokus klawiatury. */
 :focus-visible {
-  outline: 2px solid var(--teal-bright);
+  outline: 2px solid var(--teal);
   outline-offset: 2px;
   border-radius: 4px;
 }
@@ -85,11 +142,11 @@ body {
 *::-webkit-scrollbar-thumb {
   background: var(--panel-3);
   border-radius: 9px;
-  border: 3px solid var(--panel);
+  border: 3px solid transparent;
   background-clip: padding-box;
 }
 *::-webkit-scrollbar-thumb:hover {
-  background: var(--slate-dim);
+  background: var(--text-3);
   background-clip: padding-box;
 }
 *::-webkit-scrollbar-corner {
@@ -109,60 +166,77 @@ input[type="number"]::-webkit-inner-spin-button {
 
 @layer components {
   /**
-   * Role typograficzne z sekcji 2.5. Kazda liczba, ktora uzytkownik
-   * moze porownac z inna liczba, jest w JetBrains Mono z cyframi
-   * tabelarycznymi - stad `.o-mono` jako jedna, wspolna klasa.
+   * Role typograficzne z sekcji 5 instrukcji. Bricolage WYLACZNIE w
+   * rolach wyroznionych (tytul ekranu, powitanie, liczba na kaflu,
+   * naglowek panelu) - nigdy w wierszu listy.
    */
   .o-mono {
-    font-family: "JetBrains Mono", "SF Mono", ui-monospace, monospace;
+    font-family: var(--f-mono);
+    font-weight: 500;
     font-variant-numeric: tabular-nums;
+    letter-spacing: 0.03em;
   }
   .o-display {
-    font-family: "Space Grotesk", "Segoe UI", sans-serif;
+    font-family: var(--f-display);
+    font-weight: 700;
+  }
+  /** Kazda liczba stojaca w kolumnie - bez tego kolumny skacza. */
+  .o-num {
+    font-variant-numeric: tabular-nums;
   }
 
+  /** Powitanie na karcie glownej - 27 px. */
+  .o-greet {
+    font-family: var(--f-display);
+    font-weight: 700;
+    font-size: 27px;
+    line-height: 1.12;
+    letter-spacing: -0.03em;
+  }
+  /** Tytul ekranu w topbarze - 17 px. */
   .o-screen-title {
-    @apply o-display;
-    font-size: 19px;
-    font-weight: 600;
-    letter-spacing: -0.018em;
-  }
-  .o-section-title {
-    @apply o-display;
+    font-family: var(--f-display);
+    font-weight: 700;
     font-size: 17px;
-    font-weight: 600;
-    letter-spacing: -0.015em;
-  }
-  .o-hero-title {
-    @apply o-display;
-    font-size: 20px;
-    font-weight: 600;
     letter-spacing: -0.02em;
   }
-  .o-card-title {
-    font-size: 13.5px;
+  /** Liczba na kaflu KPI - 25 px. */
+  .o-kpi {
+    font-family: var(--f-display);
+    font-weight: 700;
+    font-size: 25px;
+    line-height: 1;
+    letter-spacing: -0.03em;
+    font-variant-numeric: tabular-nums;
+  }
+  /** Naglowek panelu - 14 px. */
+  .o-panel-title {
+    font-family: var(--f-display);
+    font-weight: 700;
+    font-size: 14px;
+    letter-spacing: -0.01em;
+  }
+  /** Nazwisko w wierszu listy - Instrument Sans 600 / 12,5 px. */
+  .o-row-name {
+    font-size: 12.5px;
     font-weight: 600;
   }
+  /** Tresc, opisy - 13 px. */
   .o-body {
-    font-size: 12.5px;
+    font-size: 13px;
     line-height: 1.55;
   }
+  /** Etykieta wersalikami - mono 9,5 px, tracking .15em. */
   .o-eyebrow {
-    @apply o-mono;
+    font-family: var(--f-mono);
+    font-weight: 500;
     font-size: 9.5px;
-    letter-spacing: 0.11em;
+    letter-spacing: 0.15em;
     text-transform: uppercase;
-    color: var(--slate-dim);
-  }
-  .o-counter {
-    @apply o-mono;
-    font-size: 22px;
-    font-weight: 600;
-    letter-spacing: -0.02em;
-    line-height: 1;
+    color: var(--text-3);
   }
 
-  /* Skeleton - shimmer wg sekcji 5. Nigdy przez podmiane innerHTML. */
+  /* Skeleton - shimmer. Nigdy przez podmiane innerHTML. */
   .o-skeleton-bar {
     display: block;
     border-radius: 5px;
@@ -176,7 +250,7 @@ input[type="number"]::-webkit-inner-spin-button {
     animation: shimmer 1.3s linear infinite;
   }
 
-  /*
+  /**
    * Podglad opisu oferty (Ordlak). Preflight Tailwinda zeruje odstepy i
    * punktory, a podglad ma pokazywac tresc mniej wiecej tak, jak wyglada
    * po wklejeniu na Allegro - dlatego przywracamy je tutaj punktowo,
@@ -203,21 +277,15 @@ input[type="number"]::-webkit-inner-spin-button {
   .o-html-preview strong,
   .o-html-preview b {
     font-weight: 600;
-    color: var(--white, #fff);
+    color: var(--text);
   }
-  /**
-   * Linki wystepuja tylko w tresci wiadomosci z dyskusji (sanityzator
-   * opisu oferty wycina `<a>`) - np. odnosnik do "Allegro Ochrona
-   * Kupujacych" w komunikacie systemowym. Maja wygladac na klikalne,
-   * a nie zlewac sie z reszta zdania.
-   */
   .o-html-preview a {
-    color: var(--teal-bright);
+    color: var(--teal);
     text-decoration: underline;
     text-underline-offset: 2px;
   }
   .o-html-preview a:hover {
-    color: var(--white);
+    color: var(--text);
   }
 }
 
@@ -227,7 +295,397 @@ input[type="number"]::-webkit-inner-spin-button {
   }
 }
 
-/* Kryterium odbioru 10.2: reduced motion wylacza wszystkie animacje. */
+/* =====================================================================
+ * ORDLAK - maskotka jako komponent SVG (sekcja 6 instrukcji).
+ *
+ * Wypelnienia ida przez --skin / --skin-dark, zeby stany "alert"
+ * i "sleep" mogly przemalowac cala sylwetke jedna deklaracja.
+ * ===================================================================== */
+
+.ordlak {
+  --skin: var(--teal);
+  --skin-dark: var(--teal-2);
+  display: inline-block;
+}
+.ordlak svg {
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+  display: block;
+}
+
+/**
+ * Sylwetka nie jest symetryczna - notatnik wypycha ja w prawo, stopy w
+ * dol. Ramka figury to 92,81 x 97 jednostek, srodek w (72,41 / 64,5).
+ * Te dwie liczby to 64 - 72.41 oraz 64 - 64.5; nie zmieniaj ich bez
+ * ponownego pomiaru getBBox() na .ord-figure. To one sprawiaja, ze
+ * maskotka siedzi na srodku kolka bez recznych korekt.
+ */
+.ord-shift {
+  transform: translate(-8.4px, -0.5px);
+}
+
+.ord-body {
+  fill: var(--skin);
+}
+.ord-foot {
+  fill: var(--skin-dark);
+}
+.ord-eye {
+  fill: #062120;
+}
+.ord-glint {
+  fill: #eaf3ef;
+  opacity: 0.92;
+}
+.ord-arc,
+.ord-lid {
+  stroke: #062120;
+  stroke-width: 4.4;
+  stroke-linecap: round;
+  fill: none;
+  display: none;
+}
+.ord-ant-stem {
+  stroke: var(--skin-dark);
+  stroke-width: 3.4;
+  stroke-linecap: round;
+}
+.ord-ant-bulb {
+  fill: var(--skin);
+}
+.ord-board {
+  fill: #0b1a18;
+  stroke: var(--skin-dark);
+  stroke-width: 2.6;
+}
+.ord-clip {
+  fill: var(--skin-dark);
+}
+.ord-boardline {
+  stroke: var(--skin);
+  stroke-width: 2.6;
+  stroke-linecap: round;
+  opacity: 0.5;
+}
+.ord-mouth,
+.ord-mouth-worry {
+  stroke: #062120;
+  stroke-width: 3.4;
+  stroke-linecap: round;
+  fill: none;
+}
+.ord-mouth-worry {
+  display: none;
+}
+.ord-shadow {
+  fill: #000;
+  opacity: 0.3;
+}
+.ord-wave {
+  opacity: 0;
+}
+.ord-wave path {
+  stroke: var(--teal);
+  stroke-width: 3.4;
+  fill: none;
+  stroke-linecap: round;
+  opacity: 0;
+}
+.ord-think,
+.ord-bang,
+.ord-zzz,
+.ord-spark {
+  opacity: 0;
+}
+.ord-think circle {
+  fill: var(--teal);
+}
+.ord-bang path {
+  stroke: var(--coral);
+  stroke-width: 5;
+  stroke-linecap: round;
+}
+.ord-zzz {
+  font-family: var(--f-mono);
+  font-weight: 700;
+  fill: var(--teal);
+}
+.ord-spark {
+  fill: var(--teal);
+}
+
+.ord-figure {
+  transform-box: fill-box;
+  transform-origin: center bottom;
+}
+.ord-eyes {
+  transform-box: fill-box;
+  transform-origin: center;
+}
+.ord-ant {
+  transform-box: fill-box;
+  transform-origin: 50% 100%;
+}
+
+@keyframes ord-bob {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-3.5%);
+  }
+}
+@keyframes ord-blink {
+  0%,
+  92%,
+  100% {
+    transform: scaleY(1);
+  }
+  95% {
+    transform: scaleY(0.08);
+  }
+}
+@keyframes ord-lean {
+  0%,
+  100% {
+    transform: rotate(-2.5deg) translateY(0);
+  }
+  50% {
+    transform: rotate(1.5deg) translateY(-2%);
+  }
+}
+@keyframes ord-hop {
+  0%,
+  100% {
+    transform: translateY(0) scaleY(1);
+  }
+  28% {
+    transform: translateY(-11%) scaleY(1.04);
+  }
+  46% {
+    transform: translateY(0) scaleY(0.94);
+  }
+  62% {
+    transform: translateY(-4%) scaleY(1);
+  }
+}
+@keyframes ord-shake {
+  0%,
+  100% {
+    transform: translateX(0);
+  }
+  18% {
+    transform: translateX(-2.5%);
+  }
+  38% {
+    transform: translateX(2.5%);
+  }
+  58% {
+    transform: translateX(-1.5%);
+  }
+  78% {
+    transform: translateX(1.5%);
+  }
+}
+@keyframes ord-scan {
+  0%,
+  100% {
+    transform: translateX(-7%);
+  }
+  50% {
+    transform: translateX(7%);
+  }
+}
+@keyframes ord-antwig {
+  0%,
+  100% {
+    transform: rotate(-13deg);
+  }
+  50% {
+    transform: rotate(13deg);
+  }
+}
+@keyframes ord-dots {
+  0%,
+  60%,
+  100% {
+    opacity: 0.18;
+    transform: translateY(0);
+  }
+  30% {
+    opacity: 1;
+    transform: translateY(-2.5px);
+  }
+}
+@keyframes ord-wave {
+  0% {
+    opacity: 0;
+  }
+  12% {
+    opacity: 0.95;
+  }
+  72% {
+    opacity: 0;
+  }
+  100% {
+    opacity: 0;
+  }
+}
+@keyframes ord-breathe {
+  0%,
+  100% {
+    opacity: 0.35;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+@keyframes ord-rise {
+  0% {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  30% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+    transform: translateY(-12px);
+  }
+}
+@keyframes ord-pop {
+  0% {
+    opacity: 0;
+    transform: scale(0.4);
+  }
+  40% {
+    opacity: 1;
+    transform: scale(1.15);
+  }
+  100% {
+    opacity: 0;
+    transform: scale(0.8);
+  }
+}
+
+/* idle - oddycha i mruga */
+[data-state="idle"] .ord-figure {
+  animation: ord-bob 3.6s var(--ease) infinite;
+}
+[data-state="idle"] .ord-eyes {
+  animation: ord-blink 6s steps(1, end) infinite;
+}
+
+/* sync - antena nadaje, oczy skanuja */
+[data-state="sync"] .ord-wave {
+  opacity: 1;
+}
+[data-state="sync"] .ord-wave path:nth-child(1) {
+  animation: ord-wave 1.5s ease-out infinite;
+}
+[data-state="sync"] .ord-wave path:nth-child(2) {
+  animation: ord-wave 1.5s ease-out 0.18s infinite;
+}
+[data-state="sync"] .ord-wave path:nth-child(3) {
+  animation: ord-wave 1.5s ease-out 0.36s infinite;
+}
+[data-state="sync"] .ord-eyes {
+  animation: ord-scan 1.9s var(--ease) infinite;
+}
+[data-state="sync"] .ord-ant-bulb {
+  animation: ord-breathe 1.2s ease-in-out infinite;
+}
+
+/* think - przechyla sie, antena drga, kropki */
+[data-state="think"] .ord-figure {
+  animation: ord-lean 2.6s var(--ease) infinite;
+}
+[data-state="think"] .ord-ant {
+  animation: ord-antwig 1.1s var(--ease) infinite;
+}
+[data-state="think"] .ord-eyes {
+  transform: translate(-4%, -6%);
+}
+[data-state="think"] .ord-think {
+  opacity: 1;
+}
+[data-state="think"] .ord-think circle:nth-child(1) {
+  animation: ord-dots 1.4s infinite;
+}
+[data-state="think"] .ord-think circle:nth-child(2) {
+  animation: ord-dots 1.4s 0.18s infinite;
+}
+[data-state="think"] .ord-think circle:nth-child(3) {
+  animation: ord-dots 1.4s 0.36s infinite;
+}
+
+/* happy - podskok, oczy w luki, iskry */
+[data-state="happy"] .ord-figure {
+  animation: ord-hop 1.25s var(--ease) infinite;
+}
+[data-state="happy"] .ord-eye,
+[data-state="happy"] .ord-glint {
+  display: none;
+}
+[data-state="happy"] .ord-arc {
+  display: block;
+}
+[data-state="happy"] .ord-spark {
+  opacity: 1;
+  animation: ord-pop 1.25s var(--ease) infinite;
+}
+
+/* alert - koral, szerokie oczy, wykrzyknik */
+[data-state="alert"] {
+  --skin: var(--coral);
+  --skin-dark: #d8563a;
+}
+[data-state="alert"] .ord-figure {
+  animation: ord-shake 0.7s var(--ease) infinite;
+}
+[data-state="alert"] .ord-eyes {
+  transform: scale(1.14);
+}
+[data-state="alert"] .ord-bang {
+  opacity: 1;
+  animation: ord-breathe 1s ease-in-out infinite;
+}
+[data-state="alert"] .ord-mouth {
+  display: none;
+}
+[data-state="alert"] .ord-mouth-worry {
+  display: block;
+}
+
+/* sleep - cicha noc */
+[data-state="sleep"] {
+  --skin: #3c6a66;
+  --skin-dark: #2c4f4c;
+}
+[data-state="sleep"] .ord-figure {
+  animation: ord-bob 5.4s var(--ease) infinite;
+}
+[data-state="sleep"] .ord-eye,
+[data-state="sleep"] .ord-glint {
+  display: none;
+}
+[data-state="sleep"] .ord-lid {
+  display: block;
+}
+[data-state="sleep"] .ord-zzz {
+  opacity: 1;
+  animation: ord-rise 2.6s ease-out infinite;
+}
+[data-state="sleep"] .ord-mouth {
+  opacity: 0.4;
+}
+
+/**
+ * Redukcja animacji (sekcja 14). Ordlak zostaje w pozie spoczynku -
+ * stany nadal zmieniaja kolor i mimike, znika wylacznie ruch.
+ */
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,
@@ -252,5 +710,9 @@ input[type="number"]::-webkit-inner-spin-button {
     -webkit-line-clamp: 2;
     -webkit-box-orient: vertical;
     overflow: hidden;
+  }
+  /** Ucieta lista ma wygaszenie, nie ostra krawedz (sekcja 15). */
+  .o-fade-b {
+    mask-image: linear-gradient(to bottom, #000 calc(100% - 30px), transparent);
   }
 }

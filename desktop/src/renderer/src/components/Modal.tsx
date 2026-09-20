@@ -80,7 +80,7 @@ export function Modal({
   return (
     <div
       className="fixed inset-0 z-[110] flex items-start justify-center p-4 pt-[10vh]"
-      style={{ background: "rgba(4,7,6,.72)", backdropFilter: "blur(7px)" }}
+      style={{ background: "var(--scrim)", backdropFilter: "blur(7px)" }}
       onClick={onClose}
       role="dialog"
       aria-modal="true"
@@ -90,19 +90,19 @@ export function Modal({
         ref={boxRef}
         style={{ width: `min(${width}px, 92vw)` }}
         onClick={(event) => event.stopPropagation()}
-        className="animate-cmd-in flex max-h-[80vh] flex-col overflow-hidden rounded-lg border border-line-strong bg-panel shadow-palette"
+        className="animate-cmd-in flex max-h-[80vh] flex-col overflow-hidden rounded-lg border border-line-2 bg-panel shadow-palette"
       >
         <div className="flex items-start gap-3 border-b border-line px-5 py-4">
           <div className="min-w-0 flex-1">
-            <h3 className="o-section-title truncate">{title}</h3>
+            <h3 className="o-screen-title truncate">{title}</h3>
             {subtitle && (
-              <p className="o-mono mt-1 truncate text-[11px] text-slate-dim">{subtitle}</p>
+              <p className="o-mono mt-1 truncate text-[11px] text-text-3">{subtitle}</p>
             )}
           </div>
           <button
             onClick={onClose}
             aria-label="Zamknij"
-            className="shrink-0 text-slate-dim transition-colors hover:text-white"
+            className="shrink-0 text-text-3 transition-colors hover:text-text"
           >
             <CloseIcon size={16} />
           </button>
@@ -155,14 +155,14 @@ export function ConfirmDialog({
           <Button
             onClick={onConfirm}
             disabled={pending}
-            className="!bg-coral !text-[#2A0D05] hover:brightness-110"
+            className="!bg-coral !text-on-coral hover:brightness-110"
           >
             {pending ? "Chwileczkę…" : confirmLabel}
           </Button>
         </>
       }
     >
-      <p className="text-[12.5px] leading-[1.6] text-slate">{message}</p>
+      <p className="text-[12.5px] leading-[1.6] text-text-2">{message}</p>
     </Modal>
   );
 }

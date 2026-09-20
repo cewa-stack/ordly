@@ -7,13 +7,13 @@
  */
 import * as React from "react";
 import { useAuth } from "../lib/auth";
-import { Mascot } from "../components/Mascot";
+import { Ordlak } from "../components/Ordlak";
 import { Titlebar } from "../components/Titlebar";
 import { Button } from "../components/ui";
 import { EyeIcon, EyeOffIcon, LockIcon, ServerIcon, UserIcon } from "../icons";
 
 const FIELD_CLASS =
-  "flex items-center gap-2.5 rounded-md border border-line bg-panel-2 px-3.5 py-2.5 transition-colors focus-within:border-teal-bright";
+  "flex items-center gap-2.5 rounded-md border border-line bg-panel-2 px-3.5 py-2.5 transition-colors focus-within:border-teal";
 
 function Field({
   label,
@@ -34,14 +34,14 @@ function Field({
         {icon}
         <input
           {...inputProps}
-          className="min-w-0 flex-1 bg-transparent text-[13px] text-white outline-none placeholder:text-slate-dim"
+          className="min-w-0 flex-1 bg-transparent text-[13px] text-text outline-none placeholder:text-text-3"
         />
         {trailing && (
           <button
             type="button"
             onClick={onTrailingClick}
             aria-label="Pokaż lub ukryj hasło"
-            className="shrink-0 text-slate-dim hover:text-white"
+            className="shrink-0 text-text-3 hover:text-text"
           >
             {trailing}
           </button>
@@ -82,25 +82,25 @@ export function LoginScreen() {
   }
 
   return (
-    <div className="flex h-screen flex-col bg-panel text-white">
+    <div className="flex h-screen flex-col bg-panel text-text">
       <Titlebar online={false} hostname="" />
       <div className="relative flex flex-1 items-center justify-center overflow-hidden">
         <div
           aria-hidden="true"
           className="pointer-events-none absolute -left-40 -top-40 h-[520px] w-[520px] rounded-full opacity-50 blur-[110px]"
-          style={{ background: "rgba(62,170,175,.16)" }}
+          style={{ background: "var(--teal-2-glow)" }}
         />
         <form
           onSubmit={handleSubmit}
           className="relative flex w-full max-w-[360px] flex-col px-8"
         >
           <div className="mb-5 flex flex-col items-center text-center">
-            <Mascot pose="orders" size={92} />
+            <Ordlak state="idle" size={92} />
             <div className="o-display mt-3 text-[15.5px] font-semibold tracking-[-.015em]">
               ORDLY
             </div>
-            <h1 className="o-hero-title mt-3">Witaj z powrotem</h1>
-            <p className="mt-1.5 max-w-[280px] text-[12.5px] leading-[1.55] text-slate">
+            <h1 className="o-panel-title text-[20px] mt-3">Witaj z powrotem</h1>
+            <p className="mt-1.5 max-w-[280px] text-[12.5px] leading-[1.55] text-text-2">
               Połącz się ze swoim ORDLY na Raspberry Pi.
             </p>
           </div>
@@ -108,7 +108,7 @@ export function LoginScreen() {
           <div className="flex flex-col gap-3">
             <Field
               label="Adres serwera"
-              icon={<ServerIcon size={15} className="shrink-0 text-teal-bright" />}
+              icon={<ServerIcon size={15} className="shrink-0 text-teal" />}
               value={serverUrl}
               onChange={(event) => setServerUrl(event.target.value)}
               placeholder="https://cewastack2.tail7f5a20.ts.net"
@@ -118,7 +118,7 @@ export function LoginScreen() {
             />
             <Field
               label="Login"
-              icon={<UserIcon size={15} className="shrink-0 text-slate-dim" />}
+              icon={<UserIcon size={15} className="shrink-0 text-text-3" />}
               value={username}
               onChange={(event) => setUsername(event.target.value)}
               placeholder="admin"
@@ -128,7 +128,7 @@ export function LoginScreen() {
             />
             <Field
               label="Hasło"
-              icon={<LockIcon size={15} className="shrink-0 text-slate-dim" />}
+              icon={<LockIcon size={15} className="shrink-0 text-text-3" />}
               value={password}
               onChange={(event) => setPassword(event.target.value)}
               type={showPassword ? "text" : "password"}
@@ -148,8 +148,8 @@ export function LoginScreen() {
             {isSubmitting ? "Łączę…" : "Połącz z ORDLY"}
           </Button>
 
-          <p className="mt-3.5 text-center text-[11px] leading-[1.55] text-slate-dim">
-            Adres musi zaczynać się od <b className="text-slate">https://</b> - Tailscale
+          <p className="mt-3.5 text-center text-[11px] leading-[1.55] text-text-3">
+            Adres musi zaczynać się od <b className="text-text-2">https://</b> - Tailscale
             serwuje ORDLY po HTTPS na porcie 443.
           </p>
         </form>

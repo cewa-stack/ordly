@@ -353,6 +353,26 @@ export function ChevronIcon(props: IconProps) {
   );
 }
 
+/** Dzwonek - lista rzeczy, ktore czekaja na uzytkownika (topbar). */
+export function BellIcon(props: IconProps) {
+  return (
+    <svg {...base(props)}>
+      <path d="M6 10a6 6 0 0 1 12 0c0 4 1.4 5.5 1.4 5.5H4.6S6 14 6 10Z" />
+      <path d="M10 19a2 2 0 0 0 4 0" />
+    </svg>
+  );
+}
+
+/** Strzalka w gore - gałka wysylania w pasku asystenta. */
+export function ArrowUpIcon(props: IconProps) {
+  return (
+    <svg {...base(props)}>
+      <path d="M12 19V5" />
+      <path d="m6 11 6-6 6 6" />
+    </svg>
+  );
+}
+
 export function ClockIcon(props: IconProps) {
   return (
     <svg {...base(props)}>

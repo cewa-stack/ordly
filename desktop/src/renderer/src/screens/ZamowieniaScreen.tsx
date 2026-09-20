@@ -159,8 +159,8 @@ function OrderDetail({ order }: { order: Order }) {
   return (
     <div className="flex min-h-0 flex-col gap-[18px] overflow-y-auto border-l border-line p-5">
       <div className="flex flex-col gap-1">
-        <h3 className="o-section-title">{order.buyer_login}</h3>
-        <div className="o-mono text-[11px] text-slate-dim">
+        <h3 className="o-screen-title">{order.buyer_login}</h3>
+        <div className="o-mono text-[11px] text-text-3">
           {order.external_id.slice(0, 8).toUpperCase()} · {formatDateTime(order.order_date)}
         </div>
       </div>
@@ -170,17 +170,17 @@ function OrderDetail({ order }: { order: Order }) {
         {order.products.map((product) => (
           <div
             key={product.external_id}
-            className="flex justify-between gap-3 border-b border-line py-[7px] text-[12.5px] text-slate"
+            className="flex justify-between gap-3 border-b border-line py-[7px] text-[12.5px] text-text-2"
           >
-            <span className="min-w-0 flex-1 truncate text-white">{product.name}</span>
+            <span className="min-w-0 flex-1 truncate text-text">{product.name}</span>
             <span className="o-mono shrink-0">
               {product.quantity} × {formatCurrency(product.unit_price)}
             </span>
           </div>
         ))}
         <div className="flex justify-between gap-3 pt-[9px] text-[12.5px] font-semibold">
-          <span className="text-white">Razem</span>
-          <span className="o-mono text-teal-bright">{formatCurrency(itemsTotal)}</span>
+          <span className="text-text">Razem</span>
+          <span className="o-mono text-teal">{formatCurrency(itemsTotal)}</span>
         </div>
       </div>
 
@@ -190,19 +190,19 @@ function OrderDetail({ order }: { order: Order }) {
           {fulfillmentTimeline(order).map((step, index, all) => (
             <div key={step.label} className="relative flex gap-[11px] pb-3.5 text-[12px]">
               {index < all.length - 1 && (
-                <span className="absolute bottom-[-3px] left-[3px] top-[11px] w-px bg-line-strong" />
+                <span className="absolute bottom-[-3px] left-[3px] top-[11px] w-px bg-line-2" />
               )}
               <span
                 className={`relative z-[1] mt-1 h-[7px] w-[7px] shrink-0 rounded-full ${
                   step.done
-                    ? "bg-teal-bright shadow-[0_0_0_3px_var(--panel)]"
+                    ? "bg-teal shadow-[0_0_0_3px_var(--panel)]"
                     : "bg-panel-3 shadow-[0_0_0_3px_var(--panel),inset_0_0_0_1px_var(--line-strong)]"
                 }`}
               />
-              <span className={step.done ? "text-white" : "text-slate-dim"}>
+              <span className={step.done ? "text-text" : "text-text-3"}>
                 {step.label}
                 {step.time && (
-                  <span className="o-mono mt-0.5 block text-[10px] text-slate-dim">
+                  <span className="o-mono mt-0.5 block text-[10px] text-text-3">
                     {step.time}
                   </span>
                 )}
@@ -216,11 +216,11 @@ function OrderDetail({ order }: { order: Order }) {
         <div className="flex flex-col gap-[9px]">
           <div className="o-eyebrow">Przesyłka</div>
           <div className="flex items-center gap-2 rounded-md border border-line bg-panel-2 px-3 py-2.5">
-            <TruckIcon size={15} className="text-teal-bright" />
-            <span className="o-mono text-[11.5px] text-white">
+            <TruckIcon size={15} className="text-teal" />
+            <span className="o-mono text-[11.5px] text-text">
               {trackingQuery.data.tracking_number}
             </span>
-            <span className="ml-auto text-[11px] text-slate-dim">
+            <span className="ml-auto text-[11px] text-text-3">
               {trackingQuery.data.carrier ?? "przewoźnik nieznany"}
             </span>
           </div>
@@ -229,7 +229,7 @@ function OrderDetail({ order }: { order: Order }) {
 
       <div className="mt-auto flex flex-col gap-2 pt-1.5">
         {isCancelled(order) && (
-          <p className="text-[11.5px] leading-[1.5] text-slate-dim">
+          <p className="text-[11.5px] leading-[1.5] text-text-3">
             Zamówienie jest anulowane - statusu realizacji nie da się już zmienić.
           </p>
         )}
@@ -430,7 +430,6 @@ export function ZamowieniaScreen({ focusOrderId, onFocusHandled }: ZamowieniaScr
           {isLoading && <SkeletonRows rows={6} />}
           {!isLoading && visible.length === 0 && (
             <EmptyState
-              pose={filter === "all" ? "orders" : "think"}
               title={filter === "all" ? "Brak zamówień" : "Nic w tym filtrze"}
               description={
                 filter === "all"
@@ -445,31 +444,31 @@ export function ZamowieniaScreen({ focusOrderId, onFocusHandled }: ZamowieniaScr
               <div
                 key={order.external_id}
                 className={`relative flex w-full items-center gap-3 border-b border-line px-[22px] py-[12.5px] transition-colors duration-150 ease-ordly ${
-                  isSelected ? "bg-teal-dim" : "hover:bg-panel-2"
+                  isSelected ? "bg-teal-glow" : "hover:bg-panel-2"
                 }`}
               >
                 {isSelected && (
-                  <span className="absolute bottom-0 left-0 top-0 w-[3px] bg-teal-bright" />
+                  <span className="absolute bottom-0 left-0 top-0 w-[3px] bg-teal" />
                 )}
                 <input
                   type="checkbox"
                   checked={checked.has(order.external_id)}
                   onChange={() => toggleChecked(order.external_id)}
                   aria-label={`Zaznacz zamówienie ${order.buyer_login}`}
-                  className="h-3.5 w-3.5 shrink-0 accent-[#5FD9CC]"
+                  className="h-3.5 w-3.5 shrink-0 accent-teal"
                 />
                 <button
                   onClick={() => setSelectedId(order.external_id)}
                   className="flex min-w-0 flex-1 items-center gap-3 text-left"
                 >
                   <MarketplaceBadge marketplace={order.marketplace} />
-                  <span className="o-mono w-20 shrink-0 text-[11.5px] text-slate-dim">
+                  <span className="o-mono w-20 shrink-0 text-[11.5px] text-text-3">
                     {formatTime(order.order_date)}
                   </span>
-                  <span className="min-w-0 flex-1 truncate text-[13px] text-white">
+                  <span className="min-w-0 flex-1 truncate text-[13px] text-text">
                     {order.buyer_login}
                   </span>
-                  <span className="o-mono w-[78px] shrink-0 text-right text-[12.5px] text-slate">
+                  <span className="o-mono w-[78px] shrink-0 text-right text-[12.5px] text-text-2">
                     {formatCurrency(order.total_amount)}
                   </span>
                   <Pill tone={displayFulfillmentTone(order)}>
@@ -483,10 +482,10 @@ export function ZamowieniaScreen({ focusOrderId, onFocusHandled }: ZamowieniaScr
 
         {checked.size > 0 && (
           <div className="flex shrink-0 items-center gap-3 border-t border-line bg-panel-2 px-[22px] py-3">
-            <span className="o-mono text-[11.5px] text-slate">Zaznaczono {checked.size}</span>
+            <span className="o-mono text-[11.5px] text-text-2">Zaznaczono {checked.size}</span>
             <button
               onClick={() => setChecked(new Set())}
-              className="text-[11.5px] text-slate-dim hover:text-white"
+              className="text-[11.5px] text-text-3 hover:text-text"
             >
               Wyczyść
             </button>
@@ -510,7 +509,7 @@ export function ZamowieniaScreen({ focusOrderId, onFocusHandled }: ZamowieniaScr
       {selected ? (
         <OrderDetail key={selected.external_id} order={selected} />
       ) : (
-        <div className="flex items-center justify-center border-l border-line p-5 text-center text-[12.5px] text-slate-dim">
+        <div className="flex items-center justify-center border-l border-line p-5 text-center text-[12.5px] text-text-3">
           Wybierz zamówienie z listy, żeby zobaczyć szczegóły.
         </div>
       )}

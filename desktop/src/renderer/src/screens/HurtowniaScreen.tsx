@@ -27,7 +27,7 @@ import { formatDateTime, formatPlural } from "../lib/format";
 import type { Wholesaler, WholesalerItem } from "../types/api";
 
 const inputClass =
-  "w-full rounded-sm border border-line bg-ink-raised px-3 py-2.5 text-[12.5px] text-white outline-none focus:border-teal-bright";
+  "w-full rounded-sm border border-line bg-base px-3 py-2.5 text-[12.5px] text-text outline-none focus:border-teal";
 
 function WholesalerFormModal({
   wholesaler,
@@ -149,7 +149,7 @@ function WholesalerFormModal({
           >
             Dodaj pozycję
           </MiniButton>
-          <span className="text-[11px] text-slate-dim">
+          <span className="text-[11px] text-text-3">
             Lista tej hurtowni - co u niej kupujesz i ile zwykle bierzesz. Przy pisaniu
             maila wszystko jest zaznaczone, odznaczasz to, czego akurat nie trzeba.
           </span>
@@ -201,7 +201,6 @@ export function HurtowniaScreen() {
       {wholesalersQuery.isLoading && <SkeletonRows rows={2} />}
       {!wholesalersQuery.isLoading && (wholesalersQuery.data ?? []).length === 0 && (
         <EmptyState
-          pose="think"
           title="Brak zapisanych hurtowni"
           description="Dodaj pierwszą hurtownię i wpisz, co się w niej zamawia - Ordi złoży z tego gotowego maila."
         />
@@ -211,10 +210,10 @@ export function HurtowniaScreen() {
         {(wholesalersQuery.data ?? []).map((wholesaler) => (
           <div
             key={wholesaler.id}
-            className="flex flex-col gap-[11px] rounded-md border border-line bg-panel-2 p-[17px] transition-[border-color,transform] duration-[180ms] ease-ordly hover:-translate-y-0.5 hover:border-line-strong"
+            className="flex flex-col gap-[11px] rounded-md border border-line bg-panel-2 p-[17px] transition-[border-color,transform] duration-[180ms] ease-ordly hover:-translate-y-0.5 hover:border-line-2"
           >
             <div className="flex items-start gap-2">
-              <span className="o-display flex h-[34px] w-[34px] items-center justify-center rounded-[10px] bg-panel-3 text-[13px] font-semibold text-teal-bright">
+              <span className="o-display flex h-[34px] w-[34px] items-center justify-center rounded-[10px] bg-panel-3 text-[13px] font-semibold text-teal">
                 {wholesaler.name.slice(0, 1).toUpperCase()}
               </span>
               <div className="ml-auto flex gap-1">
@@ -234,9 +233,9 @@ export function HurtowniaScreen() {
                 </MiniButton>
               </div>
             </div>
-            <h4 className="o-card-title truncate">{wholesaler.name}</h4>
-            <p className="o-mono truncate text-[10.5px] text-slate-dim">{wholesaler.email}</p>
-            <p className="o-mono text-[10.5px] text-slate-dim">
+            <h4 className="text-[13.5px] font-semibold truncate">{wholesaler.name}</h4>
+            <p className="o-mono truncate text-[10.5px] text-text-3">{wholesaler.email}</p>
+            <p className="o-mono text-[10.5px] text-text-3">
               {wholesaler.items.length === 0
                 ? "brak zapisanych pozycji"
                 : formatPlural(wholesaler.items.length, ["pozycja", "pozycje", "pozycji"])}
@@ -259,7 +258,7 @@ export function HurtowniaScreen() {
         <SectionLabel>Wysłane zamówienia</SectionLabel>
         {historyQuery.isLoading && <SkeletonRows rows={2} />}
         {!historyQuery.isLoading && (historyQuery.data ?? []).length === 0 && (
-          <p className="text-[12.5px] text-slate-dim">
+          <p className="text-[12.5px] text-text-3">
             Nie wysłano jeszcze żadnego zamówienia do hurtowni.
           </p>
         )}
@@ -268,13 +267,13 @@ export function HurtowniaScreen() {
             key={record.id}
             className="flex items-center gap-3 rounded-md border border-line bg-panel-2 px-4 py-3 text-[12.5px]"
           >
-            <span className="o-mono w-[110px] shrink-0 text-[10.5px] text-slate-dim">
+            <span className="o-mono w-[110px] shrink-0 text-[10.5px] text-text-3">
               {formatDateTime(record.sentAt)}
             </span>
             <span className="w-[130px] shrink-0 truncate font-medium">
               {record.wholesalerName}
             </span>
-            <span className="min-w-0 flex-1 truncate text-slate">{record.itemsSummary}</span>
+            <span className="min-w-0 flex-1 truncate text-text-2">{record.itemsSummary}</span>
           </div>
         ))}
       </div>

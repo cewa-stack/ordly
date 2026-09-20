@@ -25,7 +25,7 @@ import { formatCurrency, formatPlural } from "../lib/format";
 import type { OlxOffer } from "../types/api";
 
 const inputClass =
-  "w-full rounded-sm border border-line bg-ink-raised px-3 py-2.5 text-[12.5px] text-white outline-none focus:border-teal-bright";
+  "w-full rounded-sm border border-line bg-base px-3 py-2.5 text-[12.5px] text-text outline-none focus:border-teal";
 
 function OfferFormModal({ offer, onClose }: { offer: OlxOffer | null; onClose: () => void }) {
   const queryClient = useQueryClient();
@@ -185,7 +185,7 @@ export function OlxScreen() {
   return (
     <div className="flex min-h-0 flex-1 flex-col">
       <div className="flex items-center gap-2 border-b border-line px-[22px] py-[11px]">
-        <p className="text-[11.5px] leading-[1.5] text-slate-dim">
+        <p className="text-[11.5px] leading-[1.5] text-text-3">
           OLX nie ma publicznego API dla sprzedawcy - te oferty prowadzisz ręcznie, a ORDLY
           pilnuje, żeby stan zgadzał się z magazynem.
         </p>
@@ -207,7 +207,6 @@ export function OlxScreen() {
         {offersQuery.isLoading && <SkeletonRows rows={4} />}
         {!offersQuery.isLoading && offers.length === 0 && (
           <EmptyState
-            pose="think"
             title="Brak ofert OLX"
             description="Dodaj ofertę ręcznie albo zaimportuj listę z pliku CSV."
           />
@@ -219,7 +218,7 @@ export function OlxScreen() {
                 {["Tytuł", "Cena", "Stan na OLX", "Stan w magazynie", "Akcje"].map((header) => (
                   <th
                     key={header}
-                    className="o-mono sticky top-0 z-[2] border-b border-line bg-panel px-[22px] py-[11px] text-left text-[9.5px] uppercase tracking-[.11em] text-slate-dim"
+                    className="o-mono sticky top-0 z-[2] border-b border-line bg-panel px-[22px] py-[11px] text-left text-[9.5px] uppercase tracking-[.11em] text-text-3"
                   >
                     {header}
                   </th>
@@ -235,7 +234,7 @@ export function OlxScreen() {
                   warehouseStock !== undefined && warehouseStock !== offer.stock;
                 return (
                   <tr key={offer.id} className="transition-colors hover:bg-panel-2">
-                    <td className="border-b border-line px-[22px] py-3 text-[13px] text-white">
+                    <td className="border-b border-line px-[22px] py-3 text-[13px] text-text">
                       <span className="flex items-center gap-2">
                         {offer.title}
                         {offer.url && (
@@ -244,24 +243,24 @@ export function OlxScreen() {
                             target="_blank"
                             rel="noopener noreferrer"
                             aria-label="Otwórz ogłoszenie na OLX"
-                            className="text-slate-dim hover:text-teal-bright"
+                            className="text-text-3 hover:text-teal"
                           >
                             <ExternalIcon size={13} />
                           </a>
                         )}
                       </span>
                     </td>
-                    <td className="o-mono border-b border-line px-[22px] py-3 text-[12px] text-slate">
+                    <td className="o-mono border-b border-line px-[22px] py-3 text-[12px] text-text-2">
                       {formatCurrency(offer.price)}
                     </td>
-                    <td className="o-mono border-b border-line px-[22px] py-3 text-[12px] text-white">
+                    <td className="o-mono border-b border-line px-[22px] py-3 text-[12px] text-text">
                       {offer.stock}
                     </td>
                     <td className="o-mono border-b border-line px-[22px] py-3 text-[12px]">
                       {warehouseStock === undefined ? (
-                        <span className="text-slate-dim">—</span>
+                        <span className="text-text-3">—</span>
                       ) : (
-                        <span className={mismatch ? "font-semibold text-amber" : "text-slate"}>
+                        <span className={mismatch ? "font-semibold text-amber" : "text-text-2"}>
                           {warehouseStock}
                           {mismatch ? " ≠" : ""}
                         </span>

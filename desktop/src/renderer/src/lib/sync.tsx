@@ -18,7 +18,6 @@
 import * as React from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useToast } from "./toast";
-import type { OrdiPose } from "../components/Mascot";
 
 /** Czasy 1:1 z tabela w sekcji 2.6. */
 const WORK_PHASE_MIN_MS = 1700;
@@ -28,12 +27,17 @@ export type SyncPhase = "idle" | "working" | "success";
 
 interface SyncContextValue {
   phase: SyncPhase;
-  pose: OrdiPose;
-  /** Tytul wskaznika, np. "Ordi czuwa" / "Synchronizuję…". */
+  /** Tytul wskaznika, np. "Ordlak czuwa" / "Synchronizuję…". */
   title: string;
   /** Podtytul, np. "Synchronizacja 3 min temu". */
   subtitle: string;
   lastSyncAt: Date | null;
+  /**
+   * DRUGA z rzedu nieudana synchronizacja poczty. Dopiero ona zapala
+   * alarm Ordlaka (sekcja 6): jedna nieudana proba zdarza sie przy
+   * przelaczeniu sieci i nie jest awaria skrzynki.
+   */
+  mailFailedTwice: boolean;
   sync: () => void;
 }
 
@@ -54,6 +58,9 @@ export function SyncProvider({ children }: { children: React.ReactNode }) {
   const [lastSyncAt, setLastSyncAt] = React.useState<Date | null>(null);
   const [successSubtitle, setSuccessSubtitle] = React.useState("");
   const [mailFailed, setMailFailed] = React.useState(false);
+  // Licznik nieudanych prob POD RZAD, nie ich sumy - udana synchronizacja
+  // zeruje go, wiec alarm nie zostaje na zawsze po jednej awarii.
+  const [mailFailStreak, setMailFailStreak] = React.useState(0);
   const busy = React.useRef(false);
   const queryClient = useQueryClient();
   const toast = useToast();
@@ -103,6 +110,7 @@ export function SyncProvider({ children }: { children: React.ReactNode }) {
       // Przy awarii poczty wskaznik nie moze mowic "Wszystko aktualne" -
       // sprzedaz z Allegro Lokalnie i OLX przychodzi WYLACZNIE mailem.
       setMailFailed(!mailResult.ok);
+      setMailFailStreak((prev) => (mailResult.ok ? 0 : prev + 1));
       setSuccessSubtitle(
         mailResult.ok ? `Przed chwilą · ${summary}` : "Przed chwilą · poczta niedostępna"
       );
@@ -134,8 +142,6 @@ export function SyncProvider({ children }: { children: React.ReactNode }) {
   }, [queryClient, toast]);
 
   const value = React.useMemo<SyncContextValue>(() => {
-    const pose: OrdiPose =
-      phase === "working" ? "think" : phase === "success" ? "happy" : "idle";
     const title =
       phase === "working"
         ? "Synchronizuję…"
@@ -143,7 +149,7 @@ export function SyncProvider({ children }: { children: React.ReactNode }) {
           ? mailFailed
             ? "Zamówienia aktualne"
             : "Wszystko aktualne"
-          : "Ordi czuwa";
+          : "Ordlak czuwa";
     // Kanaly, ktore ten przycisk FAKTYCZNIE odswieza: API Allegro oraz
     // poczta (Allegro Lokalnie i OLX nie maja API). Dawny napis wymienial
     // tez Amazon i eBay, ktorych ORDLY nie obsluguje.
@@ -153,8 +159,15 @@ export function SyncProvider({ children }: { children: React.ReactNode }) {
         : phase === "success"
           ? successSubtitle
           : humanizeSince(lastSyncAt);
-    return { phase, pose, title, subtitle, lastSyncAt, sync };
-  }, [phase, successSubtitle, mailFailed, lastSyncAt, sync]);
+    return {
+      phase,
+      title,
+      subtitle,
+      lastSyncAt,
+      mailFailedTwice: mailFailStreak >= 2,
+      sync,
+    };
+  }, [phase, successSubtitle, mailFailed, mailFailStreak, lastSyncAt, sync]);
 
   return <SyncContext.Provider value={value}>{children}</SyncContext.Provider>;
 }

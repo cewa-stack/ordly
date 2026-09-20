@@ -16,7 +16,8 @@ import * as React from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Chip, MiniButton, SkeletonRows } from "../components/ui";
 import { ConfirmDialog } from "../components/Modal";
-import { OrdlakMascot, type OrdlakPose } from "../components/OrdlakMascot";
+import { Ordlak, type OrdlakState } from "../components/Ordlak";
+import { useOrdlakState } from "../lib/ordlakState";
 import {
   AlertIcon,
   CheckIcon,
@@ -60,11 +61,11 @@ function ToolTrace({ tools }: { tools: string[] }) {
   if (unique.length === 0) return null;
   return (
     <div className="mt-2 flex flex-wrap items-center gap-1.5">
-      <span className="text-[10px] text-slate-dim">na podstawie:</span>
+      <span className="text-[10px] text-text-3">na podstawie:</span>
       {unique.map((tool) => (
         <span
           key={tool}
-          className="rounded-[20px] border border-line px-2 py-[2px] text-[10px] text-slate-dim"
+          className="rounded-[20px] border border-line px-2 py-[2px] text-[10px] text-text-3"
         >
           {TOOL_LABEL[tool] ?? tool}
         </span>
@@ -105,9 +106,9 @@ function AssistantBubble({
 
   return (
     <div className="group flex gap-2.5">
-      <OrdlakMascot pose="idle" size={28} floaty={false} className="mt-0.5 shrink-0" />
+      <Ordlak state="idle" size={28} className="mt-0.5 shrink-0" />
       <div className="min-w-0 flex-1">
-        <p className="whitespace-pre-wrap rounded-[4px_14px_14px_14px] border border-line bg-panel-2 px-3.5 py-2.5 text-[12.5px] leading-[1.7] text-white">
+        <p className="whitespace-pre-wrap rounded-[4px_14px_14px_14px] border border-line bg-panel-2 px-3.5 py-2.5 text-[12.5px] leading-[1.7] text-text">
           {message.content}
         </p>
         <ToolTrace tools={message.used_tools} />
@@ -132,16 +133,23 @@ function AssistantBubble({
 function UserBubble({ content }: { content: string }) {
   return (
     <div className="flex justify-end">
-      <p className="max-w-[78%] whitespace-pre-wrap rounded-[14px_14px_4px_14px] bg-teal-dim px-3.5 py-2.5 text-[12.5px] leading-[1.65] text-white">
+      <p className="max-w-[78%] whitespace-pre-wrap rounded-[14px_14px_4px_14px] bg-teal-glow px-3.5 py-2.5 text-[12.5px] leading-[1.65] text-text">
         {content}
       </p>
     </div>
   );
 }
 
-export function OrdlakScreen() {
+interface OrdlakScreenProps {
+  /** Pytanie wpisane w pasku asystenta na ekranie Start. */
+  seedQuestion?: string | null;
+  onSeedHandled?: () => void;
+}
+
+export function OrdlakScreen({ seedQuestion = null, onSeedHandled }: OrdlakScreenProps = {}) {
   const queryClient = useQueryClient();
   const toast = useToast();
+  const { setThinking } = useOrdlakState();
   const [activeId, setActiveId] = React.useState<number | null>(null);
   const [draft, setDraft] = React.useState("");
   const [pendingQuestion, setPendingQuestion] = React.useState<string | null>(null);
@@ -233,6 +241,13 @@ export function OrdlakScreen() {
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: "smooth" });
   }, [messages.length, pendingQuestion]);
 
+  // Generowanie odpowiedzi zapala `think` TAKZE na maskotce w pasku
+  // bocznym - to jeden z szesciu wyzwalaczy z sekcji 6 instrukcji.
+  React.useEffect(() => {
+    setThinking(askMutation.isPending);
+    return () => setThinking(false);
+  }, [askMutation.isPending, setThinking]);
+
   function send(text: string) {
     const question = text.trim();
     if (!question || askMutation.isPending) return;
@@ -247,8 +262,33 @@ export function OrdlakScreen() {
     askMutation.reset();
   }
 
-  const pose: OrdlakPose = askMutation.isPending
-    ? "thinking"
+  /**
+   * Pytanie z paska asystenta na ekranie Start. Wysyla sie RAZ i zaraz
+   * zwalnia zrodlo - bez tego powrot na Ordlaka wysylalby je ponownie
+   * przy kazdym wejsciu na ekran.
+   */
+  const seedSent = React.useRef<string | null>(null);
+  React.useEffect(() => {
+    if (!seedQuestion || seedSent.current === seedQuestion) return;
+    seedSent.current = seedQuestion;
+    onSeedHandled?.();
+    if (!configured || askMutation.isPending) {
+      // Brak klucza na Pi - pytanie ladzie w polu, zeby nie przepadlo.
+      setDraft(seedQuestion);
+      return;
+    }
+    setActiveId(null);
+    setPendingQuestion(seedQuestion);
+    askMutation.mutate(seedQuestion);
+  }, [seedQuestion, configured, askMutation, onSeedHandled]);
+
+  /**
+   * Stan maskotki na tym ekranie. `think` tylko wtedy, gdy model
+   * naprawde liczy - nie "na wszelki wypadek", bo wtedy przestalby
+   * cokolwiek znaczyc.
+   */
+  const state: OrdlakState = askMutation.isPending
+    ? "think"
     : messages.length > 0
       ? "happy"
       : "idle";
@@ -269,7 +309,7 @@ export function OrdlakScreen() {
         <div className="min-h-0 flex-1 overflow-y-auto px-2 py-2">
           {listQuery.isLoading && <SkeletonRows rows={4} />}
           {!listQuery.isLoading && (listQuery.data ?? []).length === 0 && (
-            <p className="px-2 py-3 text-[11.5px] leading-[1.6] text-slate-dim">
+            <p className="px-2 py-3 text-[11.5px] leading-[1.6] text-text-3">
               Nie masz jeszcze zapisanych rozmów. Zadaj pierwsze pytanie - wątek zapisze się
               sam i przetrwa restart aplikacji.
             </p>
@@ -287,12 +327,12 @@ export function OrdlakScreen() {
               >
                 <span
                   className={`block truncate text-[12px] ${
-                    conversation.id === activeId ? "text-white" : "text-slate"
+                    conversation.id === activeId ? "text-text" : "text-text-2"
                   }`}
                 >
                   {conversation.title}
                 </span>
-                <span className="o-mono block text-[10px] text-slate-dim">
+                <span className="o-mono block text-[10px] text-text-3">
                   {formatDateTime(conversation.updated_at)} · {conversation.message_count}{" "}
                   wiadomości
                 </span>
@@ -300,7 +340,7 @@ export function OrdlakScreen() {
               <button
                 onClick={() => setDeleting(conversation)}
                 aria-label={`Usuń rozmowę ${conversation.title}`}
-                className="shrink-0 rounded-md p-1 text-slate-dim opacity-0 transition-all duration-150 hover:bg-panel-3 hover:text-coral group-hover:opacity-100"
+                className="shrink-0 rounded-md p-1 text-text-3 opacity-0 transition-all duration-150 hover:bg-panel-3 hover:text-coral group-hover:opacity-100"
               >
                 <TrashIcon size={13} />
               </button>
@@ -314,23 +354,23 @@ export function OrdlakScreen() {
         <div ref={scrollRef} className="min-h-0 flex-1 overflow-y-auto px-5 py-[18px]">
           <div className="mx-auto flex w-full max-w-[760px] flex-col gap-3.5">
             {!configured && (
-              <div className="flex items-start gap-2.5 rounded-[9px] border border-[rgba(255,133,99,.3)] bg-[rgba(255,133,99,.08)] px-3.5 py-3">
+              <div className="flex items-start gap-2.5 rounded-sm border border-coral-line bg-coral-soft px-3.5 py-3">
                 <AlertIcon size={15} className="mt-0.5 shrink-0 text-coral" />
-                <p className="text-[11.5px] leading-[1.6] text-slate">
+                <p className="text-[11.5px] leading-[1.6] text-text-2">
                   Ordlak nie ma klucza API, więc nie odpowie. Uzupełnij{" "}
-                  <code className="o-mono text-slate">ANTHROPIC_API_KEY</code> w{" "}
-                  <code className="o-mono text-slate">~/ordly/backend/.env</code> na Pi i
+                  <code className="o-mono text-text-2">ANTHROPIC_API_KEY</code> w{" "}
+                  <code className="o-mono text-text-2">~/ordly/backend/.env</code> na Pi i
                   zrestartuj usługę:{" "}
-                  <code className="o-mono text-slate">sudo systemctl restart ordly</code>.
+                  <code className="o-mono text-text-2">sudo systemctl restart ordly</code>.
                 </p>
               </div>
             )}
 
             {activeId === null && !pendingQuestion && (
               <div className="flex flex-col items-center gap-3 py-10 text-center">
-                <OrdlakMascot pose={pose} size={92} />
-                <h3 className="o-card-title">Zapytaj o swój sklep</h3>
-                <p className="max-w-[460px] text-[12px] leading-[1.7] text-slate-dim">
+                <Ordlak state={state} size={92} />
+                <h3 className="text-[13.5px] font-semibold">Zapytaj o swój sklep</h3>
+                <p className="max-w-[460px] text-[12px] leading-[1.7] text-text-3">
                   Ordlak czyta te same dane co reszta aplikacji - sprzedaż, magazyn, zwroty,
                   dyskusje, skrzynkę i kalendarz sprzedażowy. Liczby bierze z bazy, nie
                   z pamięci, a cenę liczy wzorem, nie na oko.
@@ -367,8 +407,8 @@ export function OrdlakScreen() {
 
             {askMutation.isPending && (
               <div className="flex items-center gap-2.5">
-                <OrdlakMascot pose="thinking" size={28} floaty={false} className="shrink-0" />
-                <span className="o-mono animate-pulse text-[11px] text-slate-dim">
+                <Ordlak state="think" size={28} className="shrink-0" />
+                <span className="o-mono animate-pulse text-[11px] text-text-3">
                   Ordlak sprawdza dane…
                 </span>
               </div>
@@ -415,19 +455,19 @@ export function OrdlakScreen() {
                     ? "Zapytaj o sprzedaż, magazyn, dyskusje albo cenę oferty…"
                     : "Brak klucza API na Pi - asystent jest wyłączony."
                 }
-                className="max-h-[140px] min-h-[42px] w-full resize-y rounded-[10px] border border-line bg-panel-2 px-3.5 py-2.5 text-[12.5px] leading-[1.6] text-white outline-none transition-colors focus:border-teal-bright disabled:opacity-50"
+                className="max-h-[140px] min-h-[42px] w-full resize-y rounded-[10px] border border-line bg-panel-2 px-3.5 py-2.5 text-[12.5px] leading-[1.6] text-text outline-none transition-colors focus:border-teal disabled:opacity-50"
               />
               <button
                 onClick={() => send(draft)}
                 disabled={!canSend}
                 aria-label="Wyślij pytanie"
-                className="flex h-[42px] w-[42px] shrink-0 items-center justify-center rounded-[10px] bg-teal-bright text-[#052321] transition-[transform,filter] duration-150 ease-ordly hover:brightness-110 active:scale-[.985] disabled:pointer-events-none disabled:opacity-40"
+                className="flex h-[42px] w-[42px] shrink-0 items-center justify-center rounded-sm bg-teal text-on-teal transition-[transform,filter] duration-150 ease-ordly hover:brightness-110 active:scale-[.985] disabled:pointer-events-none disabled:opacity-40"
               >
                 <SendIcon size={16} />
               </button>
             </div>
             <div className="flex items-center gap-3">
-              <span className="text-[10.5px] text-slate-dim">
+              <span className="text-[10.5px] text-text-3">
                 Enter wysyła, Shift+Enter to nowa linia. Rozmowy zapisują się na Pi.
               </span>
               {activeId !== null && (

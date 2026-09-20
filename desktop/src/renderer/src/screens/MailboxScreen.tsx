@@ -18,7 +18,7 @@ import {
   MiniButton,
   SkeletonRows,
 } from "../components/ui";
-import { Mascot } from "../components/Mascot";
+import { Ordlak } from "../components/Ordlak";
 import { useToast } from "../lib/toast";
 import { formatDateTime, formatTime } from "../lib/format";
 import { buildMailDocument, hasRemoteImages } from "../lib/mailDocument";
@@ -77,7 +77,7 @@ function MailBody({ message }: { message: MailMessage }) {
   if (bodyQuery.isError) {
     return (
       <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto">
-        <div className="flex items-start gap-2 rounded-[9px] border border-line bg-panel-2 px-3.5 py-3 text-[12px] leading-[1.6] text-slate-dim">
+        <div className="flex items-start gap-2 rounded-[9px] border border-line bg-panel-2 px-3.5 py-3 text-[12px] leading-[1.6] text-text-3">
           <AlertIcon size={14} className="mt-[2px] shrink-0 text-amber" />
           <span>
             Nie udało się pobrać pełnej treści ze skrzynki.{" "}
@@ -85,7 +85,7 @@ function MailBody({ message }: { message: MailMessage }) {
             zapisany podgląd.
           </span>
         </div>
-        <p className="whitespace-pre-wrap text-[13px] leading-[1.72] text-slate">
+        <p className="whitespace-pre-wrap text-[13px] leading-[1.72] text-text-2">
           {message.body_preview}
         </p>
       </div>
@@ -104,10 +104,10 @@ function MailBody({ message }: { message: MailMessage }) {
           // klikniety link trafil do systemowej przegladarki.
           sandbox="allow-popups allow-popups-to-escape-sandbox"
           srcDoc={buildMailDocument(html)}
-          className="min-h-0 w-full flex-1 rounded-[9px] border border-line bg-white"
+          className="min-h-0 w-full flex-1 rounded-[9px] border border-line bg-text"
         />
         {hasRemoteImages(html) && (
-          <p className="shrink-0 text-[11px] leading-[1.5] text-slate-dim">
+          <p className="shrink-0 text-[11px] leading-[1.5] text-text-3">
             Obrazki z sieci są zablokowane - to zwykle piksele śledzące, które
             potwierdzałyby nadawcy otwarcie wiadomości. Żeby je zobaczyć, otwórz mail w
             Gmailu.
@@ -119,7 +119,7 @@ function MailBody({ message }: { message: MailMessage }) {
 
   return (
     <div className="min-h-0 flex-1 overflow-y-auto">
-      <p className="whitespace-pre-wrap text-[13px] leading-[1.72] text-slate">
+      <p className="whitespace-pre-wrap text-[13px] leading-[1.72] text-text-2">
         {bodyQuery.data?.plain_body || message.body_preview || "(wiadomość bez treści)"}
       </p>
     </div>
@@ -174,20 +174,20 @@ function MailboxDiagnostics({ onSync, syncing }: { onSync: () => void; syncing: 
   if (!status.configured) {
     return (
       <div className="flex flex-col items-center justify-center gap-4 px-8 py-14 text-center">
-        <Mascot pose="think" size={88} />
+        <Ordlak state="alert" size={88} />
         <h4 className="o-display text-[15px] font-semibold">Skrzynka nie jest podłączona</h4>
-        <p className="max-w-[420px] text-[12.5px] leading-[1.6] text-slate-dim">
+        <p className="max-w-[420px] text-[12.5px] leading-[1.6] text-text-3">
           Backend na Pi nie ma ustawionego konta IMAP, więc nie ma skąd pobierać maili.
-          Uzupełnij <code className="o-mono text-slate">IMAP_USER</code> i{" "}
-          <code className="o-mono text-slate">IMAP_PASS</code> w pliku{" "}
-          <code className="o-mono text-slate">~/ordly/backend/.env</code>, a potem zrestartuj
-          usługę: <code className="o-mono text-slate">sudo systemctl restart ordly</code>.
+          Uzupełnij <code className="o-mono text-text-2">IMAP_USER</code> i{" "}
+          <code className="o-mono text-text-2">IMAP_PASS</code> w pliku{" "}
+          <code className="o-mono text-text-2">~/ordly/backend/.env</code>, a potem zrestartuj
+          usługę: <code className="o-mono text-text-2">sudo systemctl restart ordly</code>.
         </p>
-        <p className="max-w-[420px] text-[11.5px] leading-[1.6] text-slate-dim">
-          Gmail i iCloud wymagają <b className="text-slate">hasła aplikacji</b> (przy włączonym
+        <p className="max-w-[420px] text-[11.5px] leading-[1.6] text-text-3">
+          Gmail i iCloud wymagają <b className="text-text-2">hasła aplikacji</b> (przy włączonym
           2FA) - zwykłe hasło konta zostanie odrzucone.
         </p>
-        <div className="o-mono mt-1 flex flex-col gap-1 rounded-md border border-line bg-panel-2 px-4 py-3 text-[10.5px] text-slate-dim">
+        <div className="o-mono mt-1 flex flex-col gap-1 rounded-md border border-line bg-panel-2 px-4 py-3 text-[10.5px] text-text-3">
           <span>serwer: {status.host || "(pusty)"}</span>
           <span>konto: {status.user_masked || "(puste)"}</span>
           <span>obserwowani nadawcy: {status.watch_senders.join(", ") || "(brak)"}</span>
@@ -198,9 +198,9 @@ function MailboxDiagnostics({ onSync, syncing }: { onSync: () => void; syncing: 
 
   return (
     <div className="flex flex-col items-center justify-center gap-4 px-8 py-14 text-center">
-      <Mascot pose="happy" size={88} />
+      <Ordlak state="sleep" size={88} />
       <h4 className="o-display text-[15px] font-semibold">Skrzynka skonfigurowana, pusto</h4>
-      <p className="max-w-[420px] text-[12.5px] leading-[1.6] text-slate-dim">
+      <p className="max-w-[420px] text-[12.5px] leading-[1.6] text-text-3">
         ORDLY ma ustawione konto {status.user_masked} na {status.host}, ale w bazie nie ma
         jeszcze maili od obserwowanych nadawców ({status.watch_senders.join(", ")}). Sprawdź
         teraz - jeśli logowanie nie działa, zobaczysz dokładny powód odmowy serwera.
@@ -347,7 +347,6 @@ export function MailboxScreen() {
             {isLoading && <SkeletonRows rows={5} />}
             {!isLoading && (data ?? []).length === 0 && (
               <EmptyState
-                pose="think"
                 title="Nic w tym filtrze"
                 description="Zmień filtr kanału albo odznacz „tylko nieprzeczytane”."
               />
@@ -359,11 +358,11 @@ export function MailboxScreen() {
                   key={message.message_id}
                   onClick={() => handleSelect(message)}
                   className={`relative flex w-full flex-col gap-[5px] border-b border-line px-[18px] py-[13px] text-left transition-colors duration-150 ${
-                    isSelected ? "bg-teal-dim" : "hover:bg-panel-2"
+                    isSelected ? "bg-teal-glow" : "hover:bg-panel-2"
                   }`}
                 >
                   {isSelected && (
-                    <span className="absolute bottom-0 left-0 top-0 w-[3px] bg-teal-bright" />
+                    <span className="absolute bottom-0 left-0 top-0 w-[3px] bg-teal" />
                   )}
                   <span className="flex items-center gap-2">
                     {!message.is_read && (
@@ -372,11 +371,11 @@ export function MailboxScreen() {
                     <b className="truncate text-[12.5px] font-semibold">
                       {senderName(message.sender)}
                     </b>
-                    <span className="o-mono ml-auto shrink-0 text-[9.5px] text-slate-dim">
+                    <span className="o-mono ml-auto shrink-0 text-[9.5px] text-text-3">
                       {formatTime(message.received_at)}
                     </span>
                   </span>
-                  <span className="truncate text-[12px] text-slate">
+                  <span className="truncate text-[12px] text-text-2">
                     {message.subject || "(bez tematu)"}
                   </span>
                 </button>
@@ -386,24 +385,24 @@ export function MailboxScreen() {
 
           <div className="flex min-h-0 flex-col gap-4 overflow-hidden px-6 py-[22px]">
             {!selected ? (
-              <div className="flex flex-1 flex-col items-center justify-center gap-2 text-slate-dim">
+              <div className="flex flex-1 flex-col items-center justify-center gap-2 text-text-3">
                 <AlertIcon size={26} />
                 <p className="text-[12.5px]">Wybierz wiadomość z listy, żeby zobaczyć podgląd.</p>
               </div>
             ) : (
               <>
-                <h3 className="o-section-title shrink-0">{selected.subject || "(bez tematu)"}</h3>
+                <h3 className="o-screen-title shrink-0">{selected.subject || "(bez tematu)"}</h3>
                 <div className="flex shrink-0 items-center gap-2.5 border-b border-line pb-3.5">
                   <InitialAvatar name={senderName(selected.sender)} />
                   <div className="min-w-0">
-                    <div className="truncate text-[12.5px] text-white">
+                    <div className="truncate text-[12.5px] text-text">
                       {senderName(selected.sender)}
                     </div>
-                    <div className="o-mono truncate text-[10.5px] text-slate-dim">
+                    <div className="o-mono truncate text-[10.5px] text-text-3">
                       {senderAddress(selected.sender)}
                     </div>
                   </div>
-                  <span className="o-mono ml-auto shrink-0 text-[10.5px] text-slate-dim">
+                  <span className="o-mono ml-auto shrink-0 text-[10.5px] text-text-3">
                     {formatDateTime(selected.received_at)}
                   </span>
                 </div>
@@ -419,9 +418,9 @@ export function MailboxScreen() {
                   href={gmailSearchUrl(selected.message_id)}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="inline-flex shrink-0 items-center gap-2 self-start rounded-[9px] border border-line bg-panel-2 px-3 py-2.5 text-[12px] text-slate transition-colors hover:border-line-strong hover:text-white"
+                  className="inline-flex shrink-0 items-center gap-2 self-start rounded-[9px] border border-line bg-panel-2 px-3 py-2.5 text-[12px] text-text-2 transition-colors hover:border-line-2 hover:text-text"
                 >
-                  <ExternalIcon size={14} className="text-teal-bright" />
+                  <ExternalIcon size={14} className="text-teal" />
                   Otwórz pełną wiadomość w Gmail
                 </a>
               </>

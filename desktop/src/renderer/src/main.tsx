@@ -5,18 +5,22 @@ import { queryClient } from "./lib/queryClient";
 import { AuthProvider } from "./lib/auth";
 import { ToastProvider } from "./lib/toast";
 import { SyncProvider } from "./lib/sync";
+import { OrdlakStateProvider } from "./lib/ordlakState";
 import { App } from "./App";
 import "./theme/global.css";
 
 // Kolejnosc dostawcow nie jest dowolna: SyncProvider wola useToast
-// i useQueryClient, wiec musi siedziec pod nimi obydwoma.
+// i useQueryClient, wiec musi siedziec pod nimi obydwoma, a
+// OrdlakStateProvider wola useSync, wiec siedzi pod SyncProviderem.
 ReactDOM.createRoot(document.getElementById("root") as HTMLElement).render(
   <React.StrictMode>
     <QueryClientProvider client={queryClient}>
       <AuthProvider>
         <ToastProvider>
           <SyncProvider>
-            <App />
+            <OrdlakStateProvider>
+              <App />
+            </OrdlakStateProvider>
           </SyncProvider>
         </ToastProvider>
       </AuthProvider>

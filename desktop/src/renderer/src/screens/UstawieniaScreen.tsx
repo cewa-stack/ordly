@@ -28,7 +28,7 @@ function Row({
     <div className="flex items-center gap-4 rounded-md border border-line bg-panel-2 px-[17px] py-[15px]">
       <div className="min-w-0 flex-1">
         <h4 className="mb-[3px] text-[13px] font-semibold">{title}</h4>
-        <p className="text-[11.5px] leading-[1.45] text-slate-dim">{description}</p>
+        <p className="text-[11.5px] leading-[1.45] text-text-3">{description}</p>
       </div>
       {children}
     </div>
@@ -36,7 +36,7 @@ function Row({
 }
 
 function Code({ children }: { children: React.ReactNode }) {
-  return <code className="o-mono text-[11px] text-slate">{children}</code>;
+  return <code className="o-mono text-[11px] text-text-2">{children}</code>;
 }
 
 export function UstawieniaScreen() {
@@ -124,7 +124,7 @@ export function UstawieniaScreen() {
           )
         }
       >
-        <span className="o-mono shrink-0 text-[11px] text-slate-dim">
+        <span className="o-mono shrink-0 text-[11px] text-text-3">
           {session ? new URL(session.baseUrl).hostname : ""}
         </span>
       </Row>
@@ -146,8 +146,8 @@ export function UstawieniaScreen() {
         <span
           className={`o-mono shrink-0 rounded-[20px] px-2.5 py-1 text-[10.5px] ${
             health?.marketplace_connection_ok
-              ? "bg-teal-dim text-teal-bright"
-              : "bg-coral-dim text-coral"
+              ? "bg-teal-glow text-teal"
+              : "bg-coral-glow text-coral"
           }`}
         >
           {health?.marketplace_connection_ok ? "połączone" : "brak tokenu"}
@@ -189,7 +189,7 @@ export function UstawieniaScreen() {
           )}
           <span
             className={`o-mono shrink-0 rounded-[20px] px-2.5 py-1 text-[10.5px] ${
-              mail?.configured ? "bg-teal-dim text-teal-bright" : "bg-coral-dim text-coral"
+              mail?.configured ? "bg-teal-glow text-teal" : "bg-coral-glow text-coral"
             }`}
           >
             {mail?.configured ? "skonfigurowana" : "wyłączona"}

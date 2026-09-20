@@ -33,19 +33,23 @@ const FULFILLMENT_LABELS: Record<string, string> = {
 };
 
 /**
- * Kolory pigulek wg sekcji 2.4. Koralowe jest to, co czeka na spakowanie
- * (wymaga dzialania); spakowane czeka juz tylko na kuriera; wyslane
- * i anulowane sa wygaszone, bo sa zamknieta historia.
+ * Tony pigulek w jezyku z sekcji 7 instrukcji "Nokturn": `hot` wymaga
+ * dzialania, `go` jest w toku, `mute` jest zamkniete.
+ *
+ * "Wyslane", "Odebrane" i "Anulowane" sa `mute`, nie `go` - to zamknieta
+ * historia. Swiecenie rzeczy juz skonczonych to glowny powod, przez
+ * ktory interfejsy robia sie hałaśliwe. "Wstrzymane" zostaje `hot`, bo
+ * jako jedyne z zamknietych naprawde czeka na decyzje sprzedawcy.
  */
 const FULFILLMENT_TONES: Record<string, PillTone> = {
-  NEW: "pack",
-  PROCESSING: "pack",
-  READY_FOR_SHIPMENT: "new",
-  READY_FOR_PICKUP: "done",
-  SENT: "done",
-  PICKED_UP: "done",
-  SUSPENDED: "warn",
-  CANCELLED: "warn",
+  NEW: "hot",
+  PROCESSING: "hot",
+  READY_FOR_SHIPMENT: "go",
+  READY_FOR_PICKUP: "mute",
+  SENT: "mute",
+  PICKED_UP: "mute",
+  SUSPENDED: "hot",
+  CANCELLED: "mute",
 };
 
 /** Minimum pol zamowienia potrzebne do decyzji o etapie obslugi. */
@@ -76,8 +80,8 @@ export function fulfillmentLabel(status: string | null): string {
 }
 
 export function fulfillmentTone(status: string | null): PillTone {
-  if (!status) return "pack";
-  return FULFILLMENT_TONES[status] ?? "warn";
+  if (!status) return "hot";
+  return FULFILLMENT_TONES[status] ?? "mute";
 }
 
 /**

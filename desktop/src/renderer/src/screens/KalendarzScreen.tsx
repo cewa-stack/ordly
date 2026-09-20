@@ -43,17 +43,17 @@ const CATEGORY_LABEL: Record<EventCategory, string> = {
  * (szansa, morski, kolko) byly odrozniane nawet przy kilku kropkach obok siebie. */
 const CATEGORY_DOT: Record<EventCategory, string> = {
   swieto: "rounded-[2px] rotate-45 bg-amber",
-  sprzedaz: "rounded-full bg-teal-bright",
+  sprzedaz: "rounded-full bg-teal",
 };
 
 const CATEGORY_BADGE: Record<EventCategory, string> = {
-  swieto: "bg-[rgba(245,192,101,.14)] text-amber",
-  sprzedaz: "bg-teal-dim text-teal-bright",
+  swieto: "bg-chan-amazon text-amber",
+  sprzedaz: "bg-teal-glow text-teal",
 };
 
 const CATEGORY_CELL_TINT: Record<EventCategory, string> = {
-  swieto: "bg-[rgba(245,192,101,.08)]",
-  sprzedaz: "bg-teal-dim",
+  swieto: "bg-amber-soft",
+  sprzedaz: "bg-teal-glow",
 };
 
 /** Gdy dzien ma obie kategorie, sprzedaz "wygrywa" ton tla - to ona niesie akcje do podjecia. */
@@ -152,7 +152,7 @@ export function KalendarzScreen() {
             setCursor(new Date(today.getFullYear(), today.getMonth(), 1));
             setSelectedDay(today);
           }}
-          className="ml-auto rounded-[7px] border border-line px-2.5 py-[5px] text-[11.5px] text-slate transition-colors hover:border-line-strong hover:text-white"
+          className="ml-auto rounded-[7px] border border-line px-2.5 py-[5px] text-[11.5px] text-text-2 transition-colors hover:border-line-2 hover:text-text"
         >
           Dziś
         </button>
@@ -168,14 +168,14 @@ export function KalendarzScreen() {
               <button
                 onClick={() => goToMonth(-1)}
                 aria-label="Poprzedni miesiąc"
-                className="flex h-7 w-7 items-center justify-center rounded-md text-slate-dim transition-colors hover:bg-panel-3 hover:text-white"
+                className="flex h-7 w-7 items-center justify-center rounded-md text-text-3 transition-colors hover:bg-panel-3 hover:text-text"
               >
                 ‹
               </button>
               <button
                 onClick={() => goToMonth(1)}
                 aria-label="Następny miesiąc"
-                className="flex h-7 w-7 items-center justify-center rounded-md text-slate-dim transition-colors hover:bg-panel-3 hover:text-white"
+                className="flex h-7 w-7 items-center justify-center rounded-md text-text-3 transition-colors hover:bg-panel-3 hover:text-text"
               >
                 ›
               </button>
@@ -184,7 +184,7 @@ export function KalendarzScreen() {
 
           <div className="grid grid-cols-7 gap-1">
             {DAY_LABELS.map((label) => (
-              <div key={label} className="o-mono px-1 pb-1 text-center text-[9.5px] uppercase tracking-[.08em] text-slate-dim">
+              <div key={label} className="o-mono px-1 pb-1 text-center text-[9.5px] uppercase tracking-[.08em] text-text-3">
                 {label}
               </div>
             ))}
@@ -202,19 +202,19 @@ export function KalendarzScreen() {
                   onClick={() => setSelectedDay(date)}
                   className={`flex h-[64px] flex-col items-start gap-1.5 rounded-[7px] border px-1.5 py-1 text-left transition-colors duration-150 ease-ordly ${
                     isSelected
-                      ? "border-teal-bright bg-teal-dim"
+                      ? "border-teal bg-teal-glow"
                       : `border-transparent hover:border-line hover:bg-panel-3 ${dominant ? CATEGORY_CELL_TINT[dominant] : ""}`
                   } ${inMonth ? "" : "opacity-35"}`}
                 >
                   <span
                     className={`o-mono text-[11px] ${
-                      isToday ? "flex h-[18px] w-[18px] items-center justify-center rounded-full bg-coral text-white" : "text-slate"
+                      isToday ? "flex h-[18px] w-[18px] items-center justify-center rounded-full bg-coral text-text" : "text-text-2"
                     }`}
                   >
                     {date.getDate()}
                   </span>
                   {dayEvents.length > 0 && (
-                    <span className="w-full truncate text-[9px] leading-tight text-slate">
+                    <span className="w-full truncate text-[9px] leading-tight text-text-2">
                       {dayEvents[0].title}
                     </span>
                   )}
@@ -228,9 +228,9 @@ export function KalendarzScreen() {
             })}
           </div>
 
-          <div className="flex items-center gap-4 border-t border-line pt-3 text-[10.5px] text-slate-dim">
+          <div className="flex items-center gap-4 border-t border-line pt-3 text-[10.5px] text-text-3">
             <span className="flex items-center gap-2">
-              <i className="h-[7px] w-[7px] rounded-full bg-teal-bright" /> Okres sprzedażowy
+              <i className="h-[7px] w-[7px] rounded-full bg-teal" /> Okres sprzedażowy
             </span>
             <span className="flex items-center gap-2">
               <i className="h-[7px] w-[7px] rotate-45 rounded-[2px] bg-amber" /> Święto (dzień wolny)
@@ -242,7 +242,7 @@ export function KalendarzScreen() {
           <div className="flex flex-col gap-2.5 rounded-md border border-line bg-panel-2 p-[18px]">
             <h4 className="text-[13px] font-semibold">{formatDayMonth(selectedDay)}</h4>
             {selectedDayEvents.length === 0 ? (
-              <p className="text-[12px] text-slate-dim">Brak wydarzeń tego dnia.</p>
+              <p className="text-[12px] text-text-3">Brak wydarzeń tego dnia.</p>
             ) : (
               selectedDayEvents.map((event) => <EventCard key={event.id} event={event} today={today} />)
             )}
@@ -251,7 +251,7 @@ export function KalendarzScreen() {
           <div className="flex flex-col gap-2.5 rounded-md border border-line bg-panel-2 p-[18px]">
             <h4 className="text-[13px] font-semibold">Najbliższe</h4>
             {upcoming.length === 0 ? (
-              <p className="text-[12px] text-slate-dim">Brak nadchodzących wydarzeń w wybranej kategorii.</p>
+              <p className="text-[12px] text-text-3">Brak nadchodzących wydarzeń w wybranej kategorii.</p>
             ) : (
               upcoming.map((event) => (
                 <button
@@ -260,13 +260,13 @@ export function KalendarzScreen() {
                     setSelectedDay(event.peak);
                     setCursor(new Date(event.peak.getFullYear(), event.peak.getMonth(), 1));
                   }}
-                  className="flex items-center gap-3 border-b border-line py-2 text-left text-[12.5px] last:border-b-0 hover:text-white"
+                  className="flex items-center gap-3 border-b border-line py-2 text-left text-[12.5px] last:border-b-0 hover:text-text"
                 >
                   <i className={`h-[7px] w-[7px] shrink-0 ${CATEGORY_DOT[event.category]}`} />
-                  <span className="min-w-0 flex-1 truncate text-white">{event.title}</span>
+                  <span className="min-w-0 flex-1 truncate text-text">{event.title}</span>
                   <span
                     className={`o-mono shrink-0 text-[10px] ${
-                      statusOf(event, today) === "trwa" ? "text-coral" : "text-slate-dim"
+                      statusOf(event, today) === "trwa" ? "text-coral" : "text-text-3"
                     }`}
                   >
                     {STATUS_LABEL[statusOf(event, today)]}
@@ -286,10 +286,10 @@ function EventCard({ event, today }: { event: SalesEventInstance; today: Date })
   return (
     <div className="flex flex-col gap-1.5 rounded-md border border-line bg-panel-3 p-3">
       <div className="flex items-center gap-2">
-        <span className="text-[13px] font-semibold text-white">{event.title}</span>
+        <span className="text-[13px] font-semibold text-text">{event.title}</span>
         <span
           className={`o-mono ml-auto shrink-0 rounded-[20px] px-2 py-[3px] text-[9.5px] font-medium ${
-            status === "trwa" ? "bg-coral-dim text-coral" : "bg-panel text-slate-dim"
+            status === "trwa" ? "bg-coral-glow text-coral" : "bg-panel text-text-3"
           }`}
         >
           {STATUS_LABEL[status]}
@@ -301,9 +301,9 @@ function EventCard({ event, today }: { event: SalesEventInstance; today: Date })
         >
           {CATEGORY_LABEL[event.category]}
         </span>
-        <span className="o-mono text-[10.5px] text-slate-dim">{formatRange(event)}</span>
+        <span className="o-mono text-[10.5px] text-text-3">{formatRange(event)}</span>
       </div>
-      <p className="text-[12px] leading-[1.55] text-slate">{event.description}</p>
+      <p className="text-[12px] leading-[1.55] text-text-2">{event.description}</p>
     </div>
   );
 }

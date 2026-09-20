@@ -7,7 +7,7 @@
  * i akcent koralowy.
  */
 import * as React from "react";
-import { Mascot } from "../components/Mascot";
+import { Ordlak } from "../components/Ordlak";
 
 type ToastTone = "success" | "error";
 
@@ -38,17 +38,17 @@ function ToastCard({ toast, onDismiss }: { toast: ToastItem; onDismiss: () => vo
       role="status"
       className={`flex max-w-[330px] cursor-pointer items-center gap-[11px] rounded-md border bg-panel-2 py-[11px] pl-[11px] pr-[15px] shadow-toast ${
         toast.leaving ? "animate-toast-out" : "animate-toast-in"
-      } ${isError ? "border-coral/50" : "border-line-strong"}`}
+      } ${isError ? "border-coral" : "border-line-2"}`}
     >
-      <Mascot pose={isError ? "think" : "happy"} size={30} floaty={false} />
+      <Ordlak state={isError ? "alert" : "happy"} size={30} className="shrink-0" />
       <div className="flex min-w-0 flex-col gap-0.5">
         <span
-          className={`text-[12.5px] font-semibold ${isError ? "text-coral" : "text-white"}`}
+          className={`text-[12.5px] font-semibold ${isError ? "text-coral" : "text-text"}`}
         >
           {toast.title}
         </span>
         {toast.subtitle && (
-          <span className="text-[11px] leading-snug text-slate-dim">{toast.subtitle}</span>
+          <span className="text-[11px] leading-snug text-text-3">{toast.subtitle}</span>
         )}
       </div>
     </div>
