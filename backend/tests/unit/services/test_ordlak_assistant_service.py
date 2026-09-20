@@ -898,3 +898,115 @@ class TestZapisRozmowy:
         assert await harness.service.delete_conversation(result.conversation_id) is True
         assert await harness.service.delete_conversation(result.conversation_id) is False
         assert await harness.service.conversation(result.conversation_id) is None
+
+
+class TestProponowanieDzialan:
+    """
+    Model PROPONUJE, człowiek ZATWIERDZA, serwer WYKONUJE.
+
+    Te testy pilnują pierwszego ogniwa: że wywołanie narzędzia
+    `zaproponuj_dzialanie` odkłada działanie na bok i NICZEGO nie zapisuje.
+    """
+
+    @pytest.mark.asyncio
+    async def test_propozycja_wraca_w_odpowiedzi_i_nic_nie_zapisuje(self):
+        harness = _build(
+            FakeAnthropic(
+                [
+                    FakeResponse(
+                        [
+                            ToolUseBlock(
+                                "zaproponuj_dzialanie",
+                                {
+                                    "rodzaj": "ustaw_stan_oferty",
+                                    "marketplace": "allegro",
+                                    "numer_oferty": "111",
+                                    "ilosc": 12,
+                                    "nazwa": "Butelka PET 30ml",
+                                },
+                            )
+                        ],
+                        stop_reason="tool_use",
+                    ),
+                    FakeResponse([TextBlock("Proponuję wpisać 12 sztuk.")]),
+                ]
+            )
+        )
+        _put(harness, _offer("111", "Butelka PET 30ml", quantity_on_hand=2))
+
+        answer = await _ask(harness, "Policzyłem butelki, jest 12.")
+
+        assert answer.reply == "Proponuję wpisać 12 sztuk."
+        assert len(answer.actions) == 1
+        assert answer.actions[0].kind == "ustaw_stan_oferty"
+        assert answer.actions[0].params["ilosc"] == 12
+        # SEDNO: katalog ma nietknięty stan sprzed rozmowy. Model niczego
+        # nie zapisał - zapis nastąpi dopiero po `POST /ordlak/apply`.
+        assert harness.catalog.offers[("allegro", "111")].quantity_on_hand == 2
+
+    @pytest.mark.asyncio
+    async def test_model_dostaje_informacje_ze_dzialanie_nie_zostalo_wykonane(self):
+        harness = _build(
+            FakeAnthropic(
+                [
+                    FakeResponse(
+                        [
+                            ToolUseBlock(
+                                "zaproponuj_dzialanie",
+                                {
+                                    "rodzaj": "oznacz_zamowienie",
+                                    "numer_zamowienia": "A-1",
+                                    "status": "wyslane",
+                                },
+                            )
+                        ],
+                        stop_reason="tool_use",
+                    ),
+                    FakeResponse([TextBlock("Mogę oznaczyć to zamówienie.")]),
+                ]
+            )
+        )
+
+        await _ask(harness, "Nadałem paczkę A-1.")
+
+        # Bez tego zdania model potrafi napisać "zrobione" - a nic nie jest.
+        assert "NIE zostala wykonana" in _tool_results(harness.client.calls[1])[0]
+
+    @pytest.mark.asyncio
+    async def test_bledna_propozycja_wraca_do_modelu_zamiast_wywalic_rozmowe(self):
+        harness = _build(
+            FakeAnthropic(
+                [
+                    FakeResponse(
+                        [
+                            ToolUseBlock(
+                                "zaproponuj_dzialanie",
+                                # Status, którego asystent nie ma prawa proponować.
+                                {
+                                    "rodzaj": "oznacz_zamowienie",
+                                    "numer_zamowienia": "A-1",
+                                    "status": "anulowane",
+                                },
+                            )
+                        ],
+                        stop_reason="tool_use",
+                    ),
+                    FakeResponse([TextBlock("Anulowania nie zrobię z tego miejsca.")]),
+                ]
+            )
+        )
+
+        answer = await _ask(harness, "Anuluj A-1.")
+
+        assert answer.actions == ()
+        assert "BLAD propozycji" in _tool_results(harness.client.calls[1])[0]
+
+    @pytest.mark.asyncio
+    async def test_zwykly_raport_nie_niesie_zadnych_dzialan(self):
+        harness = _build(
+            FakeAnthropic([FakeResponse([TextBlock("Dziś dwa zamówienia.")])])
+        )
+
+        answer = await _ask(harness, "Jak leci?")
+
+        assert answer.actions == ()

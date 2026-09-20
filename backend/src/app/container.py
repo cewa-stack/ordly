@@ -45,6 +45,7 @@ from app.repositories.sqlite_telegram_message_repository import (
 )
 from app.repositories.sqlite_token_store import SqliteTokenStore
 from app.services.allegro_lokalnie_orders_service import AllegroLokalnieOrdersService
+from app.services.assistant_actions import AssistantActionExecutor
 from app.services.backup_service import BackupService
 from app.services.dashboard_service import DashboardService
 from app.services.events_service import EventsService
@@ -184,6 +185,20 @@ class Container:
         a nie osobnym bytem obok.
         """
         return AllegroLokalnieOrdersService(SqliteOrderRepository(session))
+
+    def assistant_action_executor(self, session: AsyncSession) -> AssistantActionExecutor:
+        """
+        Buduje wykonawcę działań Ordlaka dla `POST /api/v1/ordlak/apply`.
+
+        Dostaje te same serwisy, co zwykłe endpointy zapisujące - dzięki
+        temu reguła "nie da się cofnąć statusu anulowanego zamówienia"
+        obowiązuje tak samo dla przycisku w panelu i dla asystenta.
+        """
+        return AssistantActionExecutor(
+            orders_service=self.orders_service(session),
+            offer_catalog_service=self.offer_catalog_service(session),
+            issues_service=self.issues_service(session),
+        )
 
     def ordlak_assistant_service(self, session: AsyncSession) -> OrdlakAssistantService:
         """

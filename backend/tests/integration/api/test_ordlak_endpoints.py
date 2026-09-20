@@ -10,6 +10,7 @@ dwie strony.
 from __future__ import annotations
 
 from collections.abc import Iterator
+from decimal import Decimal
 
 import pytest
 from fastapi import FastAPI
@@ -19,6 +20,8 @@ from pydantic import SecretStr
 from app.api.dependencies import get_container, get_session
 from app.api.endpoints import ordlak as ordlak_endpoints
 from app.core.config import MailWatchSettings, OrdlakSettings
+from app.domain.entities.marketplace_offer import MarketplaceOffer
+from app.services.assistant_actions import AssistantActionExecutor
 from app.services.dashboard_service import DashboardService
 from app.services.issues_service import IssuesService
 from app.services.mailbox_service import MailboxService
@@ -26,6 +29,7 @@ from app.services.offer_catalog_service import OfferCatalogService
 from app.services.ordlak_assistant_service import OrdlakAssistantService
 from app.services.returns_service import ReturnsService
 from app.services.search_service import SearchService
+from app.utils.time import utc_now
 from tests.fakes.fake_anthropic import (
     FakeAnthropic,
     FakeResponse,
@@ -94,6 +98,15 @@ class _StubContainer:
             client_factory=(lambda: self.client) if self.settings.enabled else None,
         )
 
+    def assistant_action_executor(self, _session=None) -> AssistantActionExecutor:
+        return AssistantActionExecutor(
+            orders_service=None,  # type: ignore[arg-type]
+            offer_catalog_service=OfferCatalogService(
+                plugin=self.plugin, catalog_repository=self.catalog
+            ),
+            issues_service=IssuesService(self.plugin),
+        )
+
 
 class _NullSessionScope:
     """Endpointy zapisujace otwieraja wlasny zakres sesji - tu nie ma bazy."""
@@ -111,6 +124,20 @@ def _build_client(container: _StubContainer) -> TestClient:
     app.dependency_overrides[get_container] = lambda: container
     app.dependency_overrides[get_session] = lambda: None
     return TestClient(app)
+
+
+def _offer(external_id: str, name: str) -> MarketplaceOffer:
+    """Oferta w katalogu - tyle, ile potrzebuje zapis ilosci."""
+    return MarketplaceOffer(
+        marketplace="allegro",
+        external_id=external_id,
+        name=name,
+        signature=None,
+        available_stock=5,
+        price=Decimal("19.99"),
+        quantity_on_hand=None,
+        synced_at=utc_now(),
+    )
 
 
 @pytest.fixture
@@ -234,3 +261,123 @@ class TestRozmowy:
         assert client.delete(f"/api/v1/ordlak/conversations/{thread_id}").status_code == 204
         assert client.delete(f"/api/v1/ordlak/conversations/{thread_id}").status_code == 404
         assert client.get(f"/api/v1/ordlak/conversations/{thread_id}").status_code == 404
+
+
+class TestApply:
+    """
+    `POST /ordlak/apply` - wykonanie dzialania ZATWIERDZONEGO w aplikacji.
+
+    To jest drugie ogniwo zasady "model proponuje, czlowiek zatwierdza":
+    dopiero to zapytanie cokolwiek zapisuje.
+    """
+
+    def test_zatwierdzony_stan_zapisuje_sie_w_katalogu(
+        self, client: TestClient, container: _StubContainer
+    ):
+        container.catalog.offers[("allegro", "111")] = _offer("111", "Butelka PET 30ml")
+
+        response = client.post(
+            "/api/v1/ordlak/apply",
+            json={
+                "kind": "ustaw_stan_oferty",
+                "params": {
+                    "marketplace": "allegro",
+                    "numer_oferty": "111",
+                    "ilosc": 12,
+                    "nazwa": "Butelka PET 30ml",
+                },
+            },
+        )
+
+        assert response.status_code == 200
+        assert "12 szt." in response.json()["message"]
+        assert container.catalog.offers[("allegro", "111")].quantity_on_hand == 12
+
+    def test_nieznane_dzialanie_konczy_sie_422(self, client: TestClient):
+        response = client.post(
+            "/api/v1/ordlak/apply",
+            json={"kind": "usun_wszystko", "params": {}},
+        )
+
+        assert response.status_code == 422
+        assert "Nieznane dzialanie" in response.json()["detail"]
+
+    def test_parametry_sa_walidowane_po_stronie_pi(
+        self, client: TestClient, container: _StubContainer
+    ):
+        # Aplikacja moglaby przyslac cokolwiek - `build_action` i tak
+        # odrzuca ilosc spoza zakresu, tak samo jak przy propozycji modelu.
+        response = client.post(
+            "/api/v1/ordlak/apply",
+            json={
+                "kind": "ustaw_stan_oferty",
+                "params": {
+                    "marketplace": "allegro",
+                    "numer_oferty": "111",
+                    "ilosc": -5,
+                },
+            },
+        )
+
+        assert response.status_code == 422
+        assert container.catalog.offers == {}
+
+    def test_zatwierdzona_odpowiedz_idzie_do_marketplace(
+        self, client: TestClient, container: _StubContainer
+    ):
+        response = client.post(
+            "/api/v1/ordlak/apply",
+            json={
+                "kind": "odpowiedz_w_dyskusji",
+                "params": {"numer_dyskusji": "D-7", "tresc": "Paczka wyszła dziś rano."},
+            },
+        )
+
+        assert response.status_code == 200
+        assert container.plugin.reply_calls == [("D-7", "Paczka wyszła dziś rano.")]
+
+
+class TestChatZwracaDzialania:
+    def test_propozycja_modelu_wychodzi_w_polu_actions(
+        self, container: _StubContainer
+    ):
+        container.client = FakeAnthropic(
+            [
+                FakeResponse(
+                    [
+                        ToolUseBlock(
+                            "zaproponuj_dzialanie",
+                            {
+                                "rodzaj": "oznacz_zamowienie",
+                                "numer_zamowienia": "A-1",
+                                "status": "wyslane",
+                                "kupujacy": "jan_kowalski",
+                            },
+                        )
+                    ],
+                    stop_reason="tool_use",
+                ),
+                FakeResponse([TextBlock("Mogę oznaczyć A-1 jako wysłane.")]),
+            ]
+        )
+
+        with _build_client(container) as test_client:
+            response = test_client.post(
+                "/api/v1/ordlak/chat", json={"message": "Nadałem paczkę A-1."}
+            )
+
+        assert response.status_code == 200
+        actions = response.json()["actions"]
+        assert len(actions) == 1
+        assert actions[0]["kind"] == "oznacz_zamowienie"
+        # Etykieta czyta czlowiek, wiec ma ogonki - mimo ze enum
+        # narzedzia jest w ASCII.
+        assert actions[0]["label"] == "Oznacz jako wysłane"
+        # Aplikacja musi wiedziec, ze to zobaczy kupujacy.
+        assert actions[0]["outward"] is True
+
+    def test_zwykly_raport_ma_puste_actions(self, client: TestClient):
+        response = client.post("/api/v1/ordlak/chat", json={"message": "Jak leci?"})
+
+        assert response.status_code == 200
+        assert response.json()["actions"] == []

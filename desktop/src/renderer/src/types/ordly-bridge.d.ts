@@ -96,6 +96,10 @@ export interface OrdlyBridge {
       message: string;
       conversationId?: number | null;
     }) => Promise<BridgeResult<OrdlakChatReply>>;
+    apply: (input: {
+      kind: string;
+      params: Record<string, unknown>;
+    }) => Promise<BridgeResult<{ message: string }>>;
     conversations: () => Promise<BridgeResult<OrdlakConversation[]>>;
     conversation: (id: number) => Promise<BridgeResult<OrdlakConversation>>;
     deleteConversation: (id: number) => Promise<BridgeResult<null>>;

@@ -76,6 +76,8 @@ const ordly = {
     status: () => ipcRenderer.invoke("ordly:ordlak:status"),
     ask: (input: { message: string; conversationId?: number | null }) =>
       ipcRenderer.invoke("ordly:ordlak:ask", input),
+    apply: (input: { kind: string; params: Record<string, unknown> }) =>
+      ipcRenderer.invoke("ordly:ordlak:apply", input),
     conversations: () => ipcRenderer.invoke("ordly:ordlak:conversations"),
     conversation: (id: number) => ipcRenderer.invoke("ordly:ordlak:conversation", id),
     deleteConversation: (id: number) =>

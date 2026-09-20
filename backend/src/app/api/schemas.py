@@ -10,7 +10,7 @@ from __future__ import annotations
 
 from datetime import UTC, datetime
 from decimal import Decimal
-from typing import Annotated, Literal
+from typing import Annotated, Any, Literal
 
 from pydantic import BaseModel, Field, PlainSerializer, field_validator
 
@@ -430,6 +430,25 @@ class OrdlakChatIn(BaseModel):
     conversation_id: int | None = None
 
 
+class AssistantActionOut(BaseModel):
+    """
+    Działanie ZAPROPONOWANE przez Ordlaka, czekające na zatwierdzenie.
+
+    Nic się jeszcze nie wydarzyło. Aplikacja pokazuje to jako przycisk,
+    a zapis następuje dopiero po `POST /api/v1/ordlak/apply`.
+
+    `outward` mówi, czy skutek zobaczy ktoś poza sprzedawcą - aplikacja
+    używa tego, żeby przy takich działaniach zapytać wprost, a przy
+    lokalnych (stan na półce) poprzestać na jednym kliknięciu.
+    """
+
+    kind: str
+    label: str
+    summary: str
+    params: dict[str, Any]
+    outward: bool
+
+
 class OrdlakChatOut(BaseModel):
     """
     Odpowiedź asystenta.
@@ -437,11 +456,33 @@ class OrdlakChatOut(BaseModel):
     `used_tools` to nazwy narzędzi, z których model faktycznie odczytał
     dane - aplikacja pokazuje je pod odpowiedzią, żeby było widać, że
     liczby wzięły się z bazy, a nie z modelu.
+
+    `actions` to propozycje działań - puste przy zwykłym raporcie.
     """
 
     conversation_id: int
     reply: str
     used_tools: list[str]
+    actions: list[AssistantActionOut] = []
+
+
+class AssistantApplyIn(BaseModel):
+    """
+    Ciało żądania `POST /api/v1/ordlak/apply` - JEDNO zatwierdzone działanie.
+
+    Aplikacja odsyła to, co dostała w `actions`. Parametry są walidowane
+    PONOWNIE po stronie Pi (`build_action`), więc klient nie jest źródłem
+    prawdy o tym, co wolno wykonać.
+    """
+
+    kind: str = Field(min_length=1, max_length=64)
+    params: dict[str, Any]
+
+
+class AssistantApplyOut(BaseModel):
+    """Potwierdzenie wykonania - jedno zdanie do pokazania użytkownikowi."""
+
+    message: str
 
 
 class OrdlakMessageOut(BaseModel):
@@ -473,6 +514,16 @@ def ordlak_chat_out(result: ChatResult) -> OrdlakChatOut:
         conversation_id=result.conversation_id,
         reply=result.reply,
         used_tools=list(result.used_tools),
+        actions=[
+            AssistantActionOut(
+                kind=action.kind,
+                label=action.label,
+                summary=action.summary,
+                params=action.params,
+                outward=action.outward,
+            )
+            for action in result.actions
+        ],
     )
 
 

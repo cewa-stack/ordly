@@ -14,6 +14,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.dependencies import get_container, get_session
 from app.api.schemas import (
+    AssistantApplyIn,
+    AssistantApplyOut,
     OrdlakChatIn,
     OrdlakChatOut,
     OrdlakConversationOut,
@@ -22,6 +24,7 @@ from app.api.schemas import (
     ordlak_conversation_out,
 )
 from app.container import Container
+from app.services.assistant_actions import AssistantActionError, build_action
 from app.services.ordlak_assistant_service import (
     OrdlakConversationNotFoundError,
     OrdlakError,
@@ -77,6 +80,49 @@ async def chat_with_assistant(
             ) from exc
 
     return ordlak_chat_out(result)
+
+
+@router.post("/ordlak/apply", response_model=AssistantApplyOut)
+async def apply_assistant_action(
+    container: Annotated[Container, Depends(get_container)],
+    payload: AssistantApplyIn,
+) -> AssistantApplyOut:
+    """
+    Wykonuje działanie ZATWIERDZONE przez użytkownika w aplikacji.
+
+    Model niczego tu nie uruchamia: propozycja przyszła wcześniej w polu
+    `actions` odpowiedzi `POST /ordlak/chat`, a to zapytanie wysyła
+    aplikacja dopiero wtedy, gdy człowiek nacisnął przycisk.
+
+    Parametry są walidowane PONOWNIE (`build_action`) - tą samą funkcją,
+    która sprawdza propozycję modelu. Nie ma więc drogi, którą dałoby się
+    wykonać coś, czego asystent nie mógłby zaproponować.
+
+    Uprawnienia: to zapytanie nie daje aplikacji niczego, czego nie
+    mogłaby zrobić bez Ordlaka - każde z trzech działań ma swój własny
+    endpoint i ten sam token dostępowy.
+
+    Otwiera własny zakres sesji (jak `/orders/{id}/fulfillment`), żeby
+    zapis był zatwierdzony przed odpowiedzią - inaczej aplikacja
+    odświeżyłaby listę szybciej, niż transakcja zdążyłaby się zamknąć.
+    """
+    try:
+        action = build_action({"rodzaj": payload.kind, **payload.params})
+    except AssistantActionError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT, detail=str(exc)
+        ) from exc
+
+    async with container.session_scope() as session:
+        executor = container.assistant_action_executor(session)
+        try:
+            message = await executor.apply(action)
+        except AssistantActionError as exc:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_CONTENT, detail=str(exc)
+            ) from exc
+
+    return AssistantApplyOut(message=message)
 
 
 @router.get("/ordlak/conversations", response_model=list[OrdlakConversationOut])

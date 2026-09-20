@@ -17,6 +17,17 @@ interface OrdlakAskInput {
   conversationId?: number | null;
 }
 
+/**
+ * Dzialanie ZATWIERDZONE przez uzytkownika w oknie aplikacji.
+ *
+ * Model niczego nie uruchamia - propozycja przyszla wczesniej w polu
+ * `actions` odpowiedzi czatu, a to wywolanie leci dopiero po kliknieciu.
+ */
+interface ApplyActionInput {
+  kind: string;
+  params: Record<string, unknown>;
+}
+
 interface SaveReplyInput {
   /** Sugerowana nazwa pliku bez rozszerzenia - zwykle tytul rozmowy. */
   suggestedName: string;
@@ -46,6 +57,16 @@ export function registerOrdlakIpc(): void {
           message: input.message,
           conversation_id: input.conversationId ?? null,
         },
+      });
+    })
+  );
+
+  ipcMain.handle("ordly:ordlak:apply", async (_event, input: ApplyActionInput) =>
+    toResult(async () => {
+      const session = requireSession();
+      return apiRequest(session.baseUrl, session.token, "/api/v1/ordlak/apply", {
+        method: "POST",
+        body: { kind: input.kind, params: input.params },
       });
     })
   );

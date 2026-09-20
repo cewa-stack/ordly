@@ -191,11 +191,28 @@ export interface OrdlakStatus {
   model: string;
 }
 
+/**
+ * Działanie ZAPROPONOWANE przez Ordlaka - jeszcze nic się nie wydarzyło.
+ *
+ * Zapis następuje dopiero po `POST /api/v1/ordlak/apply`, wysłanym wtedy,
+ * gdy użytkownik naciśnie przycisk. `outward` mówi, czy skutek zobaczy
+ * ktoś poza sprzedawcą (Allegro, kupujący) - przy takich pytamy wprost.
+ */
+export interface AssistantAction {
+  kind: string;
+  label: string;
+  summary: string;
+  params: Record<string, unknown>;
+  outward: boolean;
+}
+
 export interface OrdlakChatReply {
   conversation_id: number;
   reply: string;
   /** Narzędzia, z których model odczytał dane - pokazywane pod odpowiedzią. */
   used_tools: string[];
+  /** Propozycje działań. Puste przy zwykłym raporcie. */
+  actions: AssistantAction[];
 }
 
 export interface OrdlakStoredMessage {
@@ -203,6 +220,13 @@ export interface OrdlakStoredMessage {
   content: string;
   created_at: string;
   used_tools: string[];
+  /**
+   * Propozycje działań. Backend ich NIE zapisuje - są tylko przy
+   * świeżej odpowiedzi, w bieżącej sesji. To celowe: propozycja sprzed
+   * trzech dni ("oznacz jako wysłane") nie ma prawa być jedno
+   * dotknięcie od wykonania, bo od tamtej pory stan się zmienił.
+   */
+  actions?: AssistantAction[];
 }
 
 /**

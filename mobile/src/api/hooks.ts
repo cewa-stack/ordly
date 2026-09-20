@@ -23,6 +23,7 @@ import type {
   MailMessage,
   MailSource,
   MarketplaceOffer,
+  AssistantAction,
   Order,
   OrdlakChatReply,
   OrdlakConversation,
@@ -317,6 +318,28 @@ export function useAskOrdlak() {
       void queryClient.invalidateQueries({
         queryKey: ["ordlak-conversation", reply.conversation_id],
       });
+    },
+  });
+}
+
+/**
+ * Wykonuje działanie ZATWIERDZONE przez użytkownika.
+ *
+ * Model niczego nie uruchamia - propozycja przyszła w polu `actions`
+ * odpowiedzi czatu, a to zapytanie leci dopiero po naciśnięciu przycisku.
+ * Po zapisie unieważniamy wszystko, bo działanie mogło ruszyć magazyn,
+ * zamówienie albo dyskusję - a każde z nich widać na innym ekranie.
+ */
+export function useApplyAssistantAction() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (action: AssistantAction) =>
+      api.post<{ message: string }>("/api/v1/ordlak/apply", {
+        kind: action.kind,
+        params: action.params,
+      }),
+    onSuccess: () => {
+      void queryClient.invalidateQueries();
     },
   });
 }

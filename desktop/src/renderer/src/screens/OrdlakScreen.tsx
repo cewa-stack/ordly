@@ -14,7 +14,7 @@
  */
 import * as React from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Chip, MiniButton, SkeletonRows } from "../components/ui";
+import { Button, Chip, MiniButton, SkeletonRows } from "../components/ui";
 import { ConfirmDialog } from "../components/Modal";
 import { Ordlak, type OrdlakState } from "../components/Ordlak";
 import { useOrdlakState } from "../lib/ordlakState";
@@ -29,7 +29,11 @@ import {
 } from "../icons";
 import { useToast } from "../lib/toast";
 import { formatDateTime } from "../lib/format";
-import type { OrdlakConversation, OrdlakStoredMessage } from "../types/api";
+import type {
+  AssistantAction,
+  OrdlakConversation,
+  OrdlakStoredMessage,
+} from "../types/api";
 
 /** Czytelne nazwy narzedzi backendu - klucze musza zgadzac sie z `TOOLS`. */
 const TOOL_LABEL: Record<string, string> = {
@@ -74,6 +78,74 @@ function ToolTrace({ tools }: { tools: string[] }) {
   );
 }
 
+/**
+ * Propozycja dzialania - nic sie jeszcze nie wydarzylo.
+ *
+ * Zapis leci dopiero po kliknieciu, osobnym zapytaniem
+ * `POST /api/v1/ordlak/apply`. Dzialanie widoczne na zewnatrz (Allegro,
+ * kupujacy) dostaje potwierdzenie z osobnym oknem - takiej rzeczy nie
+ * cofa sie przyciskiem "wstecz".
+ */
+function ActionCard({ action }: { action: AssistantAction }) {
+  const queryClient = useQueryClient();
+  const toast = useToast();
+  const { celebrate } = useOrdlakState();
+  const [confirming, setConfirming] = React.useState(false);
+  const [done, setDone] = React.useState(false);
+
+  const mutation = useMutation({
+    mutationFn: async () => {
+      const result = await window.ordly.ordlak.apply({
+        kind: action.kind,
+        params: action.params,
+      });
+      if (!result.ok) throw new Error(result.message);
+      return result.data;
+    },
+    onSuccess: (data) => {
+      setConfirming(false);
+      setDone(true);
+      celebrate();
+      // Dzialanie moglo ruszyc magazyn, zamowienie albo dyskusje -
+      // a kazde z nich widac na innym ekranie.
+      void queryClient.invalidateQueries();
+      toast.success("Zrobione", data.message);
+    },
+    onError: (error) => {
+      setConfirming(false);
+      toast.error(
+        "Nie udało się wykonać",
+        error instanceof Error ? error.message : "Spróbuj ponownie."
+      );
+    },
+  });
+
+  return (
+    <div className="mt-2 rounded-md border border-line-2 bg-panel px-3.5 py-3">
+      <p className="text-[11.5px] leading-[1.5] text-text-2">{action.summary}</p>
+      <Button
+        className="mt-2.5"
+        variant={action.outward ? "primary" : "ghost"}
+        disabled={done || mutation.isPending}
+        onClick={() => (action.outward ? setConfirming(true) : mutation.mutate())}
+        icon={done ? <CheckIcon size={14} /> : undefined}
+      >
+        {done ? "Zrobione" : mutation.isPending ? "Wykonuję…" : action.label}
+      </Button>
+
+      <ConfirmDialog
+        open={confirming}
+        title={action.label}
+        message={action.summary}
+        confirmLabel={action.label}
+        pending={mutation.isPending}
+        onConfirm={() => mutation.mutate()}
+        onClose={() => setConfirming(false)}
+      />
+    </div>
+  );
+}
+
 function AssistantBubble({
   message,
   conversationTitle,
@@ -112,6 +184,9 @@ function AssistantBubble({
           {message.content}
         </p>
         <ToolTrace tools={message.used_tools} />
+        {(message.actions ?? []).map((action) => (
+          <ActionCard key={action.kind} action={action} />
+        ))}
         {/* Akcje pojawiaja sie na hover - w spoczynku nie zasmiecaja watku,
             ale sa przy KAZDEJ odpowiedzi, nie tylko przy ostatniej. */}
         <div className="mt-1.5 flex gap-1.5 opacity-0 transition-opacity duration-150 focus-within:opacity-100 group-hover:opacity-100">
@@ -154,6 +229,8 @@ export function OrdlakScreen({ seedQuestion = null, onSeedHandled }: OrdlakScree
   const [draft, setDraft] = React.useState("");
   const [pendingQuestion, setPendingQuestion] = React.useState<string | null>(null);
   const [deleting, setDeleting] = React.useState<OrdlakConversation | null>(null);
+  /** Propozycje z OSTATNIEJ odpowiedzi - nie ma ich w historii z Pi. */
+  const [freshActions, setFreshActions] = React.useState<AssistantAction[]>([]);
   const scrollRef = React.useRef<HTMLDivElement>(null);
 
   const statusQuery = useQuery({
@@ -192,6 +269,10 @@ export function OrdlakScreen({ seedQuestion = null, onSeedHandled }: OrdlakScree
     },
     onSuccess: (reply) => {
       setActiveId(reply.conversation_id);
+      // Propozycji dzialan backend NIE zapisuje - zyja tylko w biezacej
+      // sesji, przy ostatniej odpowiedzi. To celowe: propozycja sprzed
+      // trzech dni nie ma prawa byc jedno klikniecie od wykonania.
+      setFreshActions(reply.actions ?? []);
       void queryClient.invalidateQueries({ queryKey: ["ordlak-conversations"] });
       void queryClient.invalidateQueries({
         queryKey: ["ordlak-conversation", reply.conversation_id],
@@ -253,12 +334,14 @@ export function OrdlakScreen({ seedQuestion = null, onSeedHandled }: OrdlakScree
     if (!question || askMutation.isPending) return;
     setDraft("");
     setPendingQuestion(question);
+    setFreshActions([]);
     askMutation.mutate(question);
   }
 
   function startNew() {
     setActiveId(null);
     setDraft("");
+    setFreshActions([]);
     askMutation.reset();
   }
 
@@ -397,7 +480,13 @@ export function OrdlakScreen({ seedQuestion = null, onSeedHandled }: OrdlakScree
               ) : (
                 <AssistantBubble
                   key={index}
-                  message={message}
+                  message={
+                    // Propozycje doklejamy WYLACZNIE do ostatniej
+                    // wypowiedzi - tej, ktora wlasnie przyszla.
+                    index === messages.length - 1
+                      ? { ...message, actions: freshActions }
+                      : message
+                  }
                   conversationTitle={conversationTitle}
                 />
               )

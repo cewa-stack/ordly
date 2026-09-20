@@ -18,7 +18,7 @@ rozmów byłaby tu kosztem bez zysku.
 from __future__ import annotations
 
 from collections.abc import Callable, Sequence
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import date, timedelta
 from decimal import Decimal
 from typing import Any, Literal
@@ -37,6 +37,12 @@ from app.domain.interfaces.ordlak_conversation_repository import (
     OrdlakConversationRepository,
 )
 from app.domain.sales_calendar import upcoming_events
+from app.services.assistant_actions import (
+    MAX_ACTIONS_PER_ANSWER,
+    AssistantActionError,
+    ProposedAction,
+    build_action,
+)
 from app.services.dashboard_service import DashboardService, revenue_by_local_day
 from app.services.health_service import HealthService
 from app.services.issues_service import IssuesService
@@ -150,13 +156,18 @@ class AssistantAnswer:
 
     reply: str
     used_tools: tuple[str, ...]
+    #: Dzialania zaproponowane przez model, czekajace na zatwierdzenie
+    #: przez czlowieka. Puste przy zwyklym raporcie.
+    actions: tuple[ProposedAction, ...] = ()
 
 
 @dataclass(frozen=True, slots=True)
 class ChatResult(AssistantAnswer):
     """Odpowiedź razem z wątkiem, do którego trafiła."""
 
-    conversation_id: int
+    # `kw_only`, bo klasa bazowa ma już pole z wartością domyślną
+    # (`actions`) - bez tego dataclass odmawia złożenia konstruktora.
+    conversation_id: int = field(kw_only=True)
 
 
 TOOLS: list[dict[str, Any]] = [
@@ -376,6 +387,77 @@ TOOLS: list[dict[str, Any]] = [
         ),
         "input_schema": {"type": "object", "properties": {}},
     },
+    {
+        "name": "zaproponuj_dzialanie",
+        "description": (
+            "Proponuje JEDNO dzialanie do zatwierdzenia przez sprzedawce. "
+            "NIE WYKONUJE GO - odklada je jako przycisk pod Twoja odpowiedzia, "
+            "a zapis dzieje sie dopiero wtedy, gdy czlowiek ten przycisk "
+            "nacisnie. Uzywaj, gdy uzytkownik prosi o zrobienie czegos, co "
+            "ORDLY potrafi: wpisanie stanu na polce, oznaczenie zamowienia "
+            "jako spakowane albo wyslane, wyslanie odpowiedzi w dyskusji. "
+            "Najpierw sprawdz dane odpowiednim narzedziem odczytu - numer "
+            "oferty, zamowienia albo dyskusji musi pochodzic z danych, nie "
+            "z pamieci. Po wywolaniu napisz normalna odpowiedz: co proponujesz "
+            "i dlaczego. Nie pisz 'kliknij przycisk' - uzytkownik go widzi."
+        ),
+        "input_schema": {
+            "type": "object",
+            "required": ["rodzaj"],
+            "properties": {
+                "rodzaj": {
+                    "type": "string",
+                    "enum": [
+                        "ustaw_stan_oferty",
+                        "oznacz_zamowienie",
+                        "odpowiedz_w_dyskusji",
+                    ],
+                    "description": "Ktore z trzech dzialan proponujesz.",
+                },
+                "marketplace": {
+                    "type": "string",
+                    "description": "ustaw_stan_oferty: kanal oferty, np. 'allegro'.",
+                },
+                "numer_oferty": {
+                    "type": "string",
+                    "description": "ustaw_stan_oferty: numer oferty z narzedzia 'magazyn'.",
+                },
+                "ilosc": {
+                    "type": "integer",
+                    "description": "ustaw_stan_oferty: ile sztuk naprawde lezy na polce.",
+                },
+                "nazwa": {
+                    "type": "string",
+                    "description": "ustaw_stan_oferty: nazwa oferty, zeby przycisk byl czytelny.",
+                },
+                "numer_zamowienia": {
+                    "type": "string",
+                    "description": "oznacz_zamowienie: numer z narzedzia 'ostatnie_zamowienia'.",
+                },
+                "status": {
+                    "type": "string",
+                    "enum": ["spakowane", "wyslane"],
+                    "description": "oznacz_zamowienie: nowy status realizacji.",
+                },
+                "kupujacy": {
+                    "type": "string",
+                    "description": "oznacz_zamowienie: login kupujacego, do opisu przycisku.",
+                },
+                "numer_dyskusji": {
+                    "type": "string",
+                    "description": "odpowiedz_w_dyskusji: numer z narzedzia 'dyskusje'.",
+                },
+                "tresc": {
+                    "type": "string",
+                    "description": (
+                        "odpowiedz_w_dyskusji: gotowy tekst do wyslania kupujacemu. "
+                        "Uprzejmy, rzeczowy, bez obiecywania terminow i zwrotow, "
+                        "ktorych nie widzisz w danych."
+                    ),
+                },
+            },
+        },
+    },
 ]
 
 
@@ -426,11 +508,31 @@ Przy każdej ofercie są dwie różne liczby: ile sztuk deklaruje sama oferta
 "nie policzono"). Rozjazd między nimi jest informacją, nie błędem - warto
 go wskazać. ORDLY nie odejmuje niczego automatycznie przy sprzedaży.
 
-CZEGO NIE ROBISZ: nie wysyłasz maili, nie odpowiadasz za użytkownika
-w dyskusjach, nie wpisujesz ilości w magazynie i nie zmieniasz niczego
-w aplikacji. Jesteś od patrzenia, liczenia i pisania propozycji. Gdy
-użytkownik prosi o akcję, powiedz, na którym ekranie ORDLY ją wykona
-(Magazyn, Hurtownie, Zamówienia, Dyskusje, Poczta).
+DZIAŁANIA: trzy rzeczy możesz PRZYGOTOWAĆ do wykonania - wpisanie stanu
+na półce, oznaczenie zamówienia jako spakowane albo wysłane i wysłanie
+odpowiedzi w dyskusji. Robisz to narzędziem `zaproponuj_dzialanie`.
+
+Nie wykonujesz ich. Narzędzie odkłada propozycję jako przycisk pod Twoją
+odpowiedzią, a zapis dzieje się dopiero wtedy, gdy użytkownik ten przycisk
+naciśnie. Dwa z tych działań widzi kupujący, więc decyzja należy do
+człowieka - Ty przygotowujesz ją tak, żeby wystarczyło jedno spojrzenie.
+
+Zasady propozycji:
+- Najpierw ODCZYTAJ dane. Numer oferty, zamówienia i dyskusji ma pochodzić
+  z narzędzia, nigdy z pamięci ani z domysłu.
+- Jedna propozycja na odpowiedź. Gdy do zrobienia jest więcej, zaproponuj
+  najpilniejszą i powiedz, co czeka w kolejce.
+- Nie proponuj niczego, o co nikt nie prosił i co nie wynika wprost
+  z danych. "Widzę, że czeka od dwóch dni - mogę oznaczyć jako spakowane"
+  jest w porządku. Oznaczanie czegokolwiek "przy okazji" nie jest.
+- Po wywołaniu narzędzia napisz zwykłą odpowiedź: co proponujesz i
+  dlaczego. Nie pisz "kliknij przycisk" - użytkownik go widzi.
+- Gdy nie jesteś pewny, którego rekordu dotyczy prośba, NIE proponuj -
+  dopytaj.
+
+CZEGO NADAL NIE ROBISZ: nie wysyłasz maili do hurtowni, nie zmieniasz cen,
+nie wystawiasz i nie kończysz ofert. Gdy użytkownik prosi o którąś z tych
+rzeczy, powiedz, na którym ekranie ORDLY ją wykona (Hurtownie, Magazyn).
 """
 
 
@@ -602,7 +704,10 @@ class OrdlakAssistantService:
             thread_id, "assistant", answer.reply, answer.used_tools
         )
         return ChatResult(
-            reply=answer.reply, used_tools=answer.used_tools, conversation_id=thread_id
+            reply=answer.reply,
+            used_tools=answer.used_tools,
+            actions=answer.actions,
+            conversation_id=thread_id,
         )
 
     async def conversations(self, limit: int = 30) -> list[OrdlakConversation]:
@@ -634,6 +739,10 @@ class OrdlakAssistantService:
             {"role": turn.role, "content": turn.content} for turn in messages
         ]
         used_tools: list[str] = []
+        # Propozycje zbieraja sie przez cala petle narzedzi jednej
+        # odpowiedzi - model moze najpierw odczytac dane, a dopiero potem
+        # zaproponowac dzialanie.
+        proposals: list[ProposedAction] = []
 
         for _ in range(MAX_TOOL_ROUNDS):
             response = await self._call_model(client, conversation)
@@ -642,7 +751,9 @@ class OrdlakAssistantService:
 
             if not tool_calls:
                 return AssistantAnswer(
-                    reply=self._extract_text(response), used_tools=tuple(used_tools)
+                    reply=self._extract_text(response),
+                    used_tools=tuple(used_tools),
+                    actions=tuple(proposals),
                 )
 
             conversation.append({"role": "assistant", "content": _blocks_to_params(blocks)})
@@ -655,7 +766,7 @@ class OrdlakAssistantService:
                         "type": "tool_result",
                         "tool_use_id": getattr(call, "id", ""),
                         "content": await self._run_tool(
-                            name, getattr(call, "input", None) or {}
+                            name, getattr(call, "input", None) or {}, proposals
                         ),
                     }
                 )
@@ -706,7 +817,12 @@ class OrdlakAssistantService:
             )
         raise OrdlakError("Ordlak nie zwrócił odpowiedzi. Spróbuj zapytać ponownie.")
 
-    async def _run_tool(self, name: str, payload: dict[str, Any]) -> str:
+    async def _run_tool(
+        self,
+        name: str,
+        payload: dict[str, Any],
+        proposals: list[ProposedAction],
+    ) -> str:
         """
         Wykonuje narzędzie i zwraca wynik jako tekst dla modelu.
 
@@ -718,6 +834,12 @@ class OrdlakAssistantService:
         tekstu wysyłanego do modelu) - system prompt każe mu odpowiadać
         normalną polszczyzną, a jednolity zapis ułatwia asercje w testach.
         """
+        # Narzedzie propozycji nie czyta bazy - odklada dzialanie na bok
+        # i wraca do modelu, zeby ten opisal je uzytkownikowi wlasnymi
+        # slowami. Zaden zapis tu nie nastepuje.
+        if name == "zaproponuj_dzialanie":
+            return self._propose_action(payload, proposals)
+
         try:
             handler = {
                 "podsumowanie_sprzedazy": self._tool_sales_summary,
@@ -741,6 +863,34 @@ class OrdlakAssistantService:
         except Exception as exc:  # noqa: BLE001 - model ma się dowiedzieć, że dane nie przyszły
             logger.exception("Ordlak asystent: narzędzie {} nie zadziałało", name)
             return f"BLAD odczytu danych ({name}): {exc}"
+
+    @staticmethod
+    def _propose_action(
+        payload: dict[str, Any], proposals: list[ProposedAction]
+    ) -> str:
+        """
+        Zapisuje propozycję działania i mówi modelowi, co z nią dalej.
+
+        Błędny parametr wraca do modelu jako treść wyniku (a nie wyjątek),
+        żeby mógł poprawić numer oferty zamiast wywalić całą rozmowę.
+        """
+        if len(proposals) >= MAX_ACTIONS_PER_ANSWER:
+            return (
+                f"BLAD: limit {MAX_ACTIONS_PER_ANSWER} propozycji na odpowiedz "
+                "zostal wyczerpany. Opisz reszte slowami."
+            )
+        try:
+            action = build_action(payload)
+        except AssistantActionError as exc:
+            logger.info("Ordlak: odrzucona propozycja działania - {}", exc)
+            return f"BLAD propozycji: {exc}"
+
+        proposals.append(action)
+        return (
+            "Propozycja przyjeta i czeka na zatwierdzenie przez uzytkownika. "
+            "NIE zostala wykonana. Napisz teraz zwykla odpowiedz: co "
+            "proponujesz i dlaczego."
+        )
 
     # ------------------------------------------------------------------
     # Narzędzia

@@ -10,20 +10,24 @@
  * sesji i zapisem obu wypowiedzi przed odpowiedzią. Telefon go po prostu
  * woła; nowy endpoint byłby drugim wejściem do tej samej logiki.
  *
- * ODSTĘPSTWA OD INSTRUKCJI (świadome, oba z tego samego powodu):
+ * DZIAŁANIA (decyzja 3 z sekcji 16 - "może zapisywać, ma być przydatny"):
+ * Ordlak potrafi PRZYGOTOWAĆ trzy rzeczy - wpisanie stanu na półce,
+ * oznaczenie zamówienia i odpowiedź w dyskusji. Przychodzą jako pole
+ * `actions` przy odpowiedzi i pokazują się jako przyciski. Zapis dzieje
+ * się dopiero po naciśnięciu, zapytaniem `POST /api/v1/ordlak/apply`.
  *
- * 1. Karta wyniku NIE ma przycisku "Wstaw do oferty". Wszystkie
- *    narzędzia asystenta na Pi są TYLKO DO ODCZYTU (sprzedaż, magazyn,
- *    zwroty, dyskusje, poczta, kalendarz, kalkulator ceny) - nie ma
- *    `POST /assistant/apply` ani żadnej akcji zapisującej, którą ten
- *    przycisk mógłby wywołać. Decyzja 3 z sekcji 16 ("może zapisywać")
- *    wymaga najpierw narzędzia zapisującego po stronie Pi; dopóki go
- *    nie ma, taki przycisk byłby przyciskiem-widmem. Karta daje więc
- *    dwie akcje, które naprawdę działają: skopiowanie i udostępnienie.
- * 2. Mikrofon pokazuje się TYLKO tam, gdzie da się nagrywać - czyli w
- *    PWA, w przeglądarce z Web Speech API. Na natywnym iOS/Androidzie
- *    projekt nie ma modułu rozpoznawania mowy, więc ikona by nie
- *    działała.
+ * Dwa z tych działań widzi kupujący, więc mają potwierdzenie z osobnym
+ * ekranem - "Wyślij odpowiedź" nie jest rzeczą, którą chce się nacisnąć
+ * przypadkiem, przewijając listę kciukiem.
+ *
+ * Propozycje żyją tylko w BIEŻĄCEJ sesji: backend ich nie zapisuje, więc
+ * po powrocie do wątku przycisków nie ma. To celowe - propozycja sprzed
+ * trzech dni nie ma prawa być jedno dotknięcie od wykonania.
+ *
+ * ODSTĘPSTWO OD INSTRUKCJI: mikrofon pokazuje się TYLKO tam, gdzie da się
+ * nagrywać - czyli w PWA, w przeglądarce z Web Speech API. Na natywnym
+ * iOS/Androidzie projekt nie ma modułu rozpoznawania mowy, więc ikona by
+ * nie działała.
  */
 import * as React from "react";
 import {
@@ -46,8 +50,14 @@ import { fonts, radii, spacing } from "@/theme/typography";
 import { TabHeading } from "@/components/TabHeading";
 import { Ordlak } from "@/components/Ordlak";
 import { ArrowUpIcon, MicIcon } from "@/icons";
-import { useAskOrdlak, useOrdlakConversation, useOrdlakStatus } from "@/api/hooks";
-import type { OrdlakStoredMessage } from "@/api/types";
+import {
+  useApplyAssistantAction,
+  useAskOrdlak,
+  useOrdlakConversation,
+  useOrdlakStatus,
+} from "@/api/hooks";
+import { ConfirmDialog } from "@/components/ConfirmDialog";
+import type { AssistantAction, OrdlakStoredMessage } from "@/api/types";
 
 /**
  * Podpowiedzi są CZYNNOŚCIOWE - mówią, co Ordlak może zrobić, a nie
@@ -126,9 +136,17 @@ function UserBubble({ text }: { text: string }) {
 function AssistantMessage({
   text,
   tools,
+  actions = [],
+  onRunAction,
+  runningKind,
+  doneKinds,
 }: {
   text: string;
   tools: string[];
+  actions?: AssistantAction[];
+  onRunAction?: (action: AssistantAction) => void;
+  runningKind?: string | null;
+  doneKinds?: string[];
 }) {
   const styles = useThemedStyles(createStyles);
   const { c } = useTheme();
@@ -145,6 +163,45 @@ function AssistantMessage({
       <Ordlak state="idle" size={28} />
       <View style={styles.assistantCopy}>
         <Text style={styles.assistantText}>{text}</Text>
+
+        {/*
+          Propozycje działań. Nic się jeszcze nie wydarzyło - dopóki
+          użytkownik nie naciśnie, to tylko tekst na ekranie.
+        */}
+        {actions.map((action) => {
+          const done = doneKinds?.includes(action.kind);
+          const running = runningKind === action.kind;
+          return (
+            <View key={action.kind} style={styles.actionCard}>
+              <Text style={styles.actionSummary}>{action.summary}</Text>
+              <Pressable
+                onPress={() => onRunAction?.(action)}
+                disabled={done || running || !onRunAction}
+                accessibilityRole="button"
+                accessibilityLabel={`${action.label}. ${action.summary}`}
+                style={({ pressed }) => [
+                  styles.actionButton,
+                  action.outward && styles.actionButtonOutward,
+                  (done || running) && styles.actionButtonDone,
+                  pressed && styles.pressed,
+                ]}
+              >
+                {running ? (
+                  <ActivityIndicator size="small" color={c.onAcc} />
+                ) : (
+                  <Text
+                    style={[
+                      styles.actionButtonText,
+                      action.outward && { color: c.onAcc },
+                    ]}
+                  >
+                    {done ? "Zrobione" : action.label}
+                  </Text>
+                )}
+              </Pressable>
+            </View>
+          );
+        })}
 
         {isResultWorthy(text) && (
           <View style={styles.resultCard}>
@@ -193,6 +250,13 @@ export function OrdlakScreen() {
   const status = useOrdlakStatus();
   const thread = useOrdlakConversation(conversationId);
   const ask = useAskOrdlak();
+  const applyAction = useApplyAssistantAction();
+
+  /** Działanie czekające na potwierdzenie (tylko te widoczne na zewnątrz). */
+  const [pendingAction, setPendingAction] = React.useState<AssistantAction | null>(null);
+  /** Rodzaje już wykonane - przycisk zmienia się w „Zrobione". */
+  const [doneKinds, setDoneKinds] = React.useState<string[]>([]);
+  const [actionNote, setActionNote] = React.useState<string | null>(null);
 
   /**
    * Kopia lokalna tej rozmowy. Odpowiedz przychodzi z `POST /ordlak/chat`,
@@ -233,12 +297,38 @@ export function OrdlakScreen() {
               content: reply.reply,
               created_at: new Date().toISOString(),
               used_tools: reply.used_tools ?? [],
+              // Propozycje żyją tylko tutaj - backend ich nie zapisuje.
+              actions: reply.actions ?? [],
             },
           ]);
         },
         onSettled: () => setPendingQuestion(null),
       }
     );
+  }
+
+  function runAction(action: AssistantAction) {
+    // Działanie widoczne na zewnątrz (Allegro, kupujący) dostaje osobne
+    // pytanie. Lokalne - stan na półce - wykonuje się od razu, bo da się
+    // je poprawić następnym zdaniem.
+    if (action.outward) {
+      setPendingAction(action);
+      return;
+    }
+    confirmAction(action);
+  }
+
+  function confirmAction(action: AssistantAction) {
+    setPendingAction(null);
+    applyAction.mutate(action, {
+      onSuccess: (result) => {
+        setDoneKinds((prev) => [...prev, action.kind]);
+        setActionNote(result.message);
+      },
+      onError: () => {
+        setActionNote("Nie udało się wykonać. Sprawdź połączenie z Pi.");
+      },
+    });
   }
 
   const empty = messages.length === 0 && !pendingQuestion && !ask.isPending;
@@ -284,6 +374,10 @@ export function OrdlakScreen() {
                 key={index}
                 text={message.content}
                 tools={message.used_tools ?? []}
+                actions={message.actions}
+                onRunAction={runAction}
+                runningKind={applyAction.isPending ? pendingAction?.kind ?? null : null}
+                doneKinds={doneKinds}
               />
             )
           )}
@@ -304,6 +398,8 @@ export function OrdlakScreen() {
               Odpowiedź nie doszła. Sprawdź połączenie z Pi i spróbuj ponownie.
             </Text>
           )}
+
+          {actionNote && <Text style={styles.actionNote}>{actionNote}</Text>}
         </ScrollView>
 
         {/* Wygaszenie OD GÓRY (odwrotnie niż na listach) - sekcja 13. */}
@@ -382,6 +478,20 @@ export function OrdlakScreen() {
           )}
         </Pressable>
       </View>
+
+      {/*
+        Potwierdzenie dla działań, które widzi kupujący. `summary` z Pi
+        mówi wprost, co się stanie i że nie da się tego cofnąć.
+      */}
+      <ConfirmDialog
+        visible={pendingAction !== null}
+        title={pendingAction?.label ?? ""}
+        description={pendingAction?.summary}
+        confirmLabel={pendingAction?.label ?? "Wykonaj"}
+        busy={applyAction.isPending}
+        onConfirm={() => pendingAction && confirmAction(pendingAction)}
+        onCancel={() => setPendingAction(null)}
+      />
     </View>
   );
 }
@@ -502,6 +612,49 @@ const createStyles = (c: Palette) =>
       marginTop: 5,
     },
 
+    actionCard: {
+      marginTop: 9,
+      borderRadius: radii.md,
+      backgroundColor: c.card,
+      borderWidth: 1,
+      borderColor: c.line2,
+      paddingVertical: 11,
+      paddingHorizontal: 12,
+      gap: 9,
+    },
+    actionSummary: {
+      ...fonts.body,
+      color: c.tx2,
+    },
+    actionButton: {
+      alignSelf: "flex-start",
+      borderRadius: radii.full,
+      borderWidth: 1,
+      borderColor: c.line2,
+      paddingVertical: 8,
+      paddingHorizontal: 15,
+      minHeight: 34,
+      justifyContent: "center",
+    },
+    actionButtonOutward: {
+      // Działanie nieodwracalne dostaje pełne wypełnienie - ma być
+      // widać, że to nie jest kolejny chip do przewinięcia.
+      backgroundColor: c.acc,
+      borderColor: "transparent",
+    },
+    actionButtonDone: {
+      opacity: 0.5,
+    },
+    actionButtonText: {
+      ...fonts.status,
+      fontSize: 12,
+      color: c.tx,
+    },
+    actionNote: {
+      ...fonts.body,
+      color: c.acc,
+      paddingLeft: 38,
+    },
     resultCard: {
       marginTop: 9,
       borderRadius: radii.md,

@@ -208,11 +208,28 @@ export interface MailSyncResult {
   configured: boolean;
 }
 
+/**
+ * Dzialanie ZAPROPONOWANE przez Ordlaka - jeszcze nic sie nie wydarzylo.
+ *
+ * Zapis nastepuje dopiero po `POST /api/v1/ordlak/apply`, wyslanym wtedy,
+ * gdy uzytkownik kliknie przycisk. `outward` mowi, czy skutek zobaczy
+ * ktos poza sprzedawca (Allegro, kupujacy) - przy takich pytamy wprost.
+ */
+export interface AssistantAction {
+  kind: string;
+  label: string;
+  summary: string;
+  params: Record<string, unknown>;
+  outward: boolean;
+}
+
 export interface OrdlakChatReply {
   conversation_id: number;
   reply: string;
   /** Narzedzia, z ktorych model odczytal dane - pokazywane pod odpowiedzia. */
   used_tools: string[];
+  /** Propozycje dzialan. Puste przy zwyklym raporcie. */
+  actions: AssistantAction[];
 }
 
 /** Zapisana wypowiedz w watku (`GET /ordlak/conversations/{id}`). */
@@ -221,6 +238,13 @@ export interface OrdlakStoredMessage {
   content: string;
   created_at: string;
   used_tools: string[];
+  /**
+   * Propozycje dzialan. Backend ich NIE zapisuje - sa tylko przy swiezej
+   * odpowiedzi, w biezacej sesji. To celowe: propozycja sprzed trzech dni
+   * ("oznacz jako wyslane") nie ma prawa byc jedno klikniecie od
+   * wykonania, bo od tamtej pory stan sie zmienil.
+   */
+  actions?: AssistantAction[];
 }
 
 /**
