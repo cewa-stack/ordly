@@ -12,7 +12,8 @@
     "typecheck:node": "tsc --noEmit -p tsconfig.node.json",
     "typecheck:web": "tsc --noEmit -p tsconfig.web.json",
     "typecheck": "npm run typecheck:node && npm run typecheck:web",
-    "dist": "npm run typecheck && electron-vite build && electron-builder --win"
+    "dist": "npm run typecheck && electron-vite build && electron-builder --win",
+    "preview:ui": "vite --config vite.preview.config.ts"
   },
   "dependencies": {
     "@fontsource-variable/bricolage-grotesque": "^5.3.0",
