@@ -48,9 +48,11 @@ Z tego wynika, że projekt ma **dwa równoległe tory pracy**:
   dostępowy, żadnej rejestracji, żadnych kont wielu użytkowników.
 - **Zero nowych zależności zewnętrznych bez potrzeby.** Backend zostaje na
   FastAPI + SQLAlchemy + Pydantic, zgodnie z istniejącym stackiem.
-- **Branding jeden do jednego z `branding.md`.** Neon Lime `#C6FF00`, tło
-  `#111111`, logo ORDLY — bez wariacji "na telefon".
-- **Styl UI: zatwierdzony wariant "Bento v2"** (patrz
+- **Branding jeden do jednego z `branding.md`.** Paleta "Nokturn": teal
+  `#5FD9CC` jako sygnał „teraz", koral `#FF8563` jako „czeka na Ciebie",
+  tło `#0A1413` — bez wariacji "na telefon". Limonka `#C6FF00` z pierwszej
+  wersji nie jest już używana nigdzie w produkcie.
+- **Styl UI: zatwierdzony wariant "Nokturn"** (patrz
   [02_appdesign.md](02_appdesign.md)) — ostateczna specyfikacja komponentów
   i typografii żyje w tamtym pliku, nie tutaj.
 
@@ -205,7 +207,7 @@ miesza się z `uv`/`pytest` backendu.
 | Bezpieczne przechowywanie tokena | `expo-secure-store` (natywnie), `localStorage` (web) | Token API w Keychain/Keystore na iOS/Androidzie. **Uwaga:** `expo-secure-store` nie ma działającej implementacji web (rzuca błąd przy każdym wywołaniu) — `src/utils/secureStorage.ts` przełącza się na `localStorage` na `Platform.OS === "web"`, jedyny realistyczny odpowiednik w przeglądarce. |
 | Ikony | Wektorowe SVG 1:1 z mockupu (`react-native-svg`), nie biblioteka ikon "z automatu" | Zachowanie dopracowanego stylu ikon ustalonego w mockupie, bez podmiany na generyczny zestaw. |
 
-### 6.3 Mapa ekranów (zgodna z zatwierdzonym mockupem "Bento v2")
+### 6.3 Mapa ekranów (wariant "Nokturn")
 
 1. **Logowanie / parowanie** — pole na adres API (Tailscale) + token,
    zapisywane w `expo-secure-store`. Ekran pokazuje się tylko przy braku
@@ -289,7 +291,7 @@ to tylko pliki statyczne, restart usługi nie jest nawet konieczny (chyba
 
 | Faza | Zakres | Status |
 |---|---|---|
-| **0** | Wybór stylu UI (mockup) | ✅ zatwierdzone — wariant "Bento v2" |
+| **0** | Wybór stylu UI | ✅ zatwierdzone — wariant "Nokturn" (2026-09; zastąpił "Bento v2") |
 | **1** | ORDLY API (wszystkie endpointy z §5) + ORDLY Mobile: ekrany Start / Zamówienia / Magazyn / Statystyki, logowanie tokenem, dane live | 🚧 w budowie |
 | **2** | Powiadomienia push jako odpowiednik dzisiejszych powiadomień Telegram (`TelegramNotifier`) | 🚧 częściowo: **Web Push (PWA) zrobiony** (`WebPushNotifier` + `CompositeNotifier`, patrz §5a) — darmowy, działa już dziś na iOS/Android przez przeglądarkę. Natywny push (Expo Push) do zbudowanej binarki (EAS Build) wciąż ⏳ nie zaczęty — potrzebny tylko, jeśli/gdy zdecydujemy się na płatny build zamiast PWA. |
 | **3** | Tryb offline (cache `react-query` + wskaźnik "dane sprzed X min" gdy brak połączenia z RPi) | ⏳ zaplanowane, nie zaczęte |

@@ -7,7 +7,8 @@
 import * as React from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 
-import { colors } from "@/theme/colors";
+import type { Palette } from "@/theme/colors";
+import { useThemedStyles } from "@/theme/theme";
 import { radii, spacing, typography } from "@/theme/typography";
 import type { Order } from "@/api/types";
 import { displayFulfillmentLabel, formatMoney, parseApiDate, plural } from "@/utils/format";
@@ -23,6 +24,7 @@ function shortDate(iso: string): string {
 }
 
 export function OrderRow({ order, onPress }: OrderRowProps) {
+  const styles = useThemedStyles(createStyles);
   const label = displayFulfillmentLabel(order);
   const count = order.products.length;
   const productsLabel = `${count} ${plural(count, "produkt", "produkty", "produktów")}`;
@@ -51,11 +53,12 @@ export function OrderRow({ order, onPress }: OrderRowProps) {
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (c: Palette) =>
+  StyleSheet.create({
   card: {
-    backgroundColor: colors.surface,
+    backgroundColor: c.card,
     borderWidth: 1,
-    borderColor: colors.border,
+    borderColor: c.line,
     borderRadius: radii.lg,
     padding: spacing.lg,
     marginBottom: spacing.sm,
@@ -63,7 +66,7 @@ const styles = StyleSheet.create({
   },
   pressed: {
     opacity: 0.85,
-    backgroundColor: colors.surfaceRaised,
+    backgroundColor: c.card2,
   },
   row: {
     flexDirection: "row",
@@ -73,21 +76,21 @@ const styles = StyleSheet.create({
   },
   id: {
     ...typography.mono,
-    color: colors.textSecondary,
+    color: c.tx2,
     flexShrink: 1,
   },
   buyer: {
     ...typography.calloutSemibold,
     fontSize: 16,
-    color: colors.text,
+    color: c.tx,
   },
   meta: {
     ...typography.footnote,
-    color: colors.textSecondary,
+    color: c.tx2,
     flexShrink: 1,
   },
   amount: {
     ...typography.rowAmount,
-    color: colors.text,
+    color: c.tx,
   },
 });

@@ -15,7 +15,8 @@ import { useNavigation } from "@react-navigation/native";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { useQueryClient } from "@tanstack/react-query";
 
-import { colors } from "@/theme/colors";
+import type { Palette } from "@/theme/colors";
+import { useTheme, useThemedStyles } from "@/theme/theme";
 import { radii, spacing, typography } from "@/theme/typography";
 import { useOrders, useSearchOrders } from "@/api/hooks";
 import { OrderRow } from "@/components/OrderRow";
@@ -65,6 +66,8 @@ function filterOf(order: Order): Exclude<StatusFilter, "Wszystkie"> | null {
 }
 
 export function OrdersScreen() {
+  const styles = useThemedStyles(createStyles);
+  const { c } = useTheme();
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const queryClient = useQueryClient();
   const [query, setQuery] = React.useState("");
@@ -162,7 +165,7 @@ export function OrdersScreen() {
             <RefreshControl
               refreshing={ordersQuery.isRefetching}
               onRefresh={onRefresh}
-              tintColor={colors.primary}
+              tintColor={c.acc}
             />
           }
           ListFooterComponent={
@@ -172,10 +175,10 @@ export function OrdersScreen() {
           }
           ListEmptyComponent={
             <EmptyState
-              mascotPose={!isSearching && statusFilter === "Wszystkie" ? "orders" : undefined}
+              mascotPose={!isSearching && statusFilter === "Wszystkie" ? "sleep" : undefined}
               icon={
                 isSearching || statusFilter !== "Wszystkie" ? (
-                  <ReceiptIcon size={24} color={colors.textSecondary} />
+                  <ReceiptIcon size={24} color={c.tx2} />
                 ) : undefined
               }
               title={
@@ -204,10 +207,11 @@ export function OrdersScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (c: Palette) =>
+  StyleSheet.create({
   screen: {
     flex: 1,
-    backgroundColor: colors.background,
+    backgroundColor: c.bg,
   },
   searchWrap: {
     paddingHorizontal: spacing.xl,

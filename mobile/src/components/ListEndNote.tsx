@@ -13,9 +13,10 @@
 import * as React from "react";
 import { StyleSheet, Text, View } from "react-native";
 
-import { colors } from "@/theme/colors";
+import type { Palette } from "@/theme/colors";
+import { useThemedStyles } from "@/theme/theme";
 import { spacing, typography } from "@/theme/typography";
-import { Mascot } from "@/components/Mascot";
+import { Ordlak } from "@/components/Ordlak";
 
 interface ListEndNoteProps {
   /** Pełne zdanie kończące listę - patrz przykłady w sekcji 7.4. */
@@ -23,15 +24,17 @@ interface ListEndNoteProps {
 }
 
 export function ListEndNote({ text }: ListEndNoteProps) {
+  const styles = useThemedStyles(createStyles);
   return (
     <View style={styles.row}>
-      <Mascot pose="default" size={48} floaty={false} style={styles.mascot} />
+      <Ordlak state="sleep" size={48} style={styles.mascot} />
       <Text style={styles.text}>{text}</Text>
     </View>
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (c: Palette) =>
+  StyleSheet.create({
   row: {
     flexDirection: "row",
     alignItems: "center",
@@ -47,6 +50,6 @@ const styles = StyleSheet.create({
     flex: 1,
     fontSize: 11.5,
     lineHeight: 18,
-    color: colors.textSecondary,
+    color: c.tx2,
   },
 });

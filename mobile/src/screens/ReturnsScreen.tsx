@@ -7,7 +7,8 @@ import * as React from "react";
 import { FlatList, RefreshControl, StyleSheet, Text, View } from "react-native";
 import { useQueryClient } from "@tanstack/react-query";
 
-import { colors } from "@/theme/colors";
+import type { Palette } from "@/theme/colors";
+import { useTheme, useThemedStyles } from "@/theme/theme";
 import { radii, spacing, typography } from "@/theme/typography";
 import { useReturns } from "@/api/hooks";
 import { ReturnRow } from "@/components/ReturnRow";
@@ -19,6 +20,8 @@ import { Skeleton } from "@/components/Skeleton";
 import type { ReturnItem } from "@/api/types";
 
 export function ReturnsScreen() {
+  const styles = useThemedStyles(createStyles);
+  const { c } = useTheme();
   const returns = useReturns();
   const queryClient = useQueryClient();
 
@@ -51,7 +54,7 @@ export function ReturnsScreen() {
             <RefreshControl
               refreshing={returns.isRefetching}
               onRefresh={onRefresh}
-              tintColor={colors.primary}
+              tintColor={c.acc}
             />
           }
           ListFooterComponent={
@@ -61,7 +64,7 @@ export function ReturnsScreen() {
           }
           ListEmptyComponent={
             <EmptyState
-              mascotPose="happy"
+              mascotPose="sleep"
               title="Zero zwrotów"
               description="Wszystkie zamówienia idą gładko — żaden kupujący niczego nie zwraca."
             />
@@ -72,10 +75,11 @@ export function ReturnsScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (c: Palette) =>
+  StyleSheet.create({
   screen: {
     flex: 1,
-    backgroundColor: colors.background,
+    backgroundColor: c.bg,
   },
   header: {
     paddingHorizontal: spacing.xl,
@@ -83,11 +87,11 @@ const styles = StyleSheet.create({
   },
   title: {
     ...typography.title1,
-    color: colors.text,
+    color: c.tx,
   },
   note: {
     ...typography.footnote,
-    color: colors.textSecondary,
+    color: c.tx2,
     paddingHorizontal: spacing.xl,
     marginTop: spacing.xs,
     marginBottom: spacing.md,

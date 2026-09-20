@@ -41,6 +41,12 @@ export function usePushDeepLinks(enabled: boolean): void {
         case "Settings":
           navigation.navigate("Settings");
           return;
+        case "Discussions":
+          navigation.navigate("Discussions");
+          return;
+        case "Returns":
+          navigation.navigate("Returns");
+          return;
         case "MainTab":
           navigation.navigate("Main", { screen: target.params.tab });
           return;

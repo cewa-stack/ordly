@@ -19,17 +19,20 @@ import {
 } from "react-native";
 import { StatusBar } from "expo-status-bar";
 
-import { colors } from "@/theme/colors";
-import { radii, spacing, typography } from "@/theme/typography";
+import type { Palette } from "@/theme/colors";
+import { useTheme, useThemedStyles } from "@/theme/theme";
+import { family, radii, spacing, typography } from "@/theme/typography";
 import { ApiError } from "@/api/client";
 import { useAuth } from "@/store/auth";
 import { FormField } from "@/components/FormField";
 import { PrimaryButton } from "@/components/PrimaryButton";
-import { Mascot } from "@/components/Mascot";
+import { Ordlak } from "@/components/Ordlak";
 import { GlowBackdrop } from "@/components/GlowBackdrop";
 import { EyeIcon, EyeOffIcon, LockIcon, ServerIcon, UserIcon } from "@/icons";
 
 export function LoginScreen() {
+  const styles = useThemedStyles(createStyles);
+  const { c } = useTheme();
   const { baseUrl: storedBaseUrl, username: storedUsername, loginWithPassword, sessionExpiredMessage, clearSessionExpiredMessage } =
     useAuth();
   const [serverUrl, setServerUrl] = React.useState(storedBaseUrl ?? "http://");
@@ -80,7 +83,7 @@ export function LoginScreen() {
         keyboardShouldPersistTaps="handled"
         showsVerticalScrollIndicator={false}
       >
-        <Mascot size={92} style={styles.mascot} />
+        <Ordlak state="idle" size={92} style={styles.mascot} />
         <Text style={styles.brandName}>ORDLY</Text>
         <Text style={styles.title}>Witaj z powrotem</Text>
         <Text style={styles.subtitle}>
@@ -90,7 +93,7 @@ export function LoginScreen() {
         <View style={styles.form}>
           <FormField
             label="Adres serwera"
-            icon={<ServerIcon size={17} color={colors.primary} />}
+            icon={<ServerIcon size={17} color={c.acc} />}
             value={serverUrl}
             onChangeText={setServerUrl}
             placeholder="http://raspberrypi:8000"
@@ -101,7 +104,7 @@ export function LoginScreen() {
           />
           <FormField
             label="Login"
-            icon={<UserIcon size={17} color={colors.textSecondary} />}
+            icon={<UserIcon size={17} color={c.tx2} />}
             value={username}
             onChangeText={setUsername}
             placeholder="admin"
@@ -111,7 +114,7 @@ export function LoginScreen() {
           />
           <FormField
             label="Hasło"
-            icon={<LockIcon size={17} color={colors.textSecondary} />}
+            icon={<LockIcon size={17} color={c.tx2} />}
             value={password}
             onChangeText={setPassword}
             placeholder="domyślnie: admin"
@@ -121,9 +124,9 @@ export function LoginScreen() {
             error={Boolean(error)}
             trailing={
               showPassword ? (
-                <EyeOffIcon size={17} color={colors.textSecondary} />
+                <EyeOffIcon size={17} color={c.tx2} />
               ) : (
-                <EyeIcon size={17} color={colors.textSecondary} />
+                <EyeIcon size={17} color={c.tx2} />
               )
             }
             onTrailingPress={() => setShowPassword((v) => !v)}
@@ -152,10 +155,11 @@ export function LoginScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (c: Palette) =>
+  StyleSheet.create({
   screen: {
     flex: 1,
-    backgroundColor: colors.background,
+    backgroundColor: c.bg,
   },
   content: {
     flexGrow: 1,
@@ -169,21 +173,21 @@ const styles = StyleSheet.create({
   },
   brandName: {
     fontSize: 12.5,
-    fontWeight: "800",
+    fontFamily: family.display,
     letterSpacing: 5,
-    color: colors.text,
+    color: c.tx,
   },
   title: {
     ...typography.title1,
     fontSize: 22,
     lineHeight: 28,
-    color: colors.text,
+    color: c.tx,
     textAlign: "center",
     marginTop: spacing.lg,
   },
   subtitle: {
     ...typography.footnote,
-    color: colors.textSecondary,
+    color: c.tx2,
     textAlign: "center",
     marginTop: spacing.xs,
     marginBottom: spacing.xl,
@@ -195,7 +199,7 @@ const styles = StyleSheet.create({
   },
   error: {
     ...typography.caption,
-    color: colors.danger,
+    color: c.coral,
     lineHeight: 17,
     alignSelf: "stretch",
     marginTop: spacing.sm,
@@ -207,13 +211,13 @@ const styles = StyleSheet.create({
   hint: {
     ...typography.caption,
     fontSize: 11.5,
-    color: colors.textDim,
+    color: c.tx3,
     textAlign: "center",
     marginTop: spacing.md,
     lineHeight: 16,
   },
   hintBold: {
-    color: colors.textSecondary,
-    fontWeight: "700",
+    color: c.tx2,
+    fontFamily: family.display,
   },
 });

@@ -8,15 +8,18 @@
 import * as React from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 
-import { colors } from "@/theme/colors";
-import { radii, spacing, typography } from "@/theme/typography";
+import type { Palette } from "@/theme/colors";
+import { useTheme, useThemedStyles } from "@/theme/theme";
+import { family, radii, spacing, typography } from "@/theme/typography";
 import { useAuth } from "@/store/auth";
 import { PrimaryButton } from "@/components/PrimaryButton";
-import { Mascot } from "@/components/Mascot";
+import { Ordlak } from "@/components/Ordlak";
 import { GlowBackdrop } from "@/components/GlowBackdrop";
 import { FaceIdIcon } from "@/icons";
 
 export function BiometricOptInScreen() {
+  const styles = useThemedStyles(createStyles);
+  const { c } = useTheme();
   const { biometricLabel, confirmBiometricEnroll, skipBiometricPrompt } = useAuth();
   const [busy, setBusy] = React.useState(false);
   const [error, setError] = React.useState(false);
@@ -35,10 +38,10 @@ export function BiometricOptInScreen() {
     <View style={styles.screen}>
       <GlowBackdrop />
       <View style={styles.content}>
-        <Mascot size={88} />
+        <Ordlak state="idle" size={88} />
 
         <View style={styles.faceCircle}>
-          <FaceIdIcon size={34} color={colors.primary} />
+          <FaceIdIcon size={34} color={c.acc} />
         </View>
 
         <Text style={styles.title}>Włączyć {biometricLabel}?</Text>
@@ -67,10 +70,11 @@ export function BiometricOptInScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (c: Palette) =>
+  StyleSheet.create({
   screen: {
     flex: 1,
-    backgroundColor: colors.background,
+    backgroundColor: c.bg,
   },
   content: {
     flex: 1,
@@ -83,8 +87,8 @@ const styles = StyleSheet.create({
     height: 88,
     borderRadius: radii.full,
     borderWidth: 1.5,
-    borderColor: colors.primaryBorder,
-    backgroundColor: colors.primaryTint,
+    borderColor: c.line2,
+    backgroundColor: c.accDim,
     alignItems: "center",
     justifyContent: "center",
     marginTop: spacing.xl,
@@ -92,13 +96,13 @@ const styles = StyleSheet.create({
   title: {
     ...typography.title1,
     fontSize: 22,
-    color: colors.text,
+    color: c.tx,
     marginTop: spacing.xl,
     textAlign: "center",
   },
   subtitle: {
     ...typography.footnote,
-    color: colors.textSecondary,
+    color: c.tx2,
     textAlign: "center",
     marginTop: spacing.sm,
     maxWidth: 280,
@@ -106,7 +110,7 @@ const styles = StyleSheet.create({
   },
   error: {
     ...typography.caption,
-    color: colors.danger,
+    color: c.coral,
     textAlign: "center",
     marginTop: spacing.md,
   },
@@ -120,7 +124,7 @@ const styles = StyleSheet.create({
   },
   skipLabel: {
     ...typography.footnote,
-    fontWeight: "600",
-    color: colors.textSecondary,
+    fontFamily: family.sansSemibold,
+    color: c.tx2,
   },
 });

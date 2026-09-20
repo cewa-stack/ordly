@@ -10,25 +10,24 @@
 import * as React from "react";
 import { Image, StyleSheet, Text, View } from "react-native";
 
-import { colors, marketplaceColor } from "@/theme/colors";
+import { CHANNEL_LABEL, channelDay, channelNight } from "@/theme/colors";
+import type { Palette } from "@/theme/colors";
+import { useTheme, useThemedStyles } from "@/theme/theme";
 import { radii, spacing, typography } from "@/theme/typography";
 import { BoxIcon } from "@/icons";
 import { formatMoney } from "@/utils/format";
 import type { MarketplaceOffer } from "@/api/types";
 
-const MARKETPLACE_LABEL: Record<string, string> = {
-  allegro: "Allegro",
-  allegro_lokalnie: "Allegro Lokalnie",
-  olx: "OLX",
-  amazon: "Amazon",
-  ebay: "eBay",
-};
 
-const NEUTRAL_CHANNEL = { background: colors.surfaceRaised, text: colors.textSecondary };
+
+
 
 export function OfferRow({ offer }: { offer: MarketplaceOffer }) {
-  const channel = marketplaceColor[offer.marketplace] ?? NEUTRAL_CHANNEL;
-  const label = MARKETPLACE_LABEL[offer.marketplace] ?? offer.marketplace;
+  const styles = useThemedStyles(createStyles);
+  const { c, mode } = useTheme();
+  const palette = mode === "day" ? channelDay : channelNight;
+  const channel = palette[offer.marketplace] ?? { background: c.card2, text: c.tx2 };
+  const label = CHANNEL_LABEL[offer.marketplace] ?? offer.marketplace;
 
   return (
     <View style={styles.card}>
@@ -36,7 +35,7 @@ export function OfferRow({ offer }: { offer: MarketplaceOffer }) {
         <Image source={{ uri: offer.image_url }} style={styles.thumb} resizeMode="cover" />
       ) : (
         <View style={[styles.thumb, styles.thumbEmpty]}>
-          <BoxIcon size={20} color={colors.textDim} />
+          <BoxIcon size={20} color={c.tx3} />
         </View>
       )}
 
@@ -61,14 +60,15 @@ export function OfferRow({ offer }: { offer: MarketplaceOffer }) {
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (c: Palette) =>
+  StyleSheet.create({
   card: {
     flexDirection: "row",
     alignItems: "center",
     gap: spacing.md,
-    backgroundColor: colors.surface,
+    backgroundColor: c.card,
     borderWidth: 1,
-    borderColor: colors.border,
+    borderColor: c.line,
     borderRadius: radii.lg,
     padding: spacing.md,
     marginBottom: spacing.sm,
@@ -77,7 +77,7 @@ const styles = StyleSheet.create({
     width: 56,
     height: 56,
     borderRadius: radii.md,
-    backgroundColor: colors.surfaceRaised,
+    backgroundColor: c.card2,
   },
   thumbEmpty: {
     alignItems: "center",
@@ -90,7 +90,7 @@ const styles = StyleSheet.create({
   },
   name: {
     ...typography.calloutSemibold,
-    color: colors.text,
+    color: c.tx,
   },
   meta: {
     flexDirection: "row",
@@ -114,6 +114,6 @@ const styles = StyleSheet.create({
     ...typography.statValue,
     fontSize: 15,
     lineHeight: 20,
-    color: colors.text,
+    color: c.tx,
   },
 });

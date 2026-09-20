@@ -5,7 +5,8 @@
 import * as React from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 
-import { colors } from "@/theme/colors";
+import type { Palette } from "@/theme/colors";
+import { useThemedStyles } from "@/theme/theme";
 import { radii, spacing, typography } from "@/theme/typography";
 
 interface ErrorStateProps {
@@ -17,6 +18,7 @@ export function ErrorState({
   message = "Nie udało się pobrać danych",
   onRetry,
 }: ErrorStateProps) {
+  const styles = useThemedStyles(createStyles);
   return (
     <View style={styles.container}>
       <Text style={styles.message}>{message}</Text>
@@ -33,7 +35,8 @@ export function ErrorState({
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (c: Palette) =>
+  StyleSheet.create({
   container: {
     alignItems: "center",
     paddingVertical: spacing.xl,
@@ -41,7 +44,7 @@ const styles = StyleSheet.create({
   },
   message: {
     ...typography.footnote,
-    color: colors.textSecondary,
+    color: c.tx2,
     textAlign: "center",
   },
   button: {
@@ -49,13 +52,13 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.lg,
     borderRadius: radii.full,
     borderWidth: 1,
-    borderColor: colors.primaryBorder,
+    borderColor: c.line2,
     alignItems: "center",
     justifyContent: "center",
   },
   buttonLabel: {
     ...typography.caption,
     fontSize: 13,
-    color: colors.primary,
+    color: c.acc,
   },
 });

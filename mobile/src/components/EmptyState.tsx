@@ -7,14 +7,19 @@
 import * as React from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 
-import { colors } from "@/theme/colors";
+import type { Palette } from "@/theme/colors";
+import { useThemedStyles } from "@/theme/theme";
 import { radii, spacing, typography } from "@/theme/typography";
-import { Mascot, type MascotPose } from "./Mascot";
+import { Ordlak, type OrdlakState } from "./Ordlak";
 
 interface EmptyStateProps {
   icon?: React.ReactNode;
-  /** Poza maskotki - patrz Mascot.tsx. Pominięte = brak maskotki (tylko icon, jeśli podany). */
-  mascotPose?: MascotPose;
+  /**
+   * Stan maskotki. Pusty stan listy to jedno z miejsc, gdzie Ordlak
+   * SPI (sekcja 6) - "brak zwrotow" nie jest awaria i nie ma po co
+   * swiecic. Pominiete = brak maskotki (tylko ikona, jesli podana).
+   */
+  mascotPose?: OrdlakState;
   title: string;
   description?: string;
   actionLabel?: string;
@@ -29,10 +34,11 @@ export function EmptyState({
   actionLabel,
   onAction,
 }: EmptyStateProps) {
+  const styles = useThemedStyles(createStyles);
   return (
     <View style={styles.container}>
       {mascotPose ? (
-        <Mascot pose={mascotPose} size={76} floaty={false} style={styles.mascot} />
+        <Ordlak state={mascotPose} size={76} style={styles.mascot} />
       ) : icon ? (
         <View style={styles.iconWrap}>{icon}</View>
       ) : null}
@@ -50,7 +56,8 @@ export function EmptyState({
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (c: Palette) =>
+  StyleSheet.create({
   container: {
     alignItems: "center",
     paddingVertical: spacing.xxl,
@@ -61,9 +68,9 @@ const styles = StyleSheet.create({
     width: 56,
     height: 56,
     borderRadius: radii.full,
-    backgroundColor: colors.surface,
+    backgroundColor: c.card,
     borderWidth: 1,
-    borderColor: colors.border,
+    borderColor: c.line,
     alignItems: "center",
     justifyContent: "center",
     marginBottom: spacing.xs,
@@ -73,12 +80,12 @@ const styles = StyleSheet.create({
   },
   title: {
     ...typography.calloutSemibold,
-    color: colors.text,
+    color: c.tx,
     textAlign: "center",
   },
   description: {
     ...typography.footnote,
-    color: colors.textSecondary,
+    color: c.tx2,
     textAlign: "center",
   },
   action: {
@@ -87,13 +94,13 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.lg,
     borderRadius: radii.full,
     borderWidth: 1,
-    borderColor: colors.primaryBorder,
+    borderColor: c.line2,
     alignItems: "center",
     justifyContent: "center",
   },
   actionLabel: {
     ...typography.caption,
     fontSize: 13,
-    color: colors.primary,
+    color: c.acc,
   },
 });

@@ -7,7 +7,9 @@ import * as React from "react";
 import { ScrollView, StyleSheet, Text, View } from "react-native";
 import { useRoute, type RouteProp } from "@react-navigation/native";
 
-import { colors } from "@/theme/colors";
+import { withAlpha } from "@/theme/colors";
+import type { Palette } from "@/theme/colors";
+import { useTheme, useThemedStyles } from "@/theme/theme";
 import { radii, spacing, typography } from "@/theme/typography";
 import { useIssueMessages, useIssues } from "@/api/hooks";
 import { ErrorState } from "@/components/ErrorState";
@@ -18,16 +20,20 @@ import { issueStatusLabel, issueStatusTone, parseApiDate } from "@/utils/format"
 import type { Issue, IssueMessage } from "@/api/types";
 import type { RootStackParamList } from "@/navigation/types";
 
-const TONE_COLOR: Record<string, string> = {
-  ok: colors.success,
-  warn: colors.warning,
-  crit: colors.danger,
-};
-const TONE_TINT: Record<string, string> = {
-  ok: colors.successTint,
-  warn: colors.warningTint,
-  crit: colors.dangerTint,
-};
+/**
+ * Ton zgloszenia w kolorach AKTYWNEJ atmosfery. Funkcja, nie stala -
+ * paleta zmienia sie w trakcie dzialania aplikacji (sekcja 11).
+ */
+function toneColors(tone: string, c: Palette): { color: string; tint: string } {
+  switch (tone) {
+    case "ok":
+      return { color: c.acc, tint: c.accDim };
+    case "warn":
+      return { color: c.amber, tint: withAlpha(c.amber, 0.14) };
+    default:
+      return { color: c.coral, tint: withAlpha(c.coral, 0.14) };
+  }
+}
 
 function formatDateTime(iso: string): string {
   return parseApiDate(iso).toLocaleString("pl-PL", {
@@ -39,6 +45,8 @@ function formatDateTime(iso: string): string {
 }
 
 export function IssueDetailScreen() {
+  const styles = useThemedStyles(createStyles);
+  const { c } = useTheme();
   const route = useRoute<RouteProp<RootStackParamList, "IssueDetail">>();
   const { issueId } = route.params;
   // Lista jest zwykle już w cache z DiscussionsScreen - to tylko dociąga
@@ -73,13 +81,12 @@ export function IssueDetailScreen() {
           <View style={styles.badgeRow}>
             <Pill
               label={issue.type === "CLAIM" ? "Reklamacja" : "Dyskusja"}
-              color={colors.primary}
-              tint={colors.primaryTint}
+              color={c.acc}
+              tint={c.accDim}
             />
             <Pill
               label={issueStatusLabel(issue.status)}
-              color={TONE_COLOR[tone]}
-              tint={TONE_TINT[tone]}
+              {...toneColors(tone, c)}
             />
           </View>
           <Text style={styles.subject}>{issue.subject ?? "Bez tematu"}</Text>
@@ -120,14 +127,15 @@ export function IssueDetailScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (c: Palette) =>
+  StyleSheet.create({
   screen: {
     flex: 1,
-    backgroundColor: colors.background,
+    backgroundColor: c.bg,
   },
   headerCard: {
     borderBottomWidth: 1,
-    borderBottomColor: colors.border,
+    borderBottomColor: c.line,
     padding: spacing.xl,
   },
   badgeRow: {
@@ -136,12 +144,12 @@ const styles = StyleSheet.create({
   },
   subject: {
     ...typography.title2,
-    color: colors.text,
+    color: c.tx,
     marginTop: spacing.sm,
   },
   meta: {
     ...typography.footnote,
-    color: colors.textSecondary,
+    color: c.tx2,
     marginTop: 2,
   },
   thread: {
@@ -163,31 +171,31 @@ const styles = StyleSheet.create({
     paddingVertical: spacing.sm,
   },
   bubbleBuyer: {
-    backgroundColor: colors.surface,
+    backgroundColor: c.card,
     borderWidth: 1,
-    borderColor: colors.border,
+    borderColor: c.line,
   },
   bubbleSeller: {
-    backgroundColor: colors.primaryTint,
+    backgroundColor: c.accDim,
   },
   bubbleText: {
     ...typography.callout,
-    color: colors.text,
+    color: c.tx,
   },
   bubbleMeta: {
     ...typography.caption,
     fontSize: 10,
-    color: colors.textDim,
+    color: c.tx3,
     marginTop: 4,
   },
   footer: {
     borderTopWidth: 1,
-    borderTopColor: colors.border,
+    borderTopColor: c.line,
     padding: spacing.lg,
   },
   footerText: {
     ...typography.footnote,
-    color: colors.textDim,
+    color: c.tx3,
     textAlign: "center",
   },
 });

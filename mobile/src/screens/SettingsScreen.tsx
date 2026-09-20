@@ -8,8 +8,10 @@
 import * as React from "react";
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Switch, Text, View } from "react-native";
 
-import { colors } from "@/theme/colors";
-import { radii, spacing, typography } from "@/theme/typography";
+import { withAlpha } from "@/theme/colors";
+import type { Palette } from "@/theme/colors";
+import { useTheme, useThemedStyles } from "@/theme/theme";
+import { family, fonts, radii, spacing, typography } from "@/theme/typography";
 import { useAuth } from "@/store/auth";
 import { useLogs } from "@/api/hooks";
 import type { EventLog } from "@/api/types";
@@ -25,12 +27,12 @@ function maskToken(): string {
   return "••••••••••••";
 }
 
-const LEVEL_COLOR: Record<string, string> = {
-  INFO: colors.textSecondary,
-  WARNING: colors.warning,
-  ERROR: colors.danger,
-  CRITICAL: colors.danger,
-};
+/** Kolor poziomu zdarzenia w AKTYWNEJ atmosferze. */
+function levelColor(level: string, c: Palette): string {
+  if (level === "WARNING") return c.amber;
+  if (level === "ERROR" || level === "CRITICAL") return c.coral;
+  return c.tx2;
+}
 
 /**
  * Zdarzenia po polsku - lista pokazywała surowe `OrderCreated`
@@ -49,6 +51,8 @@ const EVENT_LABEL: Record<string, string> = {
 };
 
 export function SettingsScreen() {
+  const styles = useThemedStyles(createStyles);
+  const { c, mode, preference, setPreference } = useTheme();
   const {
     baseUrl,
     username,
@@ -116,20 +120,20 @@ export function SettingsScreen() {
           <View style={styles.card}>
             <View style={styles.row}>
               <View style={styles.bioIconWrap}>
-                <FaceIdIcon size={16} color={colors.primary} />
+                <FaceIdIcon size={16} color={c.acc} />
               </View>
               <View style={styles.grow}>
                 <Text style={styles.rowTitle}>{biometricLabel}</Text>
                 <Text style={styles.rowSub}>Szybkie odblokowanie zamiast hasła</Text>
               </View>
               {biometricBusy ? (
-                <ActivityIndicator color={colors.primary} />
+                <ActivityIndicator color={c.acc} />
               ) : (
                 <Switch
                   value={biometricEnabled}
                   onValueChange={(next) => void handleBiometricToggle(next)}
-                  trackColor={{ false: colors.border, true: colors.primary }}
-                  thumbColor={colors.text}
+                  trackColor={{ false: c.line, true: c.acc }}
+                  thumbColor={c.tx}
                 />
               )}
             </View>
@@ -143,6 +147,47 @@ export function SettingsScreen() {
       ) : null}
 
       <PushNotificationsCard />
+
+      {/*
+        Przelaczanie atmosfery (sekcja 11): GODZINA plus reczne
+        nadpisanie. Czujnik jasnosci jest kuszacy, ale skacze przy kazdym
+        przejsciu pod lampa - dlatego go tu nie ma.
+      */}
+      <Text style={styles.sectionTitle}>Atmosfera</Text>
+      <View style={styles.card}>
+        <View style={styles.themeRow}>
+          {(
+            [
+              { key: "auto", label: "Automatycznie" },
+              { key: "day", label: "Dzień" },
+              { key: "night", label: "Noc" },
+            ] as const
+          ).map((option) => {
+            const active = preference === option.key;
+            return (
+              <Pressable
+                key={option.key}
+                onPress={() => setPreference(option.key)}
+                accessibilityRole="radio"
+                accessibilityState={{ selected: active }}
+                style={[
+                  styles.themeOption,
+                  active && { backgroundColor: c.accDim, borderColor: "transparent" },
+                ]}
+              >
+                <Text style={[styles.themeLabel, active && { color: c.acc }]}>
+                  {option.label}
+                </Text>
+              </Pressable>
+            );
+          })}
+        </View>
+        <Text style={styles.themeHint}>
+          {preference === "auto"
+            ? `Dzień od 6:00 do 20:00. Teraz świeci ${mode === "day" ? "dzienna" : "nocna"}.`
+            : "Ustawienie ręczne - godzina nie będzie jej zmieniać."}
+        </Text>
+      </View>
 
       <Text style={styles.sectionTitle}>Ostatnie zdarzenia</Text>
       <View style={[styles.card, styles.cardPadded]}>
@@ -162,7 +207,7 @@ export function SettingsScreen() {
                 <View
                   style={[
                     styles.logDot,
-                    { backgroundColor: LEVEL_COLOR[entry.level] ?? colors.textSecondary },
+                    { backgroundColor: levelColor(entry.level, c) },
                   ]}
                 />
                 <Text style={styles.logLabel} numberOfLines={1}>
@@ -196,24 +241,49 @@ export function SettingsScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (c: Palette) =>
+  StyleSheet.create({
   screen: {
     flex: 1,
-    backgroundColor: colors.background,
+    backgroundColor: c.bg,
   },
   content: {
     padding: spacing.xl,
     paddingBottom: 60,
   },
+  themeRow: {
+    flexDirection: "row",
+    gap: 8,
+    padding: 12,
+  },
+  themeOption: {
+    flex: 1,
+    alignItems: "center",
+    paddingVertical: 9,
+    borderRadius: radii.full,
+    borderWidth: 1,
+    borderColor: c.line2,
+  },
+  themeLabel: {
+    ...fonts.status,
+    fontSize: 11.5,
+    color: c.tx2,
+  },
+  themeHint: {
+    ...fonts.caption,
+    color: c.tx3,
+    paddingHorizontal: 12,
+    paddingBottom: 12,
+  },
   sectionTitle: {
     ...typography.sectionTitle,
-    color: colors.text,
+    color: c.tx,
     marginBottom: spacing.md,
   },
   card: {
-    backgroundColor: colors.surface,
+    backgroundColor: c.card,
     borderWidth: 1,
-    borderColor: colors.border,
+    borderColor: c.line,
     borderRadius: radii.lg,
     paddingHorizontal: spacing.lg,
     marginBottom: spacing.xl,
@@ -230,15 +300,15 @@ const styles = StyleSheet.create({
   },
   rowBorder: {
     borderTopWidth: 1,
-    borderTopColor: colors.border,
+    borderTopColor: c.line,
   },
   rowLabel: {
     ...typography.footnote,
-    color: colors.textSecondary,
+    color: c.tx2,
   },
   rowValueMono: {
     ...typography.mono,
-    color: colors.text,
+    color: c.tx,
     flexShrink: 1,
     textAlign: "right",
   },
@@ -250,7 +320,7 @@ const styles = StyleSheet.create({
     width: 32,
     height: 32,
     borderRadius: radii.full,
-    backgroundColor: colors.primaryTint,
+    backgroundColor: c.accDim,
     alignItems: "center",
     justifyContent: "center",
     marginRight: spacing.sm,
@@ -258,17 +328,17 @@ const styles = StyleSheet.create({
   rowTitle: {
     ...typography.calloutSemibold,
     fontSize: 14,
-    color: colors.text,
+    color: c.tx,
   },
   rowSub: {
     ...typography.caption,
     fontSize: 11.5,
-    color: colors.textSecondary,
+    color: c.tx2,
     marginTop: 1,
   },
   bioError: {
     ...typography.caption,
-    color: colors.danger,
+    color: c.coral,
     paddingBottom: spacing.md,
   },
   logRow: {
@@ -291,24 +361,24 @@ const styles = StyleSheet.create({
   },
   logLabel: {
     ...typography.footnote,
-    color: colors.text,
+    color: c.tx,
     flexShrink: 1,
   },
   logDate: {
     ...typography.caption,
     fontSize: 11,
-    color: colors.textDim,
+    color: c.tx3,
   },
   logoutButton: {
     height: 52,
-    backgroundColor: colors.dangerTint,
+    backgroundColor: withAlpha(c.coral, 0.14),
     borderRadius: radii.lg,
     alignItems: "center",
     justifyContent: "center",
   },
   logoutLabel: {
     fontSize: 15,
-    fontWeight: "600",
-    color: colors.danger,
+    fontFamily: family.sansSemibold,
+    color: c.coral,
   },
 });

@@ -11,14 +11,19 @@
 import * as React from "react";
 import Svg, { Circle, Path, Rect } from "react-native-svg";
 
-import { colors } from "@/theme/colors";
+import type { Palette } from "@/theme/colors";
 
 export interface IconProps {
   size?: number;
   color?: string;
 }
 
-const defaults = { size: 20, color: colors.textSecondary } as const;
+/**
+ * Kolor domyslny jest NEUTRALNY, nie z palety: ikony sa modulem bez
+ * dostepu do kontekstu motywu, a kazde wywolanie i tak podaje `color`
+ * z `useTheme()`. Ten odcien jest wylacznie siatka bezpieczenstwa.
+ */
+const defaults = { size: 20, color: "#93A9A3" } as const;
 
 /** Dzwonek - powiadomienia (Start, top bar). */
 export function BellIcon({ size = defaults.size, color = defaults.color }: IconProps) {
@@ -377,6 +382,47 @@ export function MailIcon({ size = defaults.size, color = defaults.color }: IconP
     <Svg viewBox="0 0 24 24" width={size} height={size} fill="none">
       <Rect x={3} y={6} width={18} height={13} rx={1.5} stroke={color} strokeWidth={2} />
       <Path d="M3 7l9 6 9-6" stroke={color} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
+    </Svg>
+  );
+}
+
+/** Strzalka w gore - galka wysylania w polu asystenta. */
+export function ArrowUpIcon({ size = defaults.size, color = defaults.color }: IconProps) {
+  return (
+    <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+      <Path
+        d="M12 19V5M6 11l6-6 6 6"
+        stroke={color}
+        strokeWidth={2}
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </Svg>
+  );
+}
+
+/**
+ * Mikrofon - dyktowanie pytania do asystenta. Pokazywany WYLACZNIE tam,
+ * gdzie da sie nagrywac (PWA z Web Speech API), zeby nie byl ikona bez
+ * dzialania.
+ */
+export function MicIcon({ size = defaults.size, color = defaults.color }: IconProps) {
+  return (
+    <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+      <Path
+        d="M12 3.5a2.8 2.8 0 0 1 2.8 2.8v5a2.8 2.8 0 0 1-5.6 0v-5A2.8 2.8 0 0 1 12 3.5Z"
+        stroke={color}
+        strokeWidth={1.6}
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+      <Path
+        d="M5.8 11a6.2 6.2 0 0 0 12.4 0M12 17.2V21"
+        stroke={color}
+        strokeWidth={1.6}
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
     </Svg>
   );
 }

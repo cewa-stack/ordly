@@ -7,8 +7,9 @@
 import * as React from "react";
 import { ActivityIndicator, Platform, Pressable, StyleSheet, Text, View } from "react-native";
 
-import { colors } from "@/theme/colors";
-import { radii, spacing, typography } from "@/theme/typography";
+import type { Palette } from "@/theme/colors";
+import { useTheme, useThemedStyles } from "@/theme/theme";
+import { family, radii, spacing, typography } from "@/theme/typography";
 import { ApiError } from "@/api/client";
 import { useSendTestPush, useSubscribePush, useUnsubscribePush, useVapidStatus } from "@/api/hooks";
 import {
@@ -38,6 +39,8 @@ function expiredWord(n: number): string {
 }
 
 export function PushNotificationsCard() {
+  const styles = useThemedStyles(createStyles);
+  const { c } = useTheme();
   const vapid = useVapidStatus();
   const subscribeMutation = useSubscribePush();
   const unsubscribeMutation = useUnsubscribePush();
@@ -147,7 +150,7 @@ export function PushNotificationsCard() {
             go stamtąd.
           </Text>
         ) : vapid.isPending ? (
-          <ActivityIndicator color={colors.primary} />
+          <ActivityIndicator color={c.acc} />
         ) : !vapid.data?.enabled ? (
           <Text style={styles.info}>
             Backend nie ma jeszcze skonfigurowanego Web Push (brak kluczy VAPID w .env) -
@@ -167,7 +170,7 @@ export function PushNotificationsCard() {
               disabled={busy}
             >
               {busy ? (
-                <ActivityIndicator color={subscribed ? colors.text : colors.onPrimary} />
+                <ActivityIndicator color={subscribed ? c.tx : c.onAcc} />
               ) : (
                 <Text style={subscribed ? styles.buttonGhostLabel : styles.buttonLabel}>
                   {subscribed ? "Wyłącz powiadomienia" : "Włącz powiadomienia"}
@@ -194,23 +197,24 @@ export function PushNotificationsCard() {
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (c: Palette) =>
+  StyleSheet.create({
   sectionTitle: {
     ...typography.sectionTitle,
-    color: colors.text,
+    color: c.tx,
     marginBottom: spacing.sm,
   },
   card: {
-    backgroundColor: colors.surface,
+    backgroundColor: c.card,
     borderWidth: 1,
-    borderColor: colors.border,
+    borderColor: c.line,
     borderRadius: radii.lg,
     padding: spacing.lg,
     marginBottom: spacing.lg,
   },
   info: {
     ...typography.footnote,
-    color: colors.textSecondary,
+    color: c.tx2,
   },
   row: {
     flexDirection: "row",
@@ -219,42 +223,42 @@ const styles = StyleSheet.create({
   },
   rowLabel: {
     ...typography.footnote,
-    color: colors.textSecondary,
+    color: c.tx2,
   },
   rowValue: {
     ...typography.calloutSemibold,
-    color: colors.text,
+    color: c.tx,
   },
   button: {
     height: 48,
-    backgroundColor: colors.primary,
+    backgroundColor: c.acc,
     borderRadius: radii.md,
     alignItems: "center",
     justifyContent: "center",
   },
   buttonGhost: {
-    backgroundColor: colors.surfaceRaised,
+    backgroundColor: c.card2,
     borderWidth: 1,
-    borderColor: colors.border,
+    borderColor: c.line,
   },
   buttonLabel: {
     fontSize: 15,
-    fontWeight: "600",
-    color: colors.onPrimary,
+    fontFamily: family.sansSemibold,
+    color: c.onAcc,
   },
   buttonGhostLabel: {
     fontSize: 15,
-    fontWeight: "600",
-    color: colors.text,
+    fontFamily: family.sansSemibold,
+    color: c.tx,
   },
   success: {
     ...typography.caption,
-    color: colors.success,
+    color: c.acc,
     marginTop: spacing.sm,
   },
   error: {
     ...typography.caption,
-    color: colors.danger,
+    color: c.coral,
     marginTop: spacing.sm,
   },
 });

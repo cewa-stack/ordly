@@ -44,7 +44,7 @@ export function injectPwaHeadTags(): void {
     ["apple-mobile-web-app-capable", "yes"],
     ["apple-mobile-web-app-status-bar-style", "black-translucent"],
     ["apple-mobile-web-app-title", "ORDLY"],
-    ["theme-color", "#0D1117"],
+    ["theme-color", "#0A1413"],
   ];
   for (const [name, content] of metaTags) {
     if (!document.querySelector(`meta[name="${name}"]`)) {

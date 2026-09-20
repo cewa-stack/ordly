@@ -8,15 +8,18 @@ import * as React from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 import { StatusBar } from "expo-status-bar";
 
-import { colors } from "@/theme/colors";
-import { radii, spacing, typography } from "@/theme/typography";
+import type { Palette } from "@/theme/colors";
+import { useTheme, useThemedStyles } from "@/theme/theme";
+import { family, radii, spacing, typography } from "@/theme/typography";
 import { useAuth } from "@/store/auth";
-import { Mascot } from "@/components/Mascot";
+import { Ordlak } from "@/components/Ordlak";
 import { GlowBackdrop } from "@/components/GlowBackdrop";
 import { PrimaryButton } from "@/components/PrimaryButton";
 import { FaceIdIcon } from "@/icons";
 
 export function LockScreen() {
+  const styles = useThemedStyles(createStyles);
+  const { c } = useTheme();
   const { biometricLabel, unlockWithBiometric, useFallbackPasswordLogin, username } = useAuth();
   const [attempting, setAttempting] = React.useState(false);
   const [failed, setFailed] = React.useState(false);
@@ -45,7 +48,7 @@ export function LockScreen() {
       <StatusBar style="light" />
       <GlowBackdrop />
       <View style={styles.content}>
-        <Mascot size={92} />
+        <Ordlak state="sleep" size={92} />
         <Text style={styles.greeting}>
           {username ? `Witaj, ${username}` : "Witaj z powrotem"}
         </Text>
@@ -56,7 +59,7 @@ export function LockScreen() {
           disabled={attempting}
           style={({ pressed }) => [styles.faceCircle, pressed && { opacity: 0.85 }]}
         >
-          <FaceIdIcon size={30} color={colors.primary} />
+          <FaceIdIcon size={30} color={c.acc} />
         </Pressable>
         <Text style={styles.faceLabel}>
           {attempting ? "Sprawdzam…" : `Dotknij, aby użyć ${biometricLabel}`}
@@ -83,10 +86,11 @@ export function LockScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (c: Palette) =>
+  StyleSheet.create({
   screen: {
     flex: 1,
-    backgroundColor: colors.background,
+    backgroundColor: c.bg,
   },
   content: {
     flex: 1,
@@ -97,13 +101,13 @@ const styles = StyleSheet.create({
   greeting: {
     ...typography.title1,
     fontSize: 21,
-    color: colors.text,
+    color: c.tx,
     marginTop: spacing.lg,
     textAlign: "center",
   },
   subtitle: {
     ...typography.footnote,
-    color: colors.textSecondary,
+    color: c.tx2,
     marginTop: spacing.xs,
     marginBottom: spacing.xxl,
     textAlign: "center",
@@ -113,19 +117,19 @@ const styles = StyleSheet.create({
     height: 76,
     borderRadius: radii.full,
     borderWidth: 1.5,
-    borderColor: colors.primaryBorder,
-    backgroundColor: colors.primaryTint,
+    borderColor: c.line2,
+    backgroundColor: c.accDim,
     alignItems: "center",
     justifyContent: "center",
   },
   faceLabel: {
     ...typography.caption,
-    color: colors.textSecondary,
+    color: c.tx2,
     marginTop: spacing.md,
   },
   errorText: {
     ...typography.caption,
-    color: colors.danger,
+    color: c.coral,
     marginTop: spacing.md,
     textAlign: "center",
   },
@@ -139,7 +143,7 @@ const styles = StyleSheet.create({
   },
   fallbackLabel: {
     ...typography.footnote,
-    fontWeight: "600",
-    color: colors.textSecondary,
+    fontFamily: family.sansSemibold,
+    color: c.tx2,
   },
 });

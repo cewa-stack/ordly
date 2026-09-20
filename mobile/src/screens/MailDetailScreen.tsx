@@ -13,7 +13,9 @@ import * as React from "react";
 import { Linking, ScrollView, StyleSheet, Text, View } from "react-native";
 import { useRoute, type RouteProp } from "@react-navigation/native";
 
-import { colors } from "@/theme/colors";
+import { withAlpha } from "@/theme/colors";
+import type { Palette } from "@/theme/colors";
+import { useThemedStyles } from "@/theme/theme";
 import { radii, spacing, typography } from "@/theme/typography";
 import { useMailBody, useMailMessages, useMarkMailRead } from "@/api/hooks";
 import { MailBodyFrame, canRenderMailHtml } from "@/components/MailBodyFrame";
@@ -47,6 +49,7 @@ function formatDateTime(iso: string): string {
 
 /** Treść w wersji tekstowej - wariant zapasowy i jedyny wariant natywny. */
 function PlainBody({ text }: { text: string }) {
+  const styles = useThemedStyles(createStyles);
   return (
     <ScrollView style={styles.plainScroll} contentContainerStyle={styles.card}>
       <Text style={styles.body}>{text}</Text>
@@ -65,6 +68,7 @@ function MailBodyView({
   isLoading: boolean;
   errorMessage: string | null;
 }) {
+  const styles = useThemedStyles(createStyles);
   if (isLoading) {
     return <Skeleton height={220} radius={radii.lg} style={{ marginTop: spacing.lg }} />;
   }
@@ -105,6 +109,7 @@ function MailBodyView({
 }
 
 export function MailDetailScreen() {
+  const styles = useThemedStyles(createStyles);
   const route = useRoute<RouteProp<RootStackParamList, "MailDetail">>();
   const { messageId } = route.params;
   const mail = useMailMessages();
@@ -184,10 +189,11 @@ export function MailDetailScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (c: Palette) =>
+  StyleSheet.create({
   screen: {
     flex: 1,
-    backgroundColor: colors.background,
+    backgroundColor: c.bg,
   },
   header: {
     paddingHorizontal: spacing.xl,
@@ -202,11 +208,11 @@ const styles = StyleSheet.create({
   },
   sender: {
     ...typography.footnote,
-    color: colors.textSecondary,
+    color: c.tx2,
     flexShrink: 1,
   },
   sourceTag: {
-    backgroundColor: colors.surfaceRaised,
+    backgroundColor: c.card2,
     borderRadius: radii.full,
     paddingHorizontal: 8,
     paddingVertical: 2,
@@ -214,17 +220,17 @@ const styles = StyleSheet.create({
   sourceTagText: {
     ...typography.caption,
     fontSize: 9.5,
-    color: colors.textDim,
+    color: c.tx3,
     textTransform: "uppercase",
   },
   subject: {
     ...typography.title2,
-    color: colors.text,
+    color: c.tx,
     marginTop: spacing.sm,
   },
   date: {
     ...typography.caption,
-    color: colors.textDim,
+    color: c.tx3,
     marginTop: 4,
   },
   bodyArea: {
@@ -236,49 +242,49 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   card: {
-    backgroundColor: colors.surface,
+    backgroundColor: c.card,
     borderWidth: 1,
-    borderColor: colors.border,
+    borderColor: c.line,
     borderRadius: radii.lg,
     padding: spacing.lg,
   },
   body: {
     ...typography.body,
-    color: colors.textSecondary,
+    color: c.tx2,
   },
   warning: {
-    backgroundColor: colors.warningTint,
+    backgroundColor: withAlpha(c.amber, 0.14),
     borderRadius: radii.md,
     paddingHorizontal: spacing.md,
     paddingVertical: spacing.sm,
   },
   warningText: {
     ...typography.footnote,
-    color: colors.warning,
+    color: c.amber,
   },
   imagesNote: {
     ...typography.caption,
-    color: colors.textDim,
+    color: c.tx3,
   },
   readOnlyNote: {
     ...typography.caption,
-    color: colors.warning,
+    color: c.amber,
     marginTop: spacing.sm,
   },
   footer: {
     borderTopWidth: 1,
-    borderTopColor: colors.border,
+    borderTopColor: c.line,
     paddingHorizontal: spacing.xl,
     paddingVertical: spacing.lg,
   },
   link: {
     ...typography.calloutSemibold,
     fontSize: 13,
-    color: colors.primary,
+    color: c.acc,
   },
   notFound: {
     ...typography.footnote,
-    color: colors.textSecondary,
+    color: c.tx2,
     textAlign: "center",
     marginTop: spacing.xxl,
   },

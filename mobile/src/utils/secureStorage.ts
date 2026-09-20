@@ -39,3 +39,30 @@ export async function deleteItemAsync(key: string): Promise<void> {
   }
   await SecureStore.deleteItemAsync(key);
 }
+
+/**
+ * Wybor atmosfery (sekcja 11): `auto` wedlug godziny albo reczne
+ * nadpisanie. Trzyma sie obok tokena, bo to ta sama warstwa
+ * "ustawienie, ktore ma przezyc restart" - ale NIE jest tajemnica,
+ * wiec brak Keychain na webie niczego tu nie psuje.
+ */
+const THEME_KEY = "ordly.theme";
+
+export async function loadThemePreference(): Promise<string | null> {
+  try {
+    return await getItemAsync(THEME_KEY);
+  } catch {
+    // Zablokowany localStorage (tryb prywatny) nie moze wywrocic startu
+    // aplikacji - brak zapisanego wyboru znaczy po prostu "auto".
+    return null;
+  }
+}
+
+export async function saveThemePreference(value: string): Promise<void> {
+  try {
+    await setItemAsync(THEME_KEY, value);
+  } catch {
+    // Nieudany zapis jest do przezycia: atmosfera zadziala w tej sesji,
+    // tylko nie przezyje restartu.
+  }
+}

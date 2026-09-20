@@ -13,7 +13,9 @@
 import * as React from "react";
 import { Linking, StyleSheet, Text, type StyleProp, type TextStyle } from "react-native";
 
-import { colors } from "@/theme/colors";
+import type { Palette } from "@/theme/colors";
+import { useTheme, useThemedStyles } from "@/theme/theme";
+import { family } from "@/theme/typography";
 import { looksLikeHtml, parseInlineHtml } from "@/utils/html";
 
 interface RichTextProps {
@@ -31,6 +33,8 @@ function openLink(url: string): void {
 }
 
 export function RichText({ content, style, linkColor, numberOfLines }: RichTextProps) {
+  const styles = useThemedStyles(createStyles);
+  const { c } = useTheme();
   const segments = React.useMemo(
     () => (looksLikeHtml(content) ? parseInlineHtml(content) : null),
     [content]
@@ -54,7 +58,7 @@ export function RichText({ content, style, linkColor, numberOfLines }: RichTextP
             style={[
               segment.bold ? styles.bold : null,
               segment.italic ? styles.italic : null,
-              href ? [styles.link, { color: linkColor ?? colors.primary }] : null,
+              href ? [styles.link, { color: linkColor ?? c.acc }] : null,
             ]}
             onPress={href ? () => openLink(href) : undefined}
             suppressHighlighting={!href}
@@ -67,9 +71,10 @@ export function RichText({ content, style, linkColor, numberOfLines }: RichTextP
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (c: Palette) =>
+  StyleSheet.create({
   bold: {
-    fontWeight: "600",
+    fontFamily: family.sansSemibold,
   },
   italic: {
     fontStyle: "italic",

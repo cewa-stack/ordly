@@ -6,7 +6,8 @@ import * as React from "react";
 import { ActivityIndicator, Pressable, StyleSheet, Text, type ViewStyle } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
 
-import { colors } from "@/theme/colors";
+import type { Palette } from "@/theme/colors";
+import { useTheme, useThemedStyles } from "@/theme/theme";
 import { radii, typography } from "@/theme/typography";
 
 interface PrimaryButtonProps {
@@ -26,6 +27,8 @@ export function PrimaryButton({
   icon,
   style,
 }: PrimaryButtonProps) {
+  const styles = useThemedStyles(createStyles);
+  const { c } = useTheme();
   const isDisabled = disabled || loading;
   return (
     <Pressable
@@ -39,13 +42,13 @@ export function PrimaryButton({
       ]}
     >
       <LinearGradient
-        colors={[colors.primary, colors.accent]}
+        colors={[c.acc, c.acc]}
         start={{ x: 0, y: 0 }}
         end={{ x: 1, y: 1 }}
         style={styles.gradient}
       >
         {loading ? (
-          <ActivityIndicator color={colors.onPrimary} />
+          <ActivityIndicator color={c.onAcc} />
         ) : (
           <>
             {icon}
@@ -57,11 +60,12 @@ export function PrimaryButton({
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (c: Palette) =>
+  StyleSheet.create({
   wrap: {
     height: 52,
     borderRadius: radii.lg,
-    shadowColor: colors.primary,
+    shadowColor: c.acc,
     shadowOffset: { width: 0, height: 10 },
     shadowOpacity: 0.35,
     shadowRadius: 18,
@@ -78,7 +82,7 @@ const styles = StyleSheet.create({
   label: {
     ...typography.buttonLabel,
     fontSize: 15,
-    color: colors.onPrimary,
+    color: c.onAcc,
   },
   pressed: {
     opacity: 0.92,

@@ -1,93 +1,167 @@
 /**
- * Paleta ORDLY Mobile - motyw JASNY, wg sekcji 2.2 specyfikacji
- * (`ORDLY-spec-implementacyjny.md`).
+ * Paleta ORDLY Mobile - DWIE ATMOSFERY (sekcja 4 i 11 instrukcji
+ * "ORDLY Nokturn").
  *
- * Mobile jest jasny CELOWO: używa się go w magazynie i w słońcu, gdzie
- * ciemny motyw traci czytelność. To nie jest inwersja desktopu - to
- * osobna, świadoma paleta. Desktop zostaje dark-mode-first i nie ma
- * wariantu jasnego.
+ * Ten sam uklad, ta sama hierarchia, inne podloze. Klucze sa IDENTYCZNE
+ * w obu zestawach - dzieki temu zaden komponent nigdy nie pyta, ktora
+ * atmosfera jest aktywna. Jesli komponent musi zapytac, klucz jest zle
+ * zaprojektowany.
  *
- * Nie dodawaj tu kolorów "na oko" - najpierw wartość w specyfikacji,
- * potem tutaj.
+ * `tx3` i `day.tx3` sa jasniejsze/ciemniejsze, niz moglo by sie wydawac
+ * naturalne - to wartosci dobrane pod kontrast 4,5:1 dla tekstu 9-11 px.
+ * Nie przyciemniaj ich "dla spokoju"; po zmianie `bg`/`card` przelicz je
+ * ponownie.
  */
-export const colors = {
-  // Akcenty. `primary` jest CIEMNIEJSZY niż na desktopie (--teal-deep,
-  // nie --teal-bright) - jasny teal na bieli nie przechodzi kontrastu.
-  primary: "#1F7D80",
-  secondary: "#3EAAAF",
-  accent: "#5FD9CC",
 
-  // Powierzchnie
-  background: "#EFF4F1",
-  surface: "#FFFFFF",
-  surfaceRaised: "#E4EDE8",
-  border: "rgba(35,43,39,0.055)",
-  borderStrong: "rgba(35,43,39,0.12)",
+export interface Palette {
+  /** tlo ekranu */
+  bg: string;
+  /** karta, panel */
+  card: string;
+  /** karta w karcie, tor paska, aktywna pozycja */
+  card2: string;
+  line: string;
+  line2: string;
+  /** tekst glowny */
+  tx: string;
+  /** tekst drugorzedny */
+  tx2: string;
+  /** tekst trzeciorzedny - etykiety 9-11 px */
+  tx3: string;
+  /** akcent: akcja, teraz */
+  acc: string;
+  /** tekst na wypelnieniu akcentem */
+  onAcc: string;
+  /** przygaszony akcent - tla pastylek i posiaty */
+  accDim: string;
+  /** czeka na Ciebie */
+  coral: string;
+  amber: string;
+  violet: string;
+  /** kolor cienia karty i galki */
+  shadow: string;
+}
 
-  // Semantyczne
-  success: "#166F72",
-  warning: "#9A6F22",
-  danger: "#C4523A",
+export const night: Palette = {
+  bg: "#0A1413",
+  card: "#101D1B",
+  card2: "#162724",
+  line: "rgba(214,235,228,.075)",
+  line2: "rgba(214,235,228,.15)",
+  tx: "#EAF3EF",
+  tx2: "#93A9A3",
+  tx3: "#6F8882",
+  acc: "#5FD9CC",
+  onAcc: "#042320",
+  accDim: "rgba(95,217,204,.16)",
+  coral: "#FF8563",
+  amber: "#F5C065",
+  violet: "#A79BFF",
+  shadow: "rgba(0,0,0,.9)",
+};
 
-  // Tekst
-  text: "#232B27",
-  textSecondary: "#68766F",
-  textDim: "#96A49E",
-  textOnIcon: "#9CAAA4",
-
-  // Tekst na wypełnieniu primary (CTA)
-  onPrimary: "#FFFFFF",
-
-  // Tła statusów w wariancie jasnym (sekcja 2.4)
-  primaryTint: "#D9F0EC",
-  primaryBorder: "rgba(31,125,128,0.3)",
-  successTint: "#D9F0EC",
-  warningTint: "#FBF0D8",
-  dangerTint: "#FFE5D8",
-
-  // Cień karty (2.6) - w RN rozbity na osobne właściwości.
-  cardShadow: "rgba(35,43,39,0.06)",
-} as const;
+export const day: Palette = {
+  bg: "#EFF3F0",
+  card: "#FFFFFF",
+  card2: "#E6EDE9",
+  line: "rgba(15,26,23,.08)",
+  line2: "rgba(15,26,23,.16)",
+  tx: "#0F1A17",
+  tx2: "#5B6B66",
+  tx3: "#64746E",
+  acc: "#12706F",
+  onAcc: "#FFFFFF",
+  accDim: "rgba(18,112,111,.11)",
+  coral: "#B4462E",
+  amber: "#8A6218",
+  violet: "#4F44C4",
+  shadow: "rgba(15,26,23,.4)",
+};
 
 /**
- * Kolory kanałów sprzedaży (sekcja 2.3), wariant jasny.
- *
- * Każdy kanał ma STAŁY kolor w obu motywach - użytkownik uczy się ich
- * jako etykiet, więc tych przypisań nigdy się nie zmienia.
+ * Kolory kanalow sprzedazy. Przypisanie kanal -> barwa jest STALE w obu
+ * atmosferach (uzytkownik uczy sie ich jako etykiet), ale etykiety w
+ * atmosferze dziennej maja WLASNE tla: przezroczystosci z nocy gina
+ * na bieli.
  */
-export const marketplaceColor: Record<string, { background: string; text: string }> = {
-  allegro: { background: "#FFE7DE", text: "#C4523A" },
-  // Allegro Lokalnie: TEN SAM odcień co Allegro.pl (bo to ta sama
-  // rodzina serwisów), ale słabszy - kanał bez API, w którym ORDLY
-  // tylko pokazuje, a zarządza się na stronie. Amber jest zajęty przez
-  // Amazon, a dwa kanały w jednym kolorze przestałyby być etykietami.
-  allegro_lokalnie: { background: "#FFF1EC", text: "#D9765C" },
-  amazon: { background: "#FBF0D8", text: "#9A6F22" },
-  olx: { background: "#E9E7FE", text: "#5A4FD1" },
-  ebay: { background: "#D9F0EC", text: "#166F72" },
+export interface ChannelStyle {
+  background: string;
+  text: string;
+}
+
+export const channelNight: Record<string, ChannelStyle> = {
+  allegro: { background: "rgba(255,133,99,.14)", text: "#FF8563" },
+  // Allegro Lokalnie: TEN SAM odcien co Allegro.pl (ta sama rodzina
+  // serwisow), ale slabszy - kanal bez API, w ktorym ORDLY tylko
+  // pokazuje. Amber jest zajety przez Amazon, a dwa kanaly w jednym
+  // kolorze przestalyby byc etykietami.
+  allegro_lokalnie: { background: "rgba(255,133,99,.08)", text: "rgba(255,133,99,.72)" },
+  olx: { background: "rgba(167,155,255,.14)", text: "#A79BFF" },
+  amazon: { background: "rgba(245,192,101,.13)", text: "#F5C065" },
+  ebay: { background: "rgba(95,217,204,.16)", text: "#5FD9CC" },
 };
 
-/** Mapa statusów zamówień (sekcja 2.4) - klucze = etykiety z fulfillmentLabel. */
-export const orderStatusColor: Record<string, string> = {
-  Nowe: "#166F72",
-  "W realizacji": "#C4523A",
-  "Gotowe do wysyłki": "#166F72",
-  "Do odbioru": "#68766F",
-  "Do spakowania": "#C4523A",
-  Pakowanie: "#C4523A",
-  Wysłane: "#68766F",
-  Odebrane: "#68766F",
-  Anulowane: "#9A6F22",
+export const channelDay: Record<string, ChannelStyle> = {
+  allegro: { background: "#FFE7DE", text: "#B4462E" },
+  allegro_lokalnie: { background: "#FFF1EC", text: "#C4674F" },
+  olx: { background: "#E9E7FE", text: "#4F44C4" },
+  amazon: { background: "#FBF0D8", text: "#8A6218" },
+  ebay: { background: "#D9F0EC", text: "#12706F" },
 };
 
-export const orderStatusTint: Record<string, string> = {
-  Nowe: "#D9F0EC",
-  "W realizacji": "#FFE5D8",
-  "Gotowe do wysyłki": "#D9F0EC",
-  "Do odbioru": "#ECEFED",
-  "Do spakowania": "#FFE5D8",
-  Pakowanie: "#FFE5D8",
-  Wysłane: "#ECEFED",
-  Odebrane: "#ECEFED",
-  Anulowane: "#FBF0D8",
+/** Skrocone nazwy kanalow - etykieta ma STALE 60 px (sekcja 7). */
+export const CHANNEL_LABEL: Record<string, string> = {
+  allegro: "Allegro",
+  allegro_lokalnie: "Lokalnie",
+  olx: "OLX",
+  amazon: "Amazon",
+  ebay: "eBay",
 };
+
+/**
+ * Jezyk statusow - ten sam co na desktopie (sekcja 7):
+ *
+ *   hot  - wymaga dzialania
+ *   go   - w toku, dzis
+ *   mute - zamkniete
+ *
+ * "Wyslane" i "Odebrane" sa `mute`, nie `go`.
+ */
+export type Tone = "hot" | "go" | "mute";
+
+export function toneStyle(tone: Tone, c: Palette): ChannelStyle {
+  switch (tone) {
+    case "hot":
+      return { background: withAlpha(c.coral, 0.14), text: c.coral };
+    case "go":
+      return { background: c.accDim, text: c.acc };
+    default:
+      return { background: c.card2, text: c.tx3 };
+  }
+}
+
+/** Etykieta zamowienia -> ton. Klucze = wynik `displayFulfillmentLabel`. */
+export const ORDER_TONE: Record<string, Tone> = {
+  Nowe: "hot",
+  "W realizacji": "hot",
+  "Do spakowania": "hot",
+  Pakowanie: "hot",
+  "Gotowe do wysyłki": "go",
+  "Do odbioru": "mute",
+  Wysłane: "mute",
+  Odebrane: "mute",
+  Anulowane: "mute",
+  Wstrzymane: "hot",
+};
+
+/**
+ * Przezroczystosc na kolorze zapisanym jako `#RRGGBB`. Potrzebna, bo tla
+ * pastylek licza sie z akcentu atmosfery, a RN nie zna `color-mix()`.
+ */
+export function withAlpha(hex: string, alpha: number): string {
+  if (!hex.startsWith("#") || hex.length !== 7) return hex;
+  const r = parseInt(hex.slice(1, 3), 16);
+  const g = parseInt(hex.slice(3, 5), 16);
+  const b = parseInt(hex.slice(5, 7), 16);
+  return `rgba(${r},${g},${b},${alpha})`;
+}

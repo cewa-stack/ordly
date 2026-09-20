@@ -9,7 +9,8 @@ import { useNavigation } from "@react-navigation/native";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { useQueryClient } from "@tanstack/react-query";
 
-import { colors } from "@/theme/colors";
+import type { Palette } from "@/theme/colors";
+import { useTheme, useThemedStyles } from "@/theme/theme";
 import { radii, spacing, typography } from "@/theme/typography";
 import { useMailMessages } from "@/api/hooks";
 import { MailRow } from "@/components/MailRow";
@@ -30,6 +31,8 @@ const SOURCE_FILTERS: { key: MailSource | "all"; label: string }[] = [
 ];
 
 export function MailboxScreen() {
+  const styles = useThemedStyles(createStyles);
+  const { c } = useTheme();
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const queryClient = useQueryClient();
   const [source, setSource] = React.useState<MailSource | "all">("all");
@@ -86,7 +89,7 @@ export function MailboxScreen() {
             <RefreshControl
               refreshing={mail.isRefetching}
               onRefresh={onRefresh}
-              tintColor={colors.primary}
+              tintColor={c.acc}
             />
           }
           ListFooterComponent={
@@ -96,7 +99,7 @@ export function MailboxScreen() {
           }
           ListEmptyComponent={
             <EmptyState
-              mascotPose="happy"
+              mascotPose="sleep"
               title="Skrzynka jest pusta"
               description="Ordi pokazuje tu maile od Allegro i OLX. Jeśli spodziewasz się wiadomości, a nic nie przychodzi — sprawdź stan skrzynki w Ustawieniach na desktopie."
             />
@@ -107,10 +110,11 @@ export function MailboxScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (c: Palette) =>
+  StyleSheet.create({
   screen: {
     flex: 1,
-    backgroundColor: colors.background,
+    backgroundColor: c.bg,
   },
   header: {
     paddingHorizontal: spacing.xl,
@@ -118,7 +122,7 @@ const styles = StyleSheet.create({
   },
   title: {
     ...typography.title1,
-    color: colors.text,
+    color: c.tx,
   },
   filterRow: {
     paddingHorizontal: spacing.xl,

@@ -12,7 +12,8 @@ import * as React from "react";
 import { FlatList, Pressable, RefreshControl, StyleSheet, Text, View } from "react-native";
 import { useQueryClient } from "@tanstack/react-query";
 
-import { colors } from "@/theme/colors";
+import type { Palette } from "@/theme/colors";
+import { useTheme, useThemedStyles } from "@/theme/theme";
 import { radii, spacing, typography } from "@/theme/typography";
 import { useOffers, useSyncCatalog } from "@/api/hooks";
 import { ApiError } from "@/api/client";
@@ -27,6 +28,8 @@ import { formatDate, plural } from "@/utils/format";
 import type { MarketplaceOffer } from "@/api/types";
 
 export function StockScreen() {
+  const styles = useThemedStyles(createStyles);
+  const { c } = useTheme();
   const queryClient = useQueryClient();
   const offers = useOffers();
   const sync = useSyncCatalog();
@@ -102,7 +105,7 @@ export function StockScreen() {
           ]}
           accessibilityLabel="Pobierz katalog z marketplace"
         >
-          <SyncIcon size={16} color={colors.onPrimary} />
+          <SyncIcon size={16} color={c.onAcc} />
           <Text style={styles.syncButtonLabel}>
             {sync.isPending ? "Pobieram…" : "Synchronizuj"}
           </Text>
@@ -149,7 +152,7 @@ export function StockScreen() {
             <RefreshControl
               refreshing={offers.isRefetching}
               onRefresh={() => queryClient.invalidateQueries({ queryKey: ["offers"] })}
-              tintColor={colors.primary}
+              tintColor={c.acc}
             />
           }
           ListFooterComponent={
@@ -159,7 +162,7 @@ export function StockScreen() {
           }
           ListEmptyComponent={
             <EmptyState
-              icon={<BoxIcon size={24} color={colors.textSecondary} />}
+              icon={<BoxIcon size={24} color={c.tx2} />}
               title={query.trim() ? "Nie znaleziono oferty" : "Katalog jest pusty"}
               description={
                 query.trim()
@@ -174,10 +177,11 @@ export function StockScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (c: Palette) =>
+  StyleSheet.create({
   screen: {
     flex: 1,
-    backgroundColor: colors.background,
+    backgroundColor: c.bg,
   },
   header: {
     paddingHorizontal: spacing.xl,
@@ -185,15 +189,15 @@ const styles = StyleSheet.create({
   },
   title: {
     ...typography.title1,
-    color: colors.text,
+    color: c.tx,
   },
   syncCard: {
     flexDirection: "row",
     alignItems: "center",
     gap: spacing.md,
-    backgroundColor: colors.surface,
+    backgroundColor: c.card,
     borderWidth: 1,
-    borderColor: colors.border,
+    borderColor: c.line,
     borderRadius: radii.lg,
     paddingVertical: spacing.md,
     paddingHorizontal: spacing.lg,
@@ -205,11 +209,11 @@ const styles = StyleSheet.create({
   },
   syncCount: {
     ...typography.statValue,
-    color: colors.text,
+    color: c.tx,
   },
   syncMeta: {
     ...typography.caption,
-    color: colors.textSecondary,
+    color: c.tx2,
     marginTop: 2,
   },
   syncButton: {
@@ -219,14 +223,14 @@ const styles = StyleSheet.create({
     height: 38,
     paddingHorizontal: spacing.lg,
     borderRadius: radii.full,
-    backgroundColor: colors.primary,
+    backgroundColor: c.acc,
   },
   syncButtonPressed: {
     opacity: 0.85,
   },
   syncButtonLabel: {
     ...typography.calloutSemibold,
-    color: colors.onPrimary,
+    color: c.onAcc,
   },
   searchWrap: {
     paddingVertical: spacing.md,

@@ -6,7 +6,8 @@
 import * as React from "react";
 import { Animated, StyleSheet, View, type ViewStyle } from "react-native";
 
-import { colors } from "@/theme/colors";
+import type { Palette } from "@/theme/colors";
+import { useThemedStyles } from "@/theme/theme";
 import { radii } from "@/theme/typography";
 
 interface SkeletonProps {
@@ -17,6 +18,7 @@ interface SkeletonProps {
 }
 
 export function Skeleton({ height, width = "100%", radius = radii.sm, style }: SkeletonProps) {
+  const styles = useThemedStyles(createStyles);
   const opacity = React.useRef(new Animated.Value(0.4)).current;
 
   React.useEffect(() => {
@@ -41,8 +43,9 @@ export function Skeleton({ height, width = "100%", radius = radii.sm, style }: S
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (c: Palette) =>
+  StyleSheet.create({
   base: {
-    backgroundColor: colors.surfaceRaised,
+    backgroundColor: c.card2,
   },
 });

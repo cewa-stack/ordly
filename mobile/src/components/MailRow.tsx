@@ -6,8 +6,9 @@
 import * as React from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 
-import { colors } from "@/theme/colors";
-import { radii, spacing, typography } from "@/theme/typography";
+import type { Palette } from "@/theme/colors";
+import { useThemedStyles } from "@/theme/theme";
+import { family, radii, spacing, typography } from "@/theme/typography";
 import type { MailMessage } from "@/api/types";
 import { parseApiDate } from "@/utils/format";
 
@@ -36,6 +37,7 @@ interface MailRowProps {
 }
 
 export function MailRow({ message, onPress }: MailRowProps) {
+  const styles = useThemedStyles(createStyles);
   const unread = !message.is_read;
   return (
     <Pressable onPress={onPress} style={({ pressed }) => [styles.card, pressed && styles.pressed]}>
@@ -56,11 +58,12 @@ export function MailRow({ message, onPress }: MailRowProps) {
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (c: Palette) =>
+  StyleSheet.create({
   card: {
-    backgroundColor: colors.surface,
+    backgroundColor: c.card,
     borderWidth: 1,
-    borderColor: colors.border,
+    borderColor: c.line,
     borderRadius: radii.lg,
     padding: spacing.lg,
     marginBottom: spacing.sm,
@@ -68,7 +71,7 @@ const styles = StyleSheet.create({
   },
   pressed: {
     opacity: 0.85,
-    backgroundColor: colors.surfaceRaised,
+    backgroundColor: c.card2,
   },
   topRow: {
     flexDirection: "row",
@@ -79,20 +82,20 @@ const styles = StyleSheet.create({
     width: 7,
     height: 7,
     borderRadius: radii.full,
-    backgroundColor: colors.primary,
+    backgroundColor: c.acc,
   },
   sender: {
     ...typography.footnote,
-    color: colors.textSecondary,
+    color: c.tx2,
     flexShrink: 1,
     flexGrow: 1,
   },
   senderUnread: {
-    color: colors.text,
-    fontWeight: "700",
+    color: c.tx,
+    fontFamily: family.display,
   },
   sourceTag: {
-    backgroundColor: colors.surfaceRaised,
+    backgroundColor: c.card2,
     borderRadius: radii.full,
     paddingHorizontal: 8,
     paddingVertical: 2,
@@ -100,20 +103,20 @@ const styles = StyleSheet.create({
   sourceTagText: {
     ...typography.caption,
     fontSize: 9.5,
-    color: colors.textDim,
+    color: c.tx3,
     textTransform: "uppercase",
   },
   subject: {
     ...typography.callout,
-    color: colors.textSecondary,
+    color: c.tx2,
   },
   subjectUnread: {
-    color: colors.text,
-    fontWeight: "600",
+    color: c.tx,
+    fontFamily: family.sansSemibold,
   },
   date: {
     ...typography.caption,
     fontSize: 11,
-    color: colors.textDim,
+    color: c.tx3,
   },
 });

@@ -1,196 +1,206 @@
-# ORDLY Mobile — system projektowy
+# ORDLY — system projektowy "Nokturn"
 
-> Dokument źródłowy dla wyglądu aplikacji. Zatwierdzony kierunek: **"Bento
-> v2"** — siatka kafelków różnej wielkości na ekranie Start, reszta ekranów
-> jako listy z hairline'ami (nie karty-w-kartach). Każdy nowy komponent UI
-> ma się dać opisać tokenami z §1-3 poniżej — jeśli nie da się, najpierw
-> dokładamy token tutaj, potem piszemy komponent.
+> Dokument źródłowy dla wyglądu obu aplikacji (desktop Electron + mobile
+> Expo). Zatwierdzony kierunek: **"Nokturn"** — głęboka zieleń-petrol
+> z jednym źródłem światła, teal jako sygnał „teraz", koral jako „czeka
+> na Ciebie", maskotka Ordlak jako wskaźnik stanu.
+>
+> Wartości liczbowe żyją w kodzie
+> (`desktop/src/renderer/src/theme/global.css`,
+> `desktop/tailwind.config.ts`, `mobile/src/theme/colors.ts`,
+> `mobile/src/theme/typography.ts`). Ten plik opisuje **reguły**; przy
+> rozbieżności co do konkretnej liczby wygrywa kod, przy rozbieżności co
+> do zasady — ten plik.
 
-Historia decyzji (dla pamięci, nie do powielania w kodzie):
-- Wariant A "Terminal" i B "Soft Neon" odrzucone na rzecz C "Bento".
-- Pierwsza wersja Bento odrzucona jako "wygląda jak AI" — poprawki:
-  prawdziwe ikony liniowe zamiast kolorowych kwadratów/kółek, dodana dolna
-  nawigacja, sparkline+trend zamiast gołej liczby na limonkowym tle,
-  limonka używana chirurgicznie (tylko trend, wypełnienie paska, aktywna
-  zakładka), karty bez obwódek/poświaty (różnicowanie tylko odcieniem tła +
-  hairline).
-- Druga runda poprawek: ikona "niski stan" ujednolicona z ikoną "do
-  wysłania" — bez tła, sam kontur (żadna z ikon stanu na ekranie Start nie
-  ma kolorowego chipa w tle), suwak poziomych filtrów bez natywnego paska
-  przewijania, typografia odchudzona (patrz §2 — wagi max. 600, mniejsze
-  rozmiary niż w pierwszym szkicu).
+**Historia:** wariant „Bento v2" (limonka `#C6FF00` na `#111111`,
+mobile dark-only) został zastąpiony w całości. Limonka nie występuje już
+nigdzie w produkcie. Wcześniejszy rebranding na teal był krokiem
+pośrednim; Nokturn go domyka.
 
-## 1. Kolor
+## 1. Trzy zasady
 
-Paleta marki jest ustalona w [branding.md](branding.md) i **nie podlega
-zmianie** dla apki. Poniżej rozszerzenie o tokeny potrzebne wyłącznie w UI
-(stany semantyczne, powierzchnie, hairline) — nie zastępują brandu, tylko
-go uzupełniają.
+Z nich wynika cała reszta. Przy każdej wątpliwości wracaj do nich.
 
-```ts
-// theme/colors.ts
-export const colors = {
-  // marka — z branding.md, bez zmian
-  lime:      "#C6FF00",
-  ink:       "#111111", // tło aplikacji (dark-mode-only, patrz §5)
-  white:     "#F4F4EF", // tekst podstawowy — ciepły offwhite, nie #FFFFFF
+1. **Światło ma kierunek.** Tło to głęboka zieleń-petrol z jedną poświatą
+   u góry po lewej. Panele mają górę i dół bez obwódek. Żadnych
+   gradientowych zmywów na całą kartę, żadnego szkła.
+2. **Blask to komunikat.** Teal świeci tylko tam, gdzie coś dzieje się
+   teraz. Koral — gdy coś czeka na użytkownika. Na jednym ekranie świecą
+   najwyżej **dwa** punkty.
+3. **Ordlak żyje, a nie pozuje.** Każdy jego stan jest pochodną zdarzenia
+   w systemie. Nie ma stanów losowych ani dekoracyjnych.
 
-  // powierzchnie (różnicowanie kart tylko odcieniem, bez obwódek)
-  surface:   "#191919", // karty, wiersze
-  surface2:  "#1F1F1F", // elementy zagnieżdżone w kartach (np. avatar-inicjały)
-  hairline:  "rgba(255,255,255,0.07)", // separator zamiast border na kartach
+## 2. Kolor
 
-  // tekst pomocniczy — ciepły szary (lekki bias w stronę limonki, nie czysta szarość)
-  muted:     "#8C8C80",
-  mutedDim:  "#5E5E56",
+Paleta w [branding.md](branding.md). Tu tylko reguły użycia.
 
-  // semantyka — ODDZIELNA od akcentu marki, nigdy nie zastępowana limonką
-  ok:        "#39D97A",
-  warn:      "#FFB020",
-  crit:      "#FF5C5C",
-} as const;
-```
+- **Żadnych wartości szesnastkowych w komponentach.** Na desktopie
+  jedyne miejsca z kolorami to `theme/global.css` i `tailwind.config.ts`;
+  na mobile — `theme/colors.ts`. Kontrolę robi:
 
-**Zasada użycia limonki (najważniejsza reguła wizualna apki):** limonka
-pojawia się WYŁĄCZNIE w:
-1. trendzie/wartości hero na ekranie Start ("+12%", liczba sprzedaży),
-2. aktywnej zakładce dolnej nawigacji,
-3. aktywnym filtrze/chipie wybranym przez użytkownika,
-4. głównym przycisku akcji (CTA), maks. jeden na ekran.
+  ```bash
+  cd desktop/src/renderer/src
+  grep -rnE "(bg|text|border|from|to|via|shadow|ring)-\[(#|rgba?\()" --include=*.tsx .
+  grep -rnE "#[0-9a-fA-F]{3,8}\b" --include=*.tsx .
+  ```
 
-Nigdzie indziej — żadnych teł ikon w kolorze limonki z przezroczystością,
-żadnych "chipów" z tłem `lime@10%`. Ikony stanu (do wysłania, sync) są
-zawsze płaskie, w kolorze `muted`/`white`, bez tła — jedyna
-różnica między nimi to sam kształt ikony, nie kolor.
+  Obie komendy mają zwracać **zero** trafień.
 
-## 2. Typografia
+- **Dwie atmosfery, identyczne klucze.** Mobile ma noc i dzień; klucze
+  palety są w obu zestawach takie same (`bg`, `card`, `tx`, `acc`, …),
+  więc **żaden komponent nigdy nie pyta, która atmosfera jest aktywna**.
+  Jeśli musi zapytać — klucz jest źle zaprojektowany.
 
-System **nie ładuje** własnego fontu (ograniczenie środowiska podglądu w
-przeglądarce podczas projektowania) — w apce docelowej używamy fontów
-systemowych przez `expo-font`/domyślne, ale **skala i wagi są ustalone i
-obowiązują niezależnie od konkretnego fontu**:
+- **Przełączanie atmosfery:** godzina (dzień 6:00–20:00) plus ręczne
+  nadpisanie w Ustawieniach. Czujnik jasności jest kuszący, ale skacze
+  przy każdym przejściu pod lampą.
 
-| Rola | Rozmiar | Waga | Uwagi |
+- **Kolory kanałów sprzedaży są stałe** w obu atmosferach — użytkownik
+  uczy się ich jako etykiet. W atmosferze dziennej kanały mają własne,
+  kryjące tła, bo przezroczystości z nocy giną na bieli.
+
+- **Kontrast:** `--text-3` (`#6F8882`) daje 4,57:1 na `--panel`,
+  `day.tx3` (`#64746E`) daje 4,6:1 na bieli. Obie wartości są dobrane pod
+  tekst 9–11 px i stoją na granicy — po zmianie `--panel` albo `day.card`
+  przelicz je ponownie.
+
+## 3. Typografia
+
+| Rola | Krój | Rozmiar / waga | Tracking |
 |---|---|---|---|
-| Powitanie (ekran Start, "Dzień dobry, Kuba") | 15.5 | 600 | nie 18/750 jak w pierwszym szkicu — za ciężkie |
-| Wartość hero (sprzedaż dnia) | 25 | 600 | `font-variant-numeric: tabular-nums` |
-| Nagłówek sekcji ("Ostatnie zamówienia") | 13 | 600 | |
-| Wartość stat-card | 16 | 600 | |
-| ID zamówienia / nazwa produktu w liście | 12.5 | 600 | |
-| Kwota zamówienia | 12.5 | 600 | tabular-nums |
-| Tekst pomocniczy (buyer, SKU, etykiety) | 11.5–12 | 500 | kolor `muted` |
-| Zakładka nawigacji | 9.5 | 600 | |
+| Powitanie na karcie głównej | Bricolage 700 | 27 px | −0,03em |
+| Tytuł ekranu (desktop topbar) | Bricolage 700 | 17 px | −0,02em |
+| Tytuł ekranu (mobile) | Bricolage 700 | 24 px | −0,025em |
+| Liczba na kaflu KPI | Bricolage 700 | 25–26 px | −0,03em |
+| Nagłówek panelu | Bricolage 700 | 14 px | −0,01em |
+| Wiersz listy, nazwisko | Instrument Sans 600 | 12,5–13,5 px | 0 |
+| Treść, opisy | Instrument Sans 400 | 13 px | 0 |
+| Cyfry, numery, godziny | JetBrains Mono 500 | 11–12,5 px | 0,03em |
+| Etykieta wersalikami | JetBrains Mono 500 | 9–10,5 px | 0,15em |
 
-**Zasada:** maksymalna waga w całej aplikacji to **600 (semibold)** — nigdy
-700/800. To był główny powód, dla którego pierwsza wersja "wyglądała jak
-AI wygenerowane": zbyt duże, zbyt grube liczby. Wszystkie liczby (kwoty,
-stany magazynowe, statystyki) mają `font-variant-numeric: tabular-nums`,
-żeby kolumny cyfr się wyrównywały.
+**Zasada:** Bricolage wyłącznie w rolach wyróżnionych. Nigdy w wierszu
+listy — tam zawsze Instrument Sans albo mono.
 
-## 3. Layout, kształt, elewacja
+Wszędzie, gdzie liczby stoją jedna pod drugą, obowiązuje
+`font-variant-numeric: tabular-nums` (RN: `fontVariant: ["tabular-nums"]`).
+Bez tego kolumny rozjeżdżają się przy każdej zmianie danych.
 
-- **Promienie:** 2 wartości w całej apce — `11px` (male kontrolki: ikony,
-  avatar-inicjały, chip filtra) i `16-20px` (karty, hero). Żadnych
-  przypadkowych wartości pośrednich.
-- **Karty bez obwódek.** Różnicowanie względem tła wyłącznie kolorem
-  (`surface` na `ink`). Zero `box-shadow`/`border` jako ozdoby — jedyny
-  cień w całej apce jest na samym telefonie/tabbarze (realistyczna
-  głębia UI systemowego), nie na kartach z danymi.
-- **Listy zamiast kart-w-kartach.** Zamówienia i pozycje magazynowe w
-  obrębie sekcji to wiersze oddzielone `hairline`, nie osobne karty z
-  własnym tłem — karty rezerwujemy dla: hero, stat-card, summary-strip.
-- **Dolna nawigacja:** pływający pasek (`position: sticky` u dołu ekranu),
-  tło `surface` z `opacity ~0.82` + blur (`expo-blur`, `BlurView` na iOS;
-  na Androidzie fallback do pełnego `surface` bez blura — API blur na
-  Androidzie jest niespójne), promień `20px`, margines `12px` od krawędzi
-  ekranu. Aktywna zakładka: ikona i etykieta w kolorze `lime`/`white`,
-  reszta w `mutedDim`. Bez tła/pigułki pod aktywną ikoną.
+W React Native **wagę niesie nazwa rodziny**
+(`InstrumentSans_600SemiBold`), nie `fontWeight`. Podanie `fontWeight`
+obok własnego kroju jest ignorowane na iOS, a na Androidzie potrafi
+podmienić krój na systemowy.
 
-## 4. Ikony
+## 4. Kształt i elewacja
 
-Wszystkie ikony to **linia** (`stroke`, nie `fill`), grubość `stroke-width:
-2`, `stroke-linecap/linejoin: round`, rysowane jako komponenty
-`react-native-svg` 1:1 z zatwierdzonego mockupu — nie biblioteka ikon
-"z automatu" (Feather/Ionicons), żeby styl pozostał spójny z tym, co
-zaakceptowane. Zestaw startowy (nazwy plików w `mobile/src/icons/`):
+- Promienie z tokenów: `7 / 10 / 14 / 20 / 28 / 999`. Żadnych wartości
+  pośrednich „na oko".
+- **Wybrany element nie ma obwódki** — ma tło `--panel-2` plus pasek
+  `--teal` 2 px przy lewej krawędzi. Ten sam wzorzec w nawigacji
+  i na wybranym wierszu listy, żeby „wybrane" wyglądało wszędzie tak samo.
+- **Jeden cień w całej aplikacji** to `glow-teal` pod przyciskiem
+  `primary`. Karty z danymi nie mają cieni ani obwódek jako ozdoby.
+- **Ucięta lista ma wygaszenie**, nie ostrą krawędź (30 px od dołu;
+  na ekranie asystenta odwrotnie — 34 px od góry).
 
-| Ikona | Plik | Użycie |
+## 5. Ordlak — maskotka jako wskaźnik
+
+Jeden komponent SVG, sześć stanów, sterowanie atrybutem `data-state`
+(desktop) albo propsem `state` (mobile). **Żadnych `id` w SVG** —
+komponent montuje się wielokrotnie na jednym ekranie, a duplikaty `id`
+psują gradienty i maski.
+
+| Stan | Wyzwalacz |
+|---|---|
+| `sync` | trwa cykl synchronizacji albo ręczne odświeżenie |
+| `happy` | 1,2 s po nowym zamówieniu lub oznaczeniu paczki jako wysłanej |
+| `alert` | druga nieudana synchronizacja poczty **pod rząd**, brak łączności z Pi, Allegro nie odpowiada |
+| `think` | Ordlak generuje odpowiedź w rozmowie |
+| `sleep` | po 22:00 bez zdarzeń; oraz na pustych stanach list |
+| `idle` | wszystko pozostałe |
+
+Rozmiary: 22 px (wskaźnik, ikona paska), 26 px (nagłówek), 28 px (awatar
+w rozmowie), 40 px (gałka mobilna), 62 px (karta mobilna), 134 px (karta
+powitalna desktopu). **Poniżej 22 px Ordlak traci oczy — to dolna
+granica.** Nigdy dwa razy na jednym ekranie w rozmiarze większym niż 40 px.
+
+Geometria: viewBox `0 0 128 128`, cała zawartość w grupie przesuniętej
+o `-8.4 / -0.5`. Te dwie liczby to wynik pomiaru `getBBox()` na ramce
+figury (92,81 × 97, środek w 72,41 / 64,5) — nie zmieniaj ich bez
+ponownego pomiaru. Fale muszą być **poza** `.ord-figure`, jako jej
+rodzeństwo: wewnątrz psują ramkę figury i punkt obrotu animacji.
+
+## 6. Język statusów
+
+Spójny w całej aplikacji, trzy tony:
+
+| Znaczenie | Ton | Tło / tekst |
 |---|---|---|
-| Dzwonek | `bell.tsx` | powiadomienia (Start, top bar) |
-| Ciężarówka | `truck.tsx` | "do wysłania" |
-| Bateria/poziom niski | `low-level.tsx` | "niski stan" — **bez tła**, sam kontur, identyczny sposób renderowania jak `truck.tsx` (żadna z dwóch nie ma chipa koloru w tle) |
-| Strzałka w górę | `trend-up.tsx` | trend sprzedaży |
-| Dom | `home.tsx` | zakładka Start |
-| Paragon | `receipt.tsx` | zakładka Zamówienia |
-| Skrzynka | `box.tsx` | zakładka Magazyn |
-| Słupki | `bars.tsx` | zakładka Statystyki |
-| Lupa | `search.tsx` | wyszukiwarka |
-| Chevron | `chevron-right.tsx` | linki "wszystkie →", "raport →" |
-| Plus | `plus.tsx` | dodaj produkt / akcja twórcza |
+| Wymaga działania | `hot` | koral 14% / koral |
+| W toku, dziś | `go` | teal 16% / teal |
+| Zamknięte | `mute` | `--panel-3` / `--text-3` |
 
-## 5. Tryb ciemny jako świadomy wybór marki
+„Wysłane", „Odebrane" i „Anulowane" są `mute`, **nie** `go`. Świecenie
+rzeczy już skończonych to główny powód, przez który interfejsy robią się
+hałaśliwe.
 
-Aplikacja **nie przełącza się** na jasny motyw systemowy — `branding.md`
-definiuje tło `#111111` jako tożsamość marki (podobnie jak np. aplikacje
-konsol/streamingowe z jednym, stałym, ciemnym motywem). To świadoma
-decyzja, nie zaniedbanie — nie implementujemy `useColorScheme()` do
-przełączania palety. Jedyne miejsce, gdzie system może wpłynąć na wygląd,
-to natywne elementy OS (np. pasek statusu, klawiatura) — te zostają
-domyślne.
+## 7. Listy
 
-## 6. Komponenty (specyfikacja funkcjonalna)
+- Nagłówek i wiersze mają **identyczną** definicję kolumn (jedna stała
+  w module). Każde dziecko potrzebuje `min-width: 0`, inaczej ścieżka
+  `1fr` nie skurczy się poniżej swojej zawartości i kwoty wyjdą poza panel.
+- **Etykieta kanału ma stałą szerokość** (68 px desktop / 60 px mobile).
+  Bez niej „Lokalnie" jest szersze od „OLX" i nazwiska zaczynają się
+  w różnych miejscach — to był najbardziej widoczny błąd pierwszej wersji.
+- Nazwisko i podwiersz są ucinane wielokropkiem, żeby **każdy wiersz miał
+  tę samą wysokość** niezależnie od liczby pozycji.
+- Bez pasów zebry. Bez siatki pionowej.
+- **Liczba w liczniku panelu musi zgadzać się z liczbą widocznych wierszy.**
 
-Poniżej lista komponentów wspólnych do zbudowania w `mobile/src/components/`
-wraz z ich stanami — każdy ma obsłużyć **loading / empty / error**, nie
-tylko "happy path" (patrz też §7).
+## 8. Ruch i dostępność
 
-- **`HeroSalesCard`** — sprzedaż dnia + sparkline + trend. Stan `loading`:
-  skeleton w kolorze `surface2` pulsujący; `error`: komunikat "Nie udało
-  się pobrać danych" + przycisk "Spróbuj ponownie"; brak stanu "empty"
-  (0 PLN to poprawna wartość, nie błąd).
-- **`StatCard`** — ikona + etykieta + wartość (do wysłania).
-- **`SyncStatusRow`** — kropka stanu (`ok`/`warn`/`crit`) + "Synchronizacja:
-  X min temu". Kropka `crit`, gdy ostatni sync > 15 minut temu (2× interwał
-  `SYNC_ORDERS_INTERVAL_SECONDS`).
-- **`OrderRow`** — awatar-inicjały, ID, kupujący, kwota, status (kropka +
-  etykieta, kolor wg mapy: `NOWE→lime`, `PAKOWANIE→warn`, `WYSŁANE→muted`
-  z kropką `ok`, `ANULOWANE→crit`).
-- **`OfferRow`** — miniatura oferty, tytuł, cena (tabular-nums) i ikona
-  kanału (Allegro / Allegro Lokalnie / OLX). Bez paska stanu i bez ilości:
-  na telefonie Magazyn jest podglądem tego, co jest wystawione, a ilość
-  wpisuje się na desktopie.
-- **`FilterChipRow`** — pozioma lista bez widocznego paska przewijania
-  (`showsHorizontalScrollIndicator={false}` w RN — odpowiednik naprawionego
-  suwaka z mockupu).
-- **`SearchBar`** — pole tekstowe ze stanem `focused` (obwódka `lime` 1px —
-  jedyne miejsce w apce, gdzie limonka pojawia się jako obwódka, bo to
-  stan interakcji, nie ozdoba).
-- **`SummaryStrip`** — 3 komórki + separator pionowy `hairline`.
-- **`BottomTabBar`** — patrz §3.
+Jedna krzywa w całej aplikacji: `cubic-bezier(.22,.61,.36,1)`.
 
-## 7. Stany, których mockup nie pokazywał (uzupełnienie na potrzeby budowy)
+| Zdarzenie | Czas |
+|---|---|
+| Hover, zmiana stanu kontrolki | 150 ms |
+| Wejście panelu, przejście ekranu | 280 ms |
+| Oddech maskotki | 3,6 s |
+| Cykl fal synchronizacji | 1,5 s (przesunięcia 0 / 0,18 / 0,36 s) |
 
-Mockup HTML pokazywał wyłącznie "happy path" z danymi przykładowymi.
-Prawdziwa apka musi obsłużyć:
+- `prefers-reduced-motion` (RN: `AccessibilityInfo.isReduceMotionEnabled`)
+  zatrzymuje **ruch**; stany nadal zmieniają kolor i mimikę.
+- Każdy element dotykowy na mobile ma co najmniej 44 × 44 px pola
+  trafienia, także zakładki.
+- Każdy SVG maskotki ma `role="img"` / `accessibilityRole="image"`
+  i etykietę „Ordlak". **Stan nie jest w etykiecie** — czytnik ekranu nie
+  ma powtarzać „Ordlak synchronizuje" przy każdym odświeżeniu. Stan
+  komunikuje tekst obok.
 
-- **Ładowanie pierwsze (cold start):** pełnoekranowy skeleton w układzie
-  docelowego ekranu (te same kształty kart, wypełnione `surface2`), nie
-  spinner na środku pustego ekranu.
-- **Pull-to-refresh:** natywny wskaźnik RN przefarbowany na `lime` na
-  tle `ink`.
-- **Brak połączenia z API** (RPi offline / Tailscale rozłączony): baner na
-  górze ekranu ("Brak połączenia z ORDLY") + dane z cache `react-query`
-  wyszarzone (opacity 0.6) zamiast zniknięcia całego ekranu.
-- **401 (zły/wygasły token):** przekierowanie do ekranu logowania,
-  komunikat "Sesja wygasła, zaloguj się ponownie".
-- **Pusty magazyn / brak zamówień:** stan pusty z ikoną + jednym zdaniem
-  instrukcji (np. "Katalog jest pusty. Kliknij Synchronizuj, żeby pobrać
-  wystawione oferty."), nie goła pusta lista.
+## 9. Stany, które trzeba obsłużyć
 
-## 8. Odniesienie wizualne
+Każdy ekran obsługuje **loading / empty / error**, nie tylko happy path.
 
-Ostateczny, zatwierdzony mockup HTML (dwa ekrany: Start i Magazyn,
-wariant "Bento v2" po wszystkich poprawkach) został wygenerowany w trakcie
-sesji projektowej i jest punktem odniesienia 1:1 dla wartości w tym pliku —
-w razie rozbieżności między kodem a tym dokumentem, ten dokument wygrywa
-(mockup HTML był narzędziem do decyzji, nie źródłem prawdy na stałe).
+- **Ładowanie:** skeleton w układzie docelowego ekranu, nigdy przez
+  podmianę `innerHTML`.
+- **Pusto:** Ordlak w stanie `sleep` plus jedno zdanie instrukcji.
+  Pusta lista bywa dobrą wiadomością i nie ma po co świecić.
+- **Błąd:** mówi **co** się stało i **co zrobić**. Nie przeprasza i nie
+  jest ogólnikowy.
+- **Brak połączenia z Pi:** Ordlak przechodzi w `alert`, a wskaźnik
+  w stopce paska bocznego nazywa powód.
+- **401:** powrót do logowania z komunikatem „Sesja wygasła".
+
+## 10. Reguła nadrzędna: zero przycisków-widm
+
+Każdy element interfejsu musi mieć realne pokrycie w backendzie. Jeśli
+makieta pokazuje przycisk, dla którego nie ma endpointu — **nie budujemy
+go**, tylko odnotowujemy brak. Przykłady z tego redesignu:
+
+- kafel „Niskie stany" zastąpiony „Rozjazdem stanów", bo Magazyn nie ma
+  już progów ani SKU — ilość wisi wprost na ofercie i wpisuje się ją
+  ręcznie, więc progu nie ma z czym porównać;
+- karta wyniku asystenta na mobile nie ma „Wstaw do oferty", bo wszystkie
+  narzędzia Ordlaka na Pi są **tylko do odczytu** — daje za to „Kopiuj"
+  i „Udostępnij", które działają;
+- mikrofon w polu asystenta pokazuje się wyłącznie tam, gdzie da się
+  nagrywać (PWA z Web Speech API).

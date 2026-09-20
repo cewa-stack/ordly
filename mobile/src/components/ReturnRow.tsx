@@ -6,7 +6,8 @@
 import * as React from "react";
 import { StyleSheet, Text, View } from "react-native";
 
-import { colors } from "@/theme/colors";
+import type { Palette } from "@/theme/colors";
+import { useThemedStyles } from "@/theme/theme";
 import { radii, spacing, typography } from "@/theme/typography";
 import { parseApiDate, returnStatusLabel } from "@/utils/format";
 import type { ReturnItem } from "@/api/types";
@@ -20,6 +21,7 @@ interface ReturnRowProps {
 }
 
 export function ReturnRow({ item }: ReturnRowProps) {
+  const styles = useThemedStyles(createStyles);
   return (
     <View style={styles.card}>
       <View style={styles.row}>
@@ -48,11 +50,12 @@ export function ReturnRow({ item }: ReturnRowProps) {
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (c: Palette) =>
+  StyleSheet.create({
   card: {
-    backgroundColor: colors.surface,
+    backgroundColor: c.card,
     borderWidth: 1,
-    borderColor: colors.border,
+    borderColor: c.line,
     borderRadius: radii.lg,
     padding: spacing.lg,
     marginBottom: spacing.sm,
@@ -66,7 +69,7 @@ const styles = StyleSheet.create({
   },
   id: {
     ...typography.mono,
-    color: colors.textSecondary,
+    color: c.tx2,
     flexShrink: 1,
   },
   statusPill: {
@@ -75,30 +78,30 @@ const styles = StyleSheet.create({
     paddingHorizontal: 9,
     alignItems: "center",
     justifyContent: "center",
-    backgroundColor: colors.surfaceRaised,
+    backgroundColor: c.card2,
   },
   statusText: {
     ...typography.caption,
     fontSize: 10,
-    color: colors.textSecondary,
+    color: c.tx2,
   },
   buyer: {
     ...typography.calloutSemibold,
     fontSize: 15,
-    color: colors.text,
+    color: c.tx,
   },
   meta: {
     ...typography.footnote,
-    color: colors.textSecondary,
+    color: c.tx2,
   },
   orderRef: {
     ...typography.footnote,
-    color: colors.textDim,
+    color: c.tx3,
     flexShrink: 1,
   },
   date: {
     ...typography.caption,
     fontSize: 11,
-    color: colors.textDim,
+    color: c.tx3,
   },
 });

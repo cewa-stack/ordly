@@ -5,7 +5,8 @@
 import * as React from "react";
 import { Pressable, StyleSheet, Text, TextInput, View, type TextInputProps } from "react-native";
 
-import { colors } from "@/theme/colors";
+import type { Palette } from "@/theme/colors";
+import { useTheme, useThemedStyles } from "@/theme/theme";
 import { radii, spacing, typography } from "@/theme/typography";
 
 interface FormFieldProps extends Omit<TextInputProps, "style"> {
@@ -26,6 +27,8 @@ export function FormField({
   onBlur,
   ...inputProps
 }: FormFieldProps) {
+  const styles = useThemedStyles(createStyles);
+  const { c } = useTheme();
   const [focused, setFocused] = React.useState(false);
   return (
     <View style={styles.field}>
@@ -40,7 +43,7 @@ export function FormField({
         {icon}
         <TextInput
           {...inputProps}
-          placeholderTextColor={colors.textDim}
+          placeholderTextColor={c.tx3}
           style={styles.input}
           onFocus={(e) => {
             setFocused(true);
@@ -65,39 +68,40 @@ export function FormField({
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (c: Palette) =>
+  StyleSheet.create({
   field: {
     gap: 6,
   },
   label: {
     ...typography.caption,
-    color: colors.textSecondary,
+    color: c.tx2,
   },
   labelFocused: {
-    color: colors.primary,
+    color: c.acc,
   },
   row: {
     height: 52,
     flexDirection: "row",
     alignItems: "center",
     gap: spacing.sm,
-    backgroundColor: colors.surface,
+    backgroundColor: c.card,
     borderWidth: 1,
-    borderColor: colors.border,
+    borderColor: c.line,
     borderRadius: radii.md,
     paddingHorizontal: spacing.lg,
   },
   rowFocused: {
-    borderColor: colors.primary,
+    borderColor: c.acc,
   },
   rowError: {
-    borderColor: colors.danger,
+    borderColor: c.coral,
   },
   input: {
     flex: 1,
     height: "100%",
     padding: 0,
-    color: colors.text,
+    color: c.tx,
     fontSize: 15,
   },
 });

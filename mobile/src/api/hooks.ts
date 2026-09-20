@@ -24,6 +24,9 @@ import type {
   MailSource,
   MarketplaceOffer,
   Order,
+  OrdlakChatReply,
+  OrdlakConversation,
+  OrdlakStatus,
   PushSubscribeBody,
   ReturnItem,
   Shipment,
@@ -251,6 +254,69 @@ export function useMarkMailRead() {
       api.post<void>(`/api/v1/mail/messages/${encodeURIComponent(messageId)}/mark-read`),
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ["mail-messages"] });
+    },
+  });
+}
+
+// ---------------------------------------------------------------------
+// Ordlak - asystent
+// ---------------------------------------------------------------------
+
+/**
+ * Stan modułu: czy klucz API jest ustawiony na Pi i na jakim modelu
+ * chodzi. Ekran asystenta pyta o to PRZED pokazaniem pola tekstowego,
+ * żeby od razu powiedzieć "brak klucza na Pi" zamiast pozwolić napisać
+ * pytanie i dopiero wtedy pokazać błąd.
+ */
+export function useOrdlakStatus() {
+  return useQuery({
+    queryKey: ["ordlak-status"],
+    queryFn: () => api.get<OrdlakStatus>("/api/v1/ordlak/status"),
+    staleTime: 5 * 60_000,
+    retry: false,
+  });
+}
+
+/** Zapisane wątki (bez treści), od ostatnio używanego. */
+export function useOrdlakConversations() {
+  return useQuery({
+    queryKey: ["ordlak-conversations"],
+    queryFn: () => api.get<OrdlakConversation[]>("/api/v1/ordlak/conversations"),
+    retry: false,
+  });
+}
+
+/** Jeden wątek z pełną historią wiadomości. */
+export function useOrdlakConversation(id: number | null) {
+  return useQuery({
+    queryKey: ["ordlak-conversation", id],
+    queryFn: () => api.get<OrdlakConversation>(`/api/v1/ordlak/conversations/${id!}`),
+    enabled: id !== null,
+    retry: false,
+  });
+}
+
+/**
+ * Zadaje pytanie asystentowi.
+ *
+ * Backend otwiera własny zakres sesji i zatwierdza OBIE wypowiedzi przed
+ * odpowiedzią, więc `conversation_id` z odpowiedzi zawsze wskazuje na
+ * wątek, który już jest w bazie - kolejne pytanie w tym wątku nie
+ * dostanie 404.
+ */
+export function useAskOrdlak() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (input: { message: string; conversationId: number | null }) =>
+      api.post<OrdlakChatReply>("/api/v1/ordlak/chat", {
+        message: input.message,
+        conversation_id: input.conversationId,
+      }),
+    onSuccess: (reply) => {
+      void queryClient.invalidateQueries({ queryKey: ["ordlak-conversations"] });
+      void queryClient.invalidateQueries({
+        queryKey: ["ordlak-conversation", reply.conversation_id],
+      });
     },
   });
 }

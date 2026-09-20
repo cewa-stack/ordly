@@ -6,8 +6,9 @@
 import * as React from "react";
 import { Pressable, StyleSheet, Text } from "react-native";
 
-import { colors } from "@/theme/colors";
-import { radii } from "@/theme/typography";
+import type { Palette } from "@/theme/colors";
+import { useThemedStyles } from "@/theme/theme";
+import { family, radii } from "@/theme/typography";
 
 interface FilterChipProps {
   label: string;
@@ -16,6 +17,7 @@ interface FilterChipProps {
 }
 
 export function FilterChip({ label, active, onPress }: FilterChipProps) {
+  const styles = useThemedStyles(createStyles);
   return (
     <Pressable
       onPress={onPress}
@@ -31,30 +33,31 @@ export function FilterChip({ label, active, onPress }: FilterChipProps) {
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (c: Palette) =>
+  StyleSheet.create({
   chip: {
     height: 32,
     justifyContent: "center",
     paddingHorizontal: 14,
     borderRadius: radii.full,
-    backgroundColor: colors.surface,
+    backgroundColor: c.card,
     borderWidth: 1,
-    borderColor: colors.border,
+    borderColor: c.line,
   },
   chipActive: {
-    backgroundColor: colors.primaryTint,
-    borderColor: colors.primaryBorder,
+    backgroundColor: c.accDim,
+    borderColor: c.line2,
   },
   pressed: {
     opacity: 0.8,
   },
   label: {
     fontSize: 14,
-    fontWeight: "500",
-    color: colors.textSecondary,
+    fontFamily: family.sansMedium,
+    color: c.tx2,
   },
   labelActive: {
-    color: colors.primary,
-    fontWeight: "600",
+    color: c.acc,
+    fontFamily: family.sansSemibold,
   },
 });

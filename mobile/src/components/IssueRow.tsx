@@ -6,23 +6,29 @@
 import * as React from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 
-import { colors } from "@/theme/colors";
+import { withAlpha } from "@/theme/colors";
+import type { Palette } from "@/theme/colors";
+import { useTheme, useThemedStyles } from "@/theme/theme";
 import { radii, spacing, typography } from "@/theme/typography";
 import { ChevronRightIcon } from "@/icons";
 import type { Issue } from "@/api/types";
 import { issueStatusLabel, issueStatusTone, parseApiDate } from "@/utils/format";
 import { Pill } from "./Pill";
 
-const TONE_COLOR: Record<string, string> = {
-  ok: colors.success,
-  warn: colors.warning,
-  crit: colors.danger,
-};
-const TONE_TINT: Record<string, string> = {
-  ok: colors.successTint,
-  warn: colors.warningTint,
-  crit: colors.dangerTint,
-};
+/**
+ * Ton zgloszenia w kolorach AKTYWNEJ atmosfery. Funkcja, nie stala -
+ * paleta zmienia sie w trakcie dzialania aplikacji (sekcja 11).
+ */
+function toneColors(tone: string, c: Palette): { color: string; tint: string } {
+  switch (tone) {
+    case "ok":
+      return { color: c.acc, tint: c.accDim };
+    case "warn":
+      return { color: c.amber, tint: withAlpha(c.amber, 0.14) };
+    default:
+      return { color: c.coral, tint: withAlpha(c.coral, 0.14) };
+  }
+}
 
 function shortDate(iso: string): string {
   return parseApiDate(iso).toLocaleDateString("pl-PL", { day: "numeric", month: "short" });
@@ -34,16 +40,21 @@ interface IssueRowProps {
 }
 
 export function IssueRow({ issue, onPress }: IssueRowProps) {
+  const styles = useThemedStyles(createStyles);
+  const { c } = useTheme();
   const tone = issueStatusTone(issue.status);
   return (
     <Pressable onPress={onPress} style={({ pressed }) => [styles.card, pressed && styles.pressed]}>
       <View style={styles.topRow}>
         <Pill
           label={issue.type === "CLAIM" ? "Reklamacja" : "Dyskusja"}
-          color={colors.primary}
-          tint={colors.primaryTint}
+          color={c.acc}
+          tint={c.accDim}
         />
-        <Pill label={issueStatusLabel(issue.status)} color={TONE_COLOR[tone]} tint={TONE_TINT[tone]} />
+        <Pill
+          label={issueStatusLabel(issue.status)}
+          {...toneColors(tone, c)}
+        />
       </View>
       <Text style={styles.subject} numberOfLines={1}>
         {issue.subject ?? "Bez tematu"}
@@ -56,18 +67,19 @@ export function IssueRow({ issue, onPress }: IssueRowProps) {
           {issue.last_message_at ? (
             <Text style={styles.date}>{shortDate(issue.last_message_at)}</Text>
           ) : null}
-          <ChevronRightIcon size={16} color={colors.textDim} />
+          <ChevronRightIcon size={16} color={c.tx3} />
         </View>
       </View>
     </Pressable>
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (c: Palette) =>
+  StyleSheet.create({
   card: {
-    backgroundColor: colors.surface,
+    backgroundColor: c.card,
     borderWidth: 1,
-    borderColor: colors.border,
+    borderColor: c.line,
     borderRadius: radii.lg,
     padding: spacing.lg,
     marginBottom: spacing.sm,
@@ -75,7 +87,7 @@ const styles = StyleSheet.create({
   },
   pressed: {
     opacity: 0.85,
-    backgroundColor: colors.surfaceRaised,
+    backgroundColor: c.card2,
   },
   topRow: {
     flexDirection: "row",
@@ -84,7 +96,7 @@ const styles = StyleSheet.create({
   subject: {
     ...typography.calloutSemibold,
     fontSize: 15,
-    color: colors.text,
+    color: c.tx,
     marginTop: 2,
   },
   bottomRow: {
@@ -95,7 +107,7 @@ const styles = StyleSheet.create({
   },
   meta: {
     ...typography.footnote,
-    color: colors.textSecondary,
+    color: c.tx2,
     flexShrink: 1,
   },
   trailing: {
@@ -106,6 +118,6 @@ const styles = StyleSheet.create({
   date: {
     ...typography.caption,
     fontSize: 11,
-    color: colors.textDim,
+    color: c.tx3,
   },
 });

@@ -1,217 +1,119 @@
 /**
- * Nagłówek aplikacji mobilnej wg sekcji 6.1 specyfikacji:
- * powitanie + Ordi (46 px) + pigułka synchronizacji.
+ * Nagłówek ekranu mobilnego (sekcja 11 instrukcji "Nokturn").
  *
- * Nagłówek jest WSPÓLNY dla wszystkich pięciu zakładek - nie należy do
- * żadnego ekranu z osobna. Wynika to wprost z sekcji 1: synchronizacja
- * to jedyne działanie w całej aplikacji, więc jej przycisk musi być
- * dostępny wszędzie, a nie tylko na jednym ekranie.
+ *   padding: 6px 20px 14px
+ *   nadtytuł  - mono 9,5 px wersalikami, `tx3`
+ *   tytuł     - Bricolage 700 / 24 px, akcentowane słowo w `acc`
+ *   awatar    - 38 px z inicjałami, mono 12 px, po prawej
  *
- * Ordi siedzi w orbie z pierścieniem postępu - ten sam element
- * sygnaturowy co wskaźnik w pasku bocznym desktopu, tylko w jasnym
- * wariancie (sekcja 6.1).
+ * ZMIANA WOBEC POPRZEDNIEJ WERSJI: zniknęła pigułka synchronizacji.
+ * Synchronizacja nie przepadła - przeniosła się na kartę Ordlaka na
+ * ekranie Start (dotknięcie karty uruchamia cykl), a listy mają
+ * pociągnięcie w dół. Nagłówek ma nieść, GDZIE jesteś, nie mieścić
+ * jedynego przycisku aplikacji.
+ *
+ * Awatar prowadzi do Ustawień - to jedyne wejście do powiadomień push,
+ * Face ID i wylogowania.
  */
 import * as React from "react";
-import { Animated, Easing, Pressable, StyleSheet, Text, View } from "react-native";
+import { Pressable, StyleSheet, Text, View } from "react-native";
 import { useNavigation } from "@react-navigation/native";
 
-import { colors } from "@/theme/colors";
-import { radii, spacing, typography } from "@/theme/typography";
-import { Mascot } from "@/components/Mascot";
-import { ChevronRightIcon, GearIcon, SyncIcon } from "@/icons";
-import { useSync } from "@/store/sync";
-
-const DATE_FORMATTER = new Intl.DateTimeFormat("pl-PL", {
-  weekday: "long",
-  day: "numeric",
-  month: "long",
-});
-
-function SyncSpinner() {
-  const rotation = React.useRef(new Animated.Value(0)).current;
-
-  React.useEffect(() => {
-    // Pierścień synchronizacji: 950 ms, liniowo, w pętli (sekcja 2.6).
-    const loop = Animated.loop(
-      Animated.timing(rotation, {
-        toValue: 1,
-        duration: 950,
-        easing: Easing.linear,
-        useNativeDriver: true,
-      })
-    );
-    loop.start();
-    return () => loop.stop();
-  }, [rotation]);
-
-  const spin = rotation.interpolate({
-    inputRange: [0, 1],
-    outputRange: ["0deg", "360deg"],
-  });
-
-  return (
-    <Animated.View style={{ transform: [{ rotate: spin }] }}>
-      <SyncIcon size={16} color={colors.primary} />
-    </Animated.View>
-  );
-}
+import type { Palette } from "@/theme/colors";
+import { useTheme, useThemedStyles } from "@/theme/theme";
+import { fonts, spacing } from "@/theme/typography";
 
 interface AppHeaderProps {
-  username: string;
+  /** Nadtytuł wersalikami, np. "PONIEDZIAŁEK · 22 WRZEŚNIA". */
+  eyebrow: string;
+  /** Tytuł ekranu. */
+  title: string;
+  /**
+   * Słowo z tytułu, które świeci akcentem. Musi być fragmentem `title` -
+   * inaczej nie zostanie podświetlone (i o to chodzi: nie doklejamy
+   * słów, których w tytule nie ma).
+   */
+  accent?: string;
+  initials: string;
 }
 
-export function AppHeader({ username }: AppHeaderProps) {
-  const { pose, title, subtitle, phase, sync } = useSync();
+export function AppHeader({ eyebrow, title, accent, initials }: AppHeaderProps) {
+  const styles = useThemedStyles(createStyles);
+  const { c } = useTheme();
   const navigation = useNavigation();
-  const popScale = React.useRef(new Animated.Value(1)).current;
 
-  React.useEffect(() => {
-    if (phase !== "success") return;
-    // "Pop" po sukcesie: 1 -> 1.2 -> 1 w 550 ms (sekcja 3.2).
-    Animated.sequence([
-      Animated.timing(popScale, {
-        toValue: 1.2,
-        duration: 209,
-        easing: Easing.out(Easing.quad),
-        useNativeDriver: true,
-      }),
-      Animated.timing(popScale, {
-        toValue: 1,
-        duration: 341,
-        easing: Easing.out(Easing.quad),
-        useNativeDriver: true,
-      }),
-    ]).start();
-  }, [phase, popScale]);
+  // Tytuł rozbity na trzy części, żeby akcent nie wymagał osobnego pola
+  // i nie dało się podświetlić czegoś, czego w tytule nie ma.
+  const index = accent ? title.indexOf(accent) : -1;
+  const before = index >= 0 ? title.slice(0, index) : title;
+  const middle = index >= 0 ? accent! : "";
+  const after = index >= 0 ? title.slice(index + accent!.length) : "";
 
   return (
     <View style={styles.header}>
-      <View style={styles.greetingRow}>
-        <View style={styles.orb}>
-          <Animated.View style={{ transform: [{ scale: popScale }] }}>
-            <Mascot pose={pose} size={33} floaty={phase === "idle"} />
-          </Animated.View>
-        </View>
-        <View style={styles.greetingCopy}>
-          <Text style={styles.greeting} numberOfLines={1}>
-            Cześć, {username}
-          </Text>
-          <Text style={styles.date}>{DATE_FORMATTER.format(new Date())}</Text>
-        </View>
-        {/* Jedyne wejście do Ustawień (powiadomienia push, Face ID,
-            wylogowanie). Zniknęło razem z zakładką Start i przez to na
-            nowym telefonie nie dało się włączyć powiadomień. */}
-        <Pressable
-          onPress={() => navigation.navigate("Settings")}
-          accessibilityRole="button"
-          accessibilityLabel="Ustawienia i powiadomienia"
-          hitSlop={8}
-          style={({ pressed }) => [styles.settingsButton, pressed && styles.syncPillPressed]}
-        >
-          <GearIcon size={19} color={colors.textSecondary} />
-        </Pressable>
+      <View style={styles.copy}>
+        <Text style={styles.eyebrow} numberOfLines={1}>
+          {eyebrow}
+        </Text>
+        <Text style={styles.title} numberOfLines={1}>
+          {before}
+          {middle ? <Text style={{ color: c.acc }}>{middle}</Text> : null}
+          {after}
+        </Text>
       </View>
 
       <Pressable
-        onPress={sync}
-        disabled={phase !== "idle"}
+        onPress={() => navigation.navigate("Settings")}
         accessibilityRole="button"
-        accessibilityLabel="Synchronizuj z marketplace"
-        style={({ pressed }) => [styles.syncPill, pressed && styles.syncPillPressed]}
+        accessibilityLabel="Ustawienia i powiadomienia"
+        hitSlop={8}
+        style={({ pressed }) => [styles.avatar, pressed && styles.pressed]}
       >
-        {phase === "working" ? (
-          <SyncSpinner />
-        ) : (
-          <SyncIcon size={16} color={colors.primary} />
-        )}
-        <View style={styles.syncCopy}>
-          <Text style={styles.syncTitle}>{title}</Text>
-          <Text style={styles.syncSubtitle} numberOfLines={1}>
-            {subtitle}
-          </Text>
-        </View>
-        <ChevronRightIcon size={13} color={colors.textOnIcon} />
+        <Text style={styles.initials}>{initials}</Text>
       </Pressable>
     </View>
   );
 }
 
-const styles = StyleSheet.create({
-  header: {
-    paddingHorizontal: spacing.xl,
-    paddingTop: spacing.lg,
-    paddingBottom: 14,
-    gap: 13,
-  },
-  greetingRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: spacing.md,
-  },
-  orb: {
-    width: 46,
-    height: 46,
-    borderRadius: 23,
-    alignItems: "center",
-    justifyContent: "center",
-    // Jasny odpowiednik orba z desktopu (sekcja 6.1).
-    backgroundColor: "#D6EBE7",
-  },
-  greetingCopy: {
-    flex: 1,
-    minWidth: 0,
-  },
-  settingsButton: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    alignItems: "center",
-    justifyContent: "center",
-    backgroundColor: colors.surface,
-    borderWidth: 1,
-    borderColor: "rgba(35,43,39,0.07)",
-  },
-  greeting: {
-    ...typography.greeting,
-    color: colors.text,
-    letterSpacing: -0.25,
-  },
-  date: {
-    ...typography.meta,
-    color: "#6E7C77",
-    marginTop: 2,
-  },
-  syncPill: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: spacing.sm + 2,
-    paddingHorizontal: 14,
-    paddingVertical: 11,
-    borderRadius: 15,
-    backgroundColor: colors.surface,
-    borderWidth: 1,
-    borderColor: "rgba(35,43,39,0.07)",
-    shadowColor: "#232B27",
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
-    shadowOffset: { width: 0, height: 2 },
-    elevation: 2,
-  },
-  syncPillPressed: {
-    transform: [{ scale: 0.985 }],
-  },
-  syncCopy: {
-    flex: 1,
-    minWidth: 0,
-    gap: 2,
-  },
-  syncTitle: {
-    fontSize: 12.5,
-    fontWeight: "600",
-    color: colors.text,
-  },
-  syncSubtitle: {
-    ...typography.meta,
-    color: "#6E7C77",
-  },
-});
+const createStyles = (c: Palette) =>
+  StyleSheet.create({
+    header: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: spacing.md,
+      paddingTop: 6,
+      paddingHorizontal: spacing.xl,
+      paddingBottom: 14,
+    },
+    copy: {
+      flex: 1,
+      minWidth: 0,
+    },
+    eyebrow: {
+      ...fonts.eyebrow,
+      color: c.tx3,
+    },
+    title: {
+      ...fonts.screenTitle,
+      color: c.tx,
+      marginTop: 4,
+    },
+    avatar: {
+      width: 38,
+      height: 38,
+      borderRadius: 19,
+      alignItems: "center",
+      justifyContent: "center",
+      backgroundColor: c.card,
+      borderWidth: 1,
+      borderColor: c.line2,
+    },
+    pressed: {
+      opacity: 0.75,
+    },
+    initials: {
+      ...fonts.mono,
+      fontSize: 12,
+      color: c.tx2,
+    },
+  });

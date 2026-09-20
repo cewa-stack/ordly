@@ -6,9 +6,11 @@
 import * as React from "react";
 import { StyleSheet, View } from "react-native";
 
-import { colors } from "@/theme/colors";
+import type { Palette } from "@/theme/colors";
+import { useThemedStyles } from "@/theme/theme";
 
 export function GlowBackdrop() {
+  const styles = useThemedStyles(createStyles);
   return (
     <View style={styles.wrap} pointerEvents="none">
       <View style={[styles.ring, styles.ring1]} />
@@ -18,7 +20,8 @@ export function GlowBackdrop() {
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (c: Palette) =>
+  StyleSheet.create({
   wrap: {
     ...StyleSheet.absoluteFillObject,
     alignItems: "center",
@@ -28,7 +31,7 @@ const styles = StyleSheet.create({
     position: "absolute",
     top: -60,
     borderRadius: 999,
-    backgroundColor: colors.primary,
+    backgroundColor: c.acc,
   },
   ring1: { width: 260, height: 260, opacity: 0.05 },
   ring2: { width: 180, height: 180, top: -20, opacity: 0.07 },

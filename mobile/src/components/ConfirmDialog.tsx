@@ -11,8 +11,10 @@
 import * as React from "react";
 import { Modal, Pressable, StyleSheet, Text, View } from "react-native";
 
-import { colors } from "@/theme/colors";
-import { radii, spacing, typography } from "@/theme/typography";
+import { withAlpha } from "@/theme/colors";
+import type { Palette } from "@/theme/colors";
+import { useTheme, useThemedStyles } from "@/theme/theme";
+import { family, radii, spacing, typography } from "@/theme/typography";
 
 interface ConfirmDialogProps {
   visible: boolean;
@@ -36,6 +38,8 @@ export function ConfirmDialog({
   onConfirm,
   onCancel,
 }: ConfirmDialogProps) {
+  const styles = useThemedStyles(createStyles);
+  const { c } = useTheme();
   return (
     <Modal visible={visible} transparent animationType="fade" onRequestClose={onCancel}>
       <View style={styles.scrim}>
@@ -55,7 +59,7 @@ export function ConfirmDialog({
             <Text
               style={[
                 styles.confirmLabel,
-                { color: destructive ? colors.danger : colors.onPrimary },
+                { color: destructive ? c.coral : c.onAcc },
               ]}
             >
               {busy ? "Chwila…" : confirmLabel}
@@ -74,7 +78,8 @@ export function ConfirmDialog({
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (c: Palette) =>
+  StyleSheet.create({
   scrim: {
     flex: 1,
     backgroundColor: "rgba(0,0,0,0.6)",
@@ -85,9 +90,9 @@ const styles = StyleSheet.create({
   card: {
     width: "100%",
     maxWidth: 320,
-    backgroundColor: colors.surface,
+    backgroundColor: c.card,
     borderWidth: 1,
-    borderColor: colors.border,
+    borderColor: c.line,
     borderRadius: radii.sheet,
     padding: spacing.xl,
   },
@@ -95,11 +100,11 @@ const styles = StyleSheet.create({
     ...typography.title2,
     fontSize: 19,
     lineHeight: 25,
-    color: colors.text,
+    color: c.tx,
   },
   description: {
     ...typography.footnote,
-    color: colors.textSecondary,
+    color: c.tx2,
     marginTop: spacing.sm,
   },
   confirm: {
@@ -110,14 +115,14 @@ const styles = StyleSheet.create({
     marginTop: spacing.xl,
   },
   confirmPrimary: {
-    backgroundColor: colors.primary,
+    backgroundColor: c.acc,
   },
   confirmDestructive: {
-    backgroundColor: colors.dangerTint,
+    backgroundColor: withAlpha(c.coral, 0.14),
   },
   confirmLabel: {
     fontSize: 15,
-    fontWeight: "600",
+    fontFamily: family.sansSemibold,
   },
   cancel: {
     height: 44,
@@ -127,8 +132,8 @@ const styles = StyleSheet.create({
   },
   cancelLabel: {
     fontSize: 15,
-    fontWeight: "500",
-    color: colors.textSecondary,
+    fontFamily: family.sansMedium,
+    color: c.tx2,
   },
   pressed: {
     opacity: 0.8,

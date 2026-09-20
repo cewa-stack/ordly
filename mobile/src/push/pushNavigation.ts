@@ -13,14 +13,22 @@
  */
 import { Platform } from "react-native";
 
-import type { RootStackParamList } from "@/navigation/types";
+import type { MainTabParamList, RootStackParamList } from "@/navigation/types";
 
 export type PushTarget =
   | { screen: "OrderDetail"; params: RootStackParamList["OrderDetail"] }
   | { screen: "IssueDetail"; params: RootStackParamList["IssueDetail"] }
   | { screen: "MailDetail"; params: RootStackParamList["MailDetail"] }
   | { screen: "Settings"; params: undefined }
-  | { screen: "MainTab"; params: { tab: "Orders" | "Stock" | "Discussions" | "Mailbox" | "Returns" } };
+  /**
+   * Dyskusje i Zwroty NIE sa juz zakladkami (sekcja 11) - sa ekranami
+   * stosu glownego. Powiadomienie o nich musi trafic tam, a nie w
+   * nieistniejaca zakladke, inaczej klikniecie w push konczy sie na
+   * Starcie.
+   */
+  | { screen: "Discussions"; params: undefined }
+  | { screen: "Returns"; params: undefined }
+  | { screen: "MainTab"; params: { tab: keyof MainTabParamList } };
 
 /**
  * Zamienia ścieżkę z powiadomienia na cel nawigacji.
@@ -54,7 +62,7 @@ export function resolvePushTarget(url: string): PushTarget | null {
   if (head === "issues") {
     return id
       ? { screen: "IssueDetail", params: { issueId: id } }
-      : { screen: "MainTab", params: { tab: "Discussions" } };
+      : { screen: "Discussions", params: undefined };
   }
   if (head === "mailbox") {
     return id
@@ -64,7 +72,7 @@ export function resolvePushTarget(url: string): PushTarget | null {
   if (head === "returns") {
     // Zwroty są wyłącznie listą - koncepcja mobilna nie ma ekranu
     // szczegółów zwrotu, bo decyzję i tak podejmuje się na desktopie.
-    return { screen: "MainTab", params: { tab: "Returns" } };
+    return { screen: "Returns", params: undefined };
   }
   if (head === "settings") {
     return { screen: "Settings", params: undefined };

@@ -9,7 +9,8 @@ import { useNavigation } from "@react-navigation/native";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { useQueryClient } from "@tanstack/react-query";
 
-import { colors } from "@/theme/colors";
+import type { Palette } from "@/theme/colors";
+import { useTheme, useThemedStyles } from "@/theme/theme";
 import { radii, spacing, typography } from "@/theme/typography";
 import { useIssues } from "@/api/hooks";
 import { IssueRow } from "@/components/IssueRow";
@@ -22,6 +23,8 @@ import type { Issue } from "@/api/types";
 import type { RootStackParamList } from "@/navigation/types";
 
 export function DiscussionsScreen() {
+  const styles = useThemedStyles(createStyles);
+  const { c } = useTheme();
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const issues = useIssues();
   const queryClient = useQueryClient();
@@ -60,7 +63,7 @@ export function DiscussionsScreen() {
             <RefreshControl
               refreshing={issues.isRefetching}
               onRefresh={onRefresh}
-              tintColor={colors.primary}
+              tintColor={c.acc}
             />
           }
           ListFooterComponent={
@@ -70,7 +73,7 @@ export function DiscussionsScreen() {
           }
           ListEmptyComponent={
             <EmptyState
-              mascotPose="happy"
+              mascotPose="sleep"
               title="Brak otwartych spraw"
               description="Zero dyskusji i reklamacji do obsłużenia — spokojnie."
             />
@@ -81,10 +84,11 @@ export function DiscussionsScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (c: Palette) =>
+  StyleSheet.create({
   screen: {
     flex: 1,
-    backgroundColor: colors.background,
+    backgroundColor: c.bg,
   },
   header: {
     paddingHorizontal: spacing.xl,
@@ -93,7 +97,7 @@ const styles = StyleSheet.create({
   },
   title: {
     ...typography.title1,
-    color: colors.text,
+    color: c.tx,
   },
   listPadding: {
     paddingHorizontal: spacing.xl,

@@ -8,8 +8,10 @@ import * as React from "react";
 import { Animated, Easing, ScrollView, StyleSheet, Text, View } from "react-native";
 import { useRoute, type RouteProp } from "@react-navigation/native";
 
-import { colors, orderStatusColor } from "@/theme/colors";
-import { radii, spacing, typography } from "@/theme/typography";
+import { ORDER_TONE, toneStyle, withAlpha } from "@/theme/colors";
+import type { Palette } from "@/theme/colors";
+import { useTheme, useThemedStyles } from "@/theme/theme";
+import { family, radii, spacing, typography } from "@/theme/typography";
 import { useOrder, useOrderTracking } from "@/api/hooks";
 import { ApiError } from "@/api/client";
 import { ErrorState } from "@/components/ErrorState";
@@ -26,6 +28,7 @@ const TIMELINE_STAGES = ["Nowe", "Pakowanie", "Wysłane"] as const;
 /** Pulsujący pierścień wokół bieżącego etapu - jedyny "żywy" akcent na
  *  ekranie poza maskotką (której tu celowo nie ma, §15.16). */
 function PulsingRing() {
+  const styles = useThemedStyles(createStyles);
   const scale = React.useRef(new Animated.Value(0.7)).current;
   const opacity = React.useRef(new Animated.Value(0.5)).current;
 
@@ -83,6 +86,8 @@ function stageIndex(status: string | null): number {
 }
 
 function StatusTimeline({ status }: { status: string | null }) {
+  const styles = useThemedStyles(createStyles);
+  const { c } = useTheme();
   const currentIndex = stageIndex(status);
   if (currentIndex < 0) {
     return null;
@@ -103,7 +108,7 @@ function StatusTimeline({ status }: { status: string | null }) {
                 ]}
               >
                 {current ? <PulsingRing /> : null}
-                {done ? <CheckIcon size={12} color={colors.onPrimary} /> : null}
+                {done ? <CheckIcon size={12} color={c.onAcc} /> : null}
                 {current ? <View style={styles.timelineNodeDot} /> : null}
               </View>
               {index < TIMELINE_STAGES.length - 1 ? (
@@ -128,6 +133,8 @@ function StatusTimeline({ status }: { status: string | null }) {
 }
 
 export function OrderDetailScreen() {
+  const styles = useThemedStyles(createStyles);
+  const { c } = useTheme();
   const route = useRoute<RouteProp<RootStackParamList, "OrderDetail">>();
   const { externalId } = route.params;
   const order = useOrder(externalId);
@@ -151,7 +158,7 @@ export function OrderDetailScreen() {
 
   const data = order.data;
   const label = displayFulfillmentLabel(data);
-  const statusColor = orderStatusColor[label] ?? colors.textSecondary;
+  const statusColor = toneStyle(ORDER_TONE[label] ?? "mute", c).text;
   const productsTotal = data.products.reduce(
     (sum: number, product: OrderProduct) => sum + Number(product.total_price || 0),
     0
@@ -246,7 +253,7 @@ export function OrderDetailScreen() {
         ) : (
           <PrimaryButton
             label="Sprawdź status przesyłki"
-            icon={<TruckIcon size={16} color={colors.onPrimary} />}
+            icon={<TruckIcon size={16} color={c.onAcc} />}
             onPress={() => tracking.mutate(data.external_id)}
             loading={tracking.isPending}
           />
@@ -256,26 +263,27 @@ export function OrderDetailScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (c: Palette) =>
+  StyleSheet.create({
   screen: {
     flex: 1,
-    backgroundColor: colors.background,
+    backgroundColor: c.bg,
   },
   content: {
     padding: spacing.xl,
     paddingBottom: 60,
   },
   heroCard: {
-    backgroundColor: colors.surface,
+    backgroundColor: c.card,
     borderWidth: 1,
-    borderColor: colors.border,
+    borderColor: c.line,
     borderRadius: radii.xl,
     padding: spacing.lg,
   },
   card: {
-    backgroundColor: colors.surface,
+    backgroundColor: c.card,
     borderWidth: 1,
-    borderColor: colors.border,
+    borderColor: c.line,
     borderRadius: radii.lg,
     padding: spacing.lg,
   },
@@ -287,25 +295,25 @@ const styles = StyleSheet.create({
   },
   orderId: {
     ...typography.mono,
-    color: colors.textSecondary,
+    color: c.tx2,
     flexShrink: 1,
   },
   amount: {
     ...typography.display,
     fontSize: 30,
     lineHeight: 36,
-    color: colors.text,
+    color: c.tx,
     marginTop: spacing.sm,
   },
   cancelledNote: {
-    backgroundColor: colors.dangerTint,
+    backgroundColor: withAlpha(c.coral, 0.14),
     borderRadius: radii.sm,
     padding: spacing.md,
     marginTop: spacing.lg,
   },
   cancelledNoteText: {
     ...typography.footnote,
-    color: colors.danger,
+    color: c.coral,
   },
   timeline: {
     marginTop: spacing.lg,
@@ -324,22 +332,22 @@ const styles = StyleSheet.create({
     height: 24,
     borderRadius: radii.full,
     borderWidth: 2,
-    borderColor: colors.border,
+    borderColor: c.line,
     alignItems: "center",
     justifyContent: "center",
   },
   timelineNodeDone: {
-    backgroundColor: colors.primary,
-    borderColor: colors.primary,
+    backgroundColor: c.acc,
+    borderColor: c.acc,
   },
   timelineNodeCurrent: {
-    borderColor: colors.primary,
+    borderColor: c.acc,
   },
   timelineNodeDot: {
     width: 8,
     height: 8,
     borderRadius: radii.full,
-    backgroundColor: colors.primary,
+    backgroundColor: c.acc,
   },
   pulsingRing: {
     position: "absolute",
@@ -347,37 +355,37 @@ const styles = StyleSheet.create({
     height: 24,
     borderRadius: radii.full,
     borderWidth: 2,
-    borderColor: colors.primary,
+    borderColor: c.acc,
   },
   timelineLine: {
     width: 2,
     height: 20,
-    backgroundColor: colors.border,
+    backgroundColor: c.line,
     marginVertical: 2,
   },
   timelineLineDone: {
-    backgroundColor: colors.primary,
+    backgroundColor: c.acc,
   },
   timelineLabel: {
     ...typography.footnote,
-    color: colors.textDim,
+    color: c.tx3,
     paddingTop: 3,
   },
   timelineLabelActive: {
-    color: colors.text,
-    fontWeight: "600",
+    color: c.tx,
+    fontFamily: family.sansSemibold,
   },
   metaBlock: {
     marginTop: spacing.lg,
     borderTopWidth: 1,
-    borderTopColor: colors.border,
+    borderTopColor: c.line,
   },
   metaRow: {
     flexDirection: "row",
     justifyContent: "space-between",
     paddingVertical: spacing.sm,
     borderBottomWidth: 1,
-    borderBottomColor: colors.border,
+    borderBottomColor: c.line,
   },
   metaRowLast: {
     borderBottomWidth: 0,
@@ -385,16 +393,16 @@ const styles = StyleSheet.create({
   },
   metaLabel: {
     ...typography.footnote,
-    color: colors.textSecondary,
+    color: c.tx2,
   },
   metaValue: {
     ...typography.footnote,
-    fontWeight: "600",
-    color: colors.text,
+    fontFamily: family.sansSemibold,
+    color: c.tx,
   },
   sectionTitle: {
     ...typography.sectionTitle,
-    color: colors.text,
+    color: c.tx,
     marginTop: spacing.xl,
     marginBottom: spacing.md,
   },
@@ -405,7 +413,7 @@ const styles = StyleSheet.create({
     gap: spacing.md,
     paddingVertical: spacing.md,
     borderTopWidth: 1,
-    borderTopColor: colors.border,
+    borderTopColor: c.line,
   },
   productRowFirst: {
     borderTopWidth: 0,
@@ -417,51 +425,51 @@ const styles = StyleSheet.create({
   },
   productName: {
     ...typography.callout,
-    fontWeight: "500",
-    color: colors.text,
+    fontFamily: family.sansMedium,
+    color: c.tx,
   },
   productMeta: {
     ...typography.footnote,
-    color: colors.textSecondary,
+    color: c.tx2,
     marginTop: 2,
   },
   productTotal: {
     ...typography.mono,
     fontSize: 15,
-    color: colors.text,
+    color: c.tx,
   },
   totalRow: {
     flexDirection: "row",
     justifyContent: "space-between",
     paddingTop: spacing.md,
     borderTopWidth: 1,
-    borderTopColor: colors.border,
+    borderTopColor: c.line,
   },
   totalLabel: {
     ...typography.calloutSemibold,
-    color: colors.text,
+    color: c.tx,
   },
   totalValue: {
     ...typography.rowAmount,
-    color: colors.text,
+    color: c.tx,
   },
   trackingStatus: {
     ...typography.calloutSemibold,
-    color: colors.text,
+    color: c.tx,
   },
   trackingMeta: {
     ...typography.footnote,
-    color: colors.textSecondary,
+    color: c.tx2,
     marginTop: 4,
   },
   trackingNumber: {
     ...typography.mono,
-    color: colors.textSecondary,
+    color: c.tx2,
     marginTop: 2,
   },
   trackingError: {
     ...typography.footnote,
-    color: colors.danger,
+    color: c.coral,
     marginBottom: spacing.md,
   },
 });

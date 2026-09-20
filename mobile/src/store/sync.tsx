@@ -16,7 +16,6 @@ import * as React from "react";
 import { useQueryClient } from "@tanstack/react-query";
 
 import { useTriggerSync } from "@/api/hooks";
-import type { MascotPose } from "@/components/Mascot";
 
 /** Czasy 1:1 z tabelą w sekcji 2.6 specyfikacji. */
 const WORK_PHASE_MIN_MS = 1700;
@@ -26,7 +25,6 @@ export type SyncPhase = "idle" | "working" | "success";
 
 interface SyncContextValue {
   phase: SyncPhase;
-  pose: MascotPose;
   title: string;
   subtitle: string;
   /** Czy treść zakładki ma pokazać skeleton zamiast listy (sekcja 6.3 pkt 3). */
@@ -115,8 +113,6 @@ export function SyncProvider({ children }: { children: React.ReactNode }) {
   }, [queryClient, triggerSync]);
 
   const value = React.useMemo<SyncContextValue>(() => {
-    const pose: MascotPose =
-      phase === "working" ? "thinking" : phase === "success" ? "happy" : "default";
     const title =
       phase === "working"
         ? "Synchronizuję…"
@@ -133,7 +129,7 @@ export function SyncProvider({ children }: { children: React.ReactNode }) {
           ? successSubtitle
           : humanizeSince(lastSyncAt);
 
-    return { phase, pose, title, subtitle, isBusy: phase === "working", sync };
+    return { phase, title, subtitle, isBusy: phase === "working", sync };
   }, [phase, successSubtitle, lastSyncAt, sync]);
 
   return <SyncContext.Provider value={value}>{children}</SyncContext.Provider>;

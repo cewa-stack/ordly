@@ -20,6 +20,12 @@
  * - `img{max-width:100%}` powstrzymuje szerokie obrazki przed
  *   rozpychaniem ramki w poziomie na wąskim ekranie telefonu.
  *
+ * Ramka jest BIAŁA w obu atmosferach - i tak ma zostać. HTML maila jest
+ * pisany pod białe tło (ciemny tekst, logotypy na bieli), więc podłożenie
+ * pod niego nocnego tła dałoby czarny tekst na prawie czarnym. Kolor
+ * tekstu odpowiada `day.tx` z palety, żeby ramka nie miała własnego
+ * odcienia spoza systemu.
+ *
  * Kolejność ma znaczenie: `<meta>` z CSP musi stać przed czymkolwiek, co
  * mogłaby ograniczyć, więc wstrzykujemy to zaraz za otwarciem `<head>`.
  */
@@ -31,7 +37,7 @@ const INJECTED_HEAD =
   '<base target="_blank">' +
   "<style>html{background:#fff}body{margin:0;padding:14px;" +
   "font-family:-apple-system,BlinkMacSystemFont,Arial,sans-serif;font-size:14px;" +
-  "line-height:1.5;color:#232B27;word-wrap:break-word}" +
+  "line-height:1.5;color:#0F1A17;word-wrap:break-word}" +
   "img{max-width:100%;height:auto}table{max-width:100%}</style>";
 
 const HEAD_OPEN = /<head\b[^>]*>/i;

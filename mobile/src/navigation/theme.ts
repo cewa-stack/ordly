@@ -1,24 +1,27 @@
 /**
- * Motyw React Navigation.
+ * Motyw React Navigation - budowany z AKTYWNEJ atmosfery (sekcja 11).
  *
- * Bazą jest `DefaultTheme` (jasny), bo mobile jest jasny celowo -
- * sekcja 2.2 specyfikacji. Wcześniej stał tu `DarkTheme`; zostawienie
- * go po zmianie palety dawałoby ciemne błyski przy przejściach między
- * ekranami, mimo że same ekrany są jasne.
+ * Wczesniej byla tu jedna stala. Przy dwoch atmosferach to za malo:
+ * tlo nawigatora zostawaloby jasne po zapadnieciu nocy i kazde przejscie
+ * miedzy ekranami dawaloby biale mrugniecie pod ciemnym ekranem.
  */
-import { DefaultTheme, type Theme } from "@react-navigation/native";
+import { DarkTheme, DefaultTheme, type Theme } from "@react-navigation/native";
 
-import { colors } from "@/theme/colors";
+import type { Palette } from "@/theme/colors";
+import type { ThemeMode } from "@/theme/theme";
 
-export const navigationTheme: Theme = {
-  ...DefaultTheme,
-  colors: {
-    ...DefaultTheme.colors,
-    background: colors.background,
-    card: colors.surface,
-    text: colors.text,
-    border: colors.border,
-    primary: colors.primary,
-    notification: colors.danger,
-  },
-};
+export function navigationThemeFor(c: Palette, mode: ThemeMode): Theme {
+  const base = mode === "day" ? DefaultTheme : DarkTheme;
+  return {
+    ...base,
+    colors: {
+      ...base.colors,
+      background: c.bg,
+      card: c.card,
+      text: c.tx,
+      border: c.line,
+      primary: c.acc,
+      notification: c.coral,
+    },
+  };
+}

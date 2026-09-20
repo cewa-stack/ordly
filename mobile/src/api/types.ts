@@ -180,3 +180,40 @@ export interface MailBody {
   html_body: string | null;
   plain_body: string | null;
 }
+
+/**
+ * Asystent Ordlak. Kształt 1:1 z `app/api/schemas.py` na Pi -
+ * `POST /api/v1/ordlak/chat` istnieje od czasu desktopu, więc telefon
+ * nie potrzebuje nowego endpointu, tylko go woła.
+ */
+export interface OrdlakStatus {
+  configured: boolean;
+  model: string;
+}
+
+export interface OrdlakChatReply {
+  conversation_id: number;
+  reply: string;
+  /** Narzędzia, z których model odczytał dane - pokazywane pod odpowiedzią. */
+  used_tools: string[];
+}
+
+export interface OrdlakStoredMessage {
+  role: "user" | "assistant";
+  content: string;
+  created_at: string;
+  used_tools: string[];
+}
+
+/**
+ * Wątek rozmowy. Na LIŚCIE `messages` jest puste - pełną historię oddaje
+ * dopiero pobranie pojedynczego wątku.
+ */
+export interface OrdlakConversation {
+  id: number;
+  title: string;
+  created_at: string;
+  updated_at: string;
+  message_count: number;
+  messages: OrdlakStoredMessage[];
+}

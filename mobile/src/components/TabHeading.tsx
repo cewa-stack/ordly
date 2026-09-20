@@ -1,50 +1,53 @@
 /**
- * Nagłówek zakładki wg sekcji 6.2 specyfikacji: tytuł po lewej,
- * licznik po prawej (`.ph` w koncepcji).
+ * Nagłówek ekranu (sekcja 11 instrukcji "Nokturn").
  *
- * Zastępuje dawne "large title" z osobnym przyciskiem synchronizacji -
- * synchronizacja przeniosła się do wspólnego nagłówka aplikacji, bo
- * sekcja 6.1 mówi wprost, że to JEDYNE działanie w całej aplikacji
- * mobilnej i ma być jedno, nie pięć kopii na pięciu ekranach.
+ * Nazwa została z poprzedniej wersji, bo wołają go wszystkie zakładki -
+ * ale to już nie jest sam wiersz "tytuł + licznik". Renderuje pełen
+ * nagłówek z sekcji 11: nadtytuł wersalikami, tytuł Bricolage 24 px
+ * i awatar prowadzący do Ustawień.
+ *
+ * Nagłówek należy teraz do EKRANU, nie do szkieletu aplikacji. Wcześniej
+ * stał raz, nad nawigatorem zakładek, i mówił na każdym ekranie to samo
+ * ("Cześć, lukas") - a sekcja 11 chce, żeby niósł, GDZIE jesteś.
  */
 import * as React from "react";
-import { StyleSheet, Text, View } from "react-native";
 
-import { colors } from "@/theme/colors";
-import { spacing, typography } from "@/theme/typography";
+import { AppHeader } from "./AppHeader";
+import { useAuth } from "@/store/auth";
+
+const DATE_FORMATTER = new Intl.DateTimeFormat("pl-PL", {
+  weekday: "long",
+  day: "numeric",
+  month: "long",
+});
+
+/** Inicjały z loginu - maksymalnie dwa znaki, zawsze wersalikami. */
+export function initialsOf(username: string | null | undefined): string {
+  if (!username) return "?";
+  const parts = username.split(/[\s._-]+/).filter(Boolean);
+  const letters = parts.slice(0, 2).map((part) => part[0]?.toUpperCase() ?? "");
+  return letters.join("") || username.slice(0, 2).toUpperCase();
+}
 
 interface TabHeadingProps {
   title: string;
-  /** Krótka informacja o zawartości, np. "12 pozycji" albo "3 czekają". */
+  /**
+   * Nadtytuł. Krótka informacja o zawartości, np. "12 na liście".
+   * Pominięty = dzisiejsza data, żeby wiersz nigdy nie był pusty.
+   */
   count?: string;
+  /** Słowo z tytułu, które świeci akcentem (musi być jego fragmentem). */
+  accent?: string;
 }
 
-export function TabHeading({ title, count }: TabHeadingProps) {
+export function TabHeading({ title, count, accent }: TabHeadingProps) {
+  const { username } = useAuth();
   return (
-    <View style={styles.row}>
-      <Text style={styles.title}>{title}</Text>
-      {count ? <Text style={styles.count}>{count}</Text> : null}
-    </View>
+    <AppHeader
+      eyebrow={count ?? DATE_FORMATTER.format(new Date())}
+      title={title}
+      accent={accent}
+      initials={initialsOf(username)}
+    />
   );
 }
-
-const styles = StyleSheet.create({
-  row: {
-    flexDirection: "row",
-    alignItems: "baseline",
-    justifyContent: "space-between",
-    paddingHorizontal: spacing.lg + 6,
-    paddingTop: 6,
-    paddingBottom: 11,
-  },
-  title: {
-    ...typography.tabHeading,
-    color: colors.text,
-    letterSpacing: -0.23,
-  },
-  count: {
-    ...typography.meta,
-    fontSize: 10.5,
-    color: "#6E7C77",
-  },
-});

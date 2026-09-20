@@ -1,33 +1,31 @@
 /**
- * Szkielet aplikacji mobilnej wg sekcji 6.1 specyfikacji:
+ * Szkielet aplikacji mobilnej (sekcja 11 instrukcji "Nokturn"):
  *
  *   pasek stanu systemu
- *   powitanie + Ordi (46 px)
- *   pigułka synchronizacji     <- jedyne działanie w aplikacji
  *   -------------------------
- *   zawartość zakładki
+ *   zawartość zakładki (własny nagłówek + treść)
  *   -------------------------
- *   pasek zakładek (pływający)
+ *   pasek zakładek (88 px, z gałką Ordlaka)
  *
- * Nagłówek stoi NAD nawigatorem zakładek, nie w środku - dzięki temu nie
- * przewija się razem z listą i nie trzeba go powtarzać w każdym z pięciu
- * ekranów.
+ * ZMIANA WOBEC POPRZEDNIEJ WERSJI: wspólny nagłówek zniknął ze szkieletu.
+ * Każdy ekran ma teraz własny (przez `TabHeading`), bo sekcja 11 chce,
+ * żeby nagłówek niósł, GDZIE jesteś - a jeden wspólny mówił na wszystkich
+ * pięciu zakładkach to samo.
+ *
+ * Dolna krawędź NIE jest w `edges`: pasek zakładek sam dolicza margines
+ * bezpieczny, więc podwójne liczenie podniosłoby go nad gest home bara.
  */
 import * as React from "react";
 import { StyleSheet, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
-import { colors } from "@/theme/colors";
-import { AppHeader } from "@/components/AppHeader";
-import { useAuth } from "@/store/auth";
+import { useTheme } from "@/theme/theme";
 import { MainTabs } from "./MainTabs";
 
 export function MainShell() {
-  const { username } = useAuth();
-
+  const { c } = useTheme();
   return (
-    <SafeAreaView style={styles.root} edges={["top"]}>
-      <AppHeader username={username ?? "sprzedawco"} />
+    <SafeAreaView style={[styles.root, { backgroundColor: c.bg }]} edges={["top"]}>
       <View style={styles.content}>
         <MainTabs />
       </View>
@@ -38,7 +36,6 @@ export function MainShell() {
 const styles = StyleSheet.create({
   root: {
     flex: 1,
-    backgroundColor: colors.background,
   },
   content: {
     flex: 1,
