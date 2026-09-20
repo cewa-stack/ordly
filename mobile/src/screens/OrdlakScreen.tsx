@@ -194,8 +194,19 @@ export function OrdlakScreen() {
   const thread = useOrdlakConversation(conversationId);
   const ask = useAskOrdlak();
 
+  /**
+   * Kopia lokalna tej rozmowy. Odpowiedz przychodzi z `POST /ordlak/chat`,
+   * ale historie rysuje `GET /ordlak/conversations/{id}` - gdyby ekran
+   * czekal wylacznie na to drugie zapytanie, to przy wolnym laczu albo
+   * jego bledzie pytanie i odpowiedz znikalyby z ekranu zaraz po
+   * wyslaniu. Kopia lokalna trzyma je do czasu, az watek wroci z Pi.
+   */
+  const [localTurns, setLocalTurns] = React.useState<OrdlakStoredMessage[]>([]);
+
   const configured = status.data?.configured ?? true;
-  const messages: OrdlakStoredMessage[] = thread.data?.messages ?? [];
+  const serverMessages: OrdlakStoredMessage[] = thread.data?.messages ?? [];
+  // Wersja z Pi jest nadrzedna - ma pelna historie, nie tylko biezaca turę.
+  const messages = serverMessages.length > 0 ? serverMessages : localTurns;
 
   const speech = useSpeechInput(React.useCallback((text: string) => setDraft(text), []));
 
@@ -208,10 +219,23 @@ export function OrdlakScreen() {
     if (!question || ask.isPending || !configured) return;
     setDraft("");
     setPendingQuestion(question);
+    const askedAt = new Date().toISOString();
     ask.mutate(
       { message: question, conversationId },
       {
-        onSuccess: (reply) => setConversationId(reply.conversation_id),
+        onSuccess: (reply) => {
+          setConversationId(reply.conversation_id);
+          setLocalTurns((prev) => [
+            ...prev,
+            { role: "user", content: question, created_at: askedAt, used_tools: [] },
+            {
+              role: "assistant",
+              content: reply.reply,
+              created_at: new Date().toISOString(),
+              used_tools: reply.used_tools ?? [],
+            },
+          ]);
+        },
         onSettled: () => setPendingQuestion(null),
       }
     );
@@ -291,9 +315,15 @@ export function OrdlakScreen() {
       </View>
 
       {/* ------------------------------------------------ podpowiedzi */}
+      {/*
+        `flexGrow: 0` jest OBOWIAZKOWE. Pozioma lista w kolumnie flex
+        zabiera cala wolna wysokosc, a chipy rozciagaja sie wtedy na pol
+        ekranu - pastylka 30 px robi sie slupem.
+      */}
       <ScrollView
         horizontal
         showsHorizontalScrollIndicator={false}
+        style={styles.suggestionsBar}
         contentContainerStyle={styles.suggestions}
         keyboardShouldPersistTaps="handled"
       >
@@ -515,8 +545,13 @@ const createStyles = (c: Palette) =>
       color: c.tx2,
     },
 
+    suggestionsBar: {
+      flexGrow: 0,
+      flexShrink: 0,
+    },
     suggestions: {
       gap: spacing.sm,
+      alignItems: "center",
       paddingHorizontal: spacing.xl,
       paddingBottom: 10,
     },

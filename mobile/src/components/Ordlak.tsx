@@ -44,8 +44,6 @@ const ORIGIN_ANT = { x: 60 + SHIFT_X, y: 46 + SHIFT_Y };
 const FIGURE_W = 92.81;
 const FIGURE_H = 97;
 
-const AnimatedCircle = Animated.createAnimatedComponent(Circle);
-
 interface OrdlakProps {
   state?: OrdlakState;
   size?: number;
@@ -370,22 +368,32 @@ export function Ordlak({ state = "idle", size = 40, style }: OrdlakProps) {
           <Svg width={size} height={size} viewBox={`0 0 ${VIEW} ${VIEW}`}>
             <G translateX={SHIFT_X} translateY={SHIFT_Y}>
               <Line x1="60" y1="46" x2="60" y2="27" stroke={skinDark} strokeWidth={3.4} strokeLinecap="round" />
-              <AnimatedCircle
-                cx="60"
-                cy="22"
-                r="6"
-                fill={skin}
-                opacity={
-                  state === "sync"
-                    ? (breathe.interpolate({
-                        inputRange: [0, 0.5, 1],
-                        outputRange: [0.35, 1, 0.35],
-                      }) as never)
-                    : 1
-                }
-              />
             </G>
           </Svg>
+          {/*
+            Zarowka anteny ma WLASNA warstwe, a nie animowany atrybut
+            `opacity` na <Circle>. Wartosc z petli jest sterowana
+            natywnie (`useNativeDriver`), a podpiecie takiej wartosci pod
+            zwykly prop react-native-svg wywala sie w czasie dzialania
+            ("Attempting to run JS driven animation on animated node that
+            has been moved to native"). Krycie warstwy jest natywne i
+            bezpieczne.
+          */}
+          <Layer
+            size={size}
+            style={
+              state === "sync"
+                ? {
+                    opacity: breathe.interpolate({
+                      inputRange: [0, 0.5, 1],
+                      outputRange: [0.35, 1, 0.35],
+                    }),
+                  }
+                : undefined
+            }
+          >
+            <Circle cx="60" cy="22" r="6" fill={skin} />
+          </Layer>
         </Animated.View>
 
         {/* oczy */}

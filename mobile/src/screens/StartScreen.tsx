@@ -199,7 +199,7 @@ export function StartScreen() {
             />
             <Tile
               label="Wartość dziś"
-              value={formatMoney(dashboard.data?.revenue_today ?? 0).replace(" zł", "")}
+              value={formatMoney(dashboard.data?.revenue_today ?? 0, "PLN", { round: true }).replace(" zł", "")}
               unit="zł"
               tint="acc"
               delta={`${todayCount} ${todayCount === 1 ? "zamówienie" : "zamówień"}`}

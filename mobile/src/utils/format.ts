@@ -7,11 +7,15 @@
  * język bankowy, a apkę czyta się w magazynie. Kody inne niż PLN
  * zostają jako kod, bo nie mamy dla nich uzgodnionego symbolu.
  */
-export function formatMoney(value: number | string, currency = "PLN"): string {
+export function formatMoney(
+  value: number | string,
+  currency = "PLN",
+  { round = false } = {}
+): string {
   const numeric = typeof value === "string" ? Number(value) : value;
   const formatted = numeric.toLocaleString("pl-PL", {
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
+    minimumFractionDigits: round ? 0 : 2,
+    maximumFractionDigits: round ? 0 : 2,
   });
   const suffix = currency.toUpperCase() === "PLN" ? "zł" : currency;
   return `${formatted} ${suffix}`;

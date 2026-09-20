@@ -359,7 +359,7 @@ export function ShellLayout() {
           onSelect={setView}
           counts={counts}
           hostname={session ? hostnameOf(session.baseUrl) : ""}
-          version="v2"
+          version={`v${__APP_VERSION__}`}
         />
 
         <main className="flex min-w-0 flex-1 flex-col bg-base">
