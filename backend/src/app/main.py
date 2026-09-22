@@ -71,6 +71,7 @@ from app.scheduler.scheduler_setup import (
     register_backup_job,
     register_check_waybills_job,
     register_mail_sync_job,
+    register_morning_brief_job,
     register_shipping_reminder_job,
     register_sync_orders_job,
     register_telegram_cleanup_job,
@@ -199,6 +200,16 @@ async def _run_application() -> None:
             notifier=container.notifier(),
         )
 
+    async def scheduled_morning_brief_job() -> None:
+        """Wrapper porannego raportu push (9:00) - tylko telefon."""
+        notifier = container.web_push_notifier()
+        if notifier is None:
+            return  # Web Push nie jest skonfigurowany (brak kluczy VAPID)
+        try:
+            await notifier.send_morning_brief()
+        except Exception:  # noqa: BLE001 - job nie może wywrócić schedulera
+            logger.exception("Poranny raport push nie wyszedł")
+
     async def scheduled_telegram_cleanup_job() -> None:
         """Wrapper nocnego czyszczenia czatu Telegram (02:00)."""
         await run_telegram_cleanup_job(
@@ -235,6 +246,7 @@ async def _run_application() -> None:
     )
     register_backup_job(scheduler, scheduled_backup_job)
     register_shipping_reminder_job(scheduler, scheduled_shipping_reminder_job)
+    register_morning_brief_job(scheduler, scheduled_morning_brief_job)
     register_telegram_cleanup_job(scheduler, scheduled_telegram_cleanup_job)
     register_mail_sync_job(scheduler, scheduled_mail_sync_job)
 

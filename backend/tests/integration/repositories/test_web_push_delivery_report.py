@@ -90,7 +90,7 @@ class TestSendTest:
 
         monkeypatch.setattr(notifier_module, "webpush", fake_webpush)
 
-        report = await _notifier(session_scope).send_test("Test")
+        report = await _notifier(session_scope).send_test()
 
         assert report.subscriptions == 2
         assert report.delivered == 1
@@ -111,7 +111,7 @@ class TestSendTest:
 
         monkeypatch.setattr(notifier_module, "webpush", fake_webpush)
 
-        report = await _notifier(session_scope).send_test("Test")
+        report = await _notifier(session_scope).send_test()
 
         assert (report.delivered, report.expired, report.failed) == (0, 0, 1)
         async with session_scope() as session:
@@ -119,7 +119,7 @@ class TestSendTest:
         assert len(remaining) == 1
 
     async def test_brak_subskrypcji_daje_pusty_raport(self, session_scope: SessionScope):
-        report = await _notifier(session_scope).send_test("Test")
+        report = await _notifier(session_scope).send_test()
 
         assert report.subscriptions == 0
         assert report.delivered == 0
@@ -135,7 +135,7 @@ class TestSendTest:
         )
         monkeypatch.setattr(notifier_module, "local_now", lambda: datetime(2026, 9, 13, 23, 30))
 
-        await _notifier(session_scope).send_test("Test")
+        await _notifier(session_scope).send_test()
 
         assert sent[0]["silent"] is False
 

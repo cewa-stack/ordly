@@ -89,7 +89,7 @@ async def send_test_push(
             detail="Web Push nie jest skonfigurowany na backendzie (brak kluczy VAPID w .env).",
         )
 
-    report = await notifier.send_test("To jest testowe powiadomienie z ORDLY.")
+    report = await notifier.send_test()
     if report.subscriptions == 0:
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,

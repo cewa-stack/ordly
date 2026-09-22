@@ -102,7 +102,10 @@ class TestPushNigdyNieDostajeHtml:
                 buyer_login="a", reason="niezgodny z opisem", respond_by=None, issue_id="i"
             ),
             push_payload.new_return(external_id="r", products_summary="A", reason="b"),
-            push_payload.pending_packing(count=3, oldest_since="wczoraj"),
+            push_payload.morning_brief(
+                pending_count=3, oldest_local=None, now_local=datetime(2026, 9, 22, 9, 0)
+            ),
+            push_payload.test_notification(),
             push_payload.sync_failed(channel="allegro", retry_in_minutes=5),
             push_payload.wholesaler_confirmed(wholesaler_name="Pako", items_summary="A"),
             push_payload.allegro_lokalnie_event(

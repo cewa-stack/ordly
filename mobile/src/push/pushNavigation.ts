@@ -48,6 +48,11 @@ export function resolvePushTarget(url: string): PushTarget | null {
 
   const [head, id] = segments;
 
+  if (head === "start") {
+    // Poranny raport: mówi o paczkach, dyskusjach i zwrotach naraz, więc
+    // prowadzi tam, gdzie widać te same trzy liczby - na ekran Start.
+    return { screen: "MainTab", params: { tab: "Home" } };
+  }
   if (head === "orders") {
     return id
       ? { screen: "OrderDetail", params: { externalId: id } }

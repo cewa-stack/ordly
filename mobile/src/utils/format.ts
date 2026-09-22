@@ -121,22 +121,26 @@ export function displayFulfillmentLabel(order: OrderStatusFields): string {
 }
 
 /**
- * Zamówienie czeka na obsłużenie - liczy się do odznaki na zakładce
- * i do plakietki aplikacji.
+ * Zamówienie czeka na SPAKOWANIE - liczy się do kafla „Do spakowania”,
+ * odznaki na zakładce i plakietki aplikacji. Reguła 1:1 z desktopowym
+ * `isPendingOrder` (desktop/.../lib/fulfillment.ts) i z backendem
+ * (`AttentionService`), który z niej liczy plakietkę przy każdym push -
+ * trzy miejsca muszą dawać tę samą liczbę.
  *
- * Plakietka liczy WYŁĄCZNIE sprawy wymagające decyzji na desktopie
- * (sekcja 04 koncepcji push), więc wysłane i anulowane odpadają - w tym
- * zamówienia z lokalnie wykrytym numerem przesyłki.
+ * Dwie poprawki wobec poprzedniej wersji:
+ * - `READY_FOR_SHIPMENT` (spakowane, czeka na kuriera) już się NIE liczy.
+ *   Telefon pokazywał spakowaną paczkę jako „do spakowania”, podczas gdy
+ *   desktop - po kliknięciu „Oznacz jako spakowane” - już nie;
+ * - anulowane odpada, nawet gdy Allegro zostawiło mu etap `NEW`.
+ *   Wcześniej takie zamówienie wisiało w liczniku na zawsze.
  */
 export function isPendingFulfillment(order: OrderStatusFields): boolean {
+  if (order.status === "CANCELLED" || order.fulfillment_status === "CANCELLED") {
+    return false;
+  }
   if (isShippedForDisplay(order)) return false;
   const status = order.fulfillment_status;
-  return (
-    !status ||
-    status === "NEW" ||
-    status === "PROCESSING" ||
-    status === "READY_FOR_SHIPMENT"
-  );
+  return !status || status === "NEW" || status === "PROCESSING";
 }
 
 /**

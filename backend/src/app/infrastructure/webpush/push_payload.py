@@ -523,35 +523,10 @@ def olx_event(
     )
 
 
-def pending_packing(
-    *,
-    count: int,
-    oldest_since: str,
-    badge: int | None = None,
-    silent: bool = False,
-) -> PushPayload:
-    """
-    Zaległe pakowanie - raz dziennie o 9:00. Od kiedy czeka najstarsze.
-
-    Tytuł bez słowa „zamówienia”: „3 zamówienia do spakowania” ucinało
-    się na ekranie blokady, a liczba i tak mówi wszystko.
-    """
-    return PushPayload(
-        title=f"{count} do spakowania",
-        body=f"Najstarsze czeka od {oldest_since}",
-        thread="orders",
-        url="/orders",
-        silent=silent,
-        badge=badge,
-    )
-
-
 # --------------------------------------------------------------------------
-# PROPOZYCJE "Nokturn" (2026-09-22) - czekaja na akceptacje podgladu.
-#
-# Te buildery istnieja juz w katalogu, zeby podglad powstawal z PRAWDZIWEGO
-# kodu (regula katalogu), ale WEB_PUSH_NOTIFIER ICH JESZCZE NIE WOLA - na
-# telefonie nic sie nie zmienia, dopoki podglad nie zostanie zaakceptowany.
+# "Nokturn" (zaakceptowane i wdrozone 2026-09-22): anulowanie w katalogu,
+# poranny raport zamiast wieczornego przypomnienia, plakietka = "Wymaga
+# uwagi" z ekranu Start (patrz `services/attention_service.py`).
 # --------------------------------------------------------------------------
 
 
@@ -613,7 +588,7 @@ def morning_brief(
     badge: int | None = None,
 ) -> PushPayload | None:
     """
-    Poranny raport o 9:00 - następca `pending_packing`.
+    Poranny raport o 9:00 - zastąpił na telefonie wieczorne przypomnienie.
 
     Mówi o WSZYSTKIM, co czeka, w jednym powiadomieniu, zamiast osobnego
     przypomnienia o pakowaniu. Tytuł niesie najpilniejszą rzecz, treść -

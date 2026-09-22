@@ -25,7 +25,12 @@ import { useSync } from "./sync";
 const CELEBRATION_MS = 1200;
 /** Godzina, po ktorej Ordlak zasypia, o ile nic sie nie dzieje. */
 const SLEEP_FROM_HOUR = 22;
-const SLEEP_TO_HOUR = 6;
+/**
+ * Budzi sie o 7:00 - tak samo jak koncza sie godziny ciszy powiadomien
+ * push (22:00-7:00, `push_payload.QUIET_HOURS_END` na Pi). Gdy Ordlak
+ * spi, telefon nie dzwoni; gdy sie budzi, powiadomienia wracaja z dzwiekiem.
+ */
+const SLEEP_TO_HOUR = 7;
 
 /** Zrodla alarmu. Klucz zamiast `boolean`, zeby dwa powody sie nie zjadaly. */
 export type OrdlakAlert = "pi" | "mail" | "allegro";

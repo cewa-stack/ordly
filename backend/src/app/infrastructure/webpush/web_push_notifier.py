@@ -8,7 +8,7 @@ konta Apple Developer).
 from __future__ import annotations
 
 import asyncio
-from collections.abc import Callable
+from collections.abc import Awaitable, Callable
 from contextlib import AbstractAsyncContextManager
 from dataclasses import dataclass, replace
 from decimal import Decimal
@@ -31,8 +31,9 @@ from app.infrastructure.webpush.push_payload import PushPayload
 from app.repositories.sqlite_push_subscription_repository import (
     SqlitePushSubscriptionRepository,
 )
+from app.services.attention_service import AttentionCounts
 from app.shared.dto.reminder_dto import ShippingReminderData
-from app.utils.time import local_now
+from app.utils.time import local_now, to_local
 
 _GONE_STATUS_CODES = (404, 410)
 
@@ -72,6 +73,7 @@ class WebPushNotifier(Notifier):
         session_scope_factory: Callable[[], AbstractAsyncContextManager[AsyncSession]],
         vapid_private_key: str,
         vapid_claim_email: str,
+        attention_counter: Callable[[], Awaitable[AttentionCounts]] | None = None,
     ) -> None:
         """
         Args:
@@ -81,7 +83,11 @@ class WebPushNotifier(Notifier):
             vapid_private_key: Klucz prywatny VAPID (base64url, format RAW).
             vapid_claim_email: Adres z prefiksem `mailto:` wymagany przez
                 specyfikację VAPID jako identyfikator nadawcy.
+            attention_counter: Liczy "Wymaga uwagi" z ekranu Start. Z tego
+                powstaje plakietka na ikonie przy KAŻDYM powiadomieniu
+                i poranny raport. `None` = plakietka bez zmian (testy).
         """
+        self._attention_counter = attention_counter
         self._session_scope_factory = session_scope_factory
         self._vapid_private_key = vapid_private_key
         self._vapid_claims = {"sub": vapid_claim_email}
@@ -130,20 +136,19 @@ class WebPushNotifier(Notifier):
 
     async def notify_order_cancelled(self, order: Order) -> None:
         """
-        Anulowane zamówienie.
+        Anulowane zamówienie - katalog, pozycja „Zamówienie anulowane”.
 
-        Katalog z sekcji 03 nie ma osobnej pozycji dla anulowania, ale
-        to zdarzenie zdejmuje pracę z listy - idzie więc jako ciche
-        powiadomienie w wątku zamówień, żeby lista w telefonie się
-        zgadzała bez budzenia użytkownika.
+        Treść była dotąd budowana tutaj, poza katalogiem, i pokazywała login
+        kupującego na ekranie blokady. Zostaje CICHE: anulowanie niczego od
+        sprzedawcy nie wymaga.
         """
         await self._send(
-            PushPayload(
-                title="Zamówienie anulowane",
-                body=f"{order.buyer.login} — {order.products_summary}.",
-                thread="orders",
-                url=f"/orders/{order.external_id}",
-                silent=True,
+            push_payload.order_cancelled(
+                marketplace=order.marketplace,
+                amount=order.total_amount,
+                currency=order.currency,
+                products=[(p.quantity, p.name) for p in order.products],
+                external_id=order.external_id,
             )
         )
 
@@ -158,17 +163,39 @@ class WebPushNotifier(Notifier):
         )
 
     async def notify_shipping_reminder(self, data: ShippingReminderData) -> None:
-        """Zaległe pakowanie - katalog, pozycja „Zaległe pakowanie"."""
-        if data.new_count == 0:
-            return
-        oldest = min(order.order_date for order in data.new_orders)
-        await self._send(
-            push_payload.pending_packing(
-                count=data.new_count,
-                oldest_since=oldest.strftime("%H:%M"),
-                badge=data.new_count,
-            )
+        """
+        Wieczorne przypomnienie (20:00) - na telefon NIE wychodzi.
+
+        Zastąpił je poranny raport o 9:00 (`send_morning_brief`), który mówi
+        o paczkach, dyskusjach i zwrotach naraz. Telegram dostaje swoje
+        przypomnienie o 20:00 bez zmian - to zdarzenie obsługuje dalej.
+        """
+        return
+
+    async def send_morning_brief(self) -> PushDeliveryReport | None:
+        """
+        Poranny raport o 9:00 - tylko push, wołany z własnego zadania.
+
+        `None`, gdy nic nie czeka albo nie da się policzyć stanu: pusty
+        raport o 9:00 byłby hałasem.
+        """
+        if self._attention_counter is None:
+            return None
+        counts = await self._attention_counter()
+        payload = push_payload.morning_brief(
+            pending_count=counts.pending,
+            oldest_local=(
+                to_local(counts.oldest_pending_utc).replace(tzinfo=None)
+                if counts.oldest_pending_utc is not None
+                else None
+            ),
+            now_local=local_now().replace(tzinfo=None),
+            open_issues=counts.open_issues or 0,
+            open_returns=counts.open_returns,
         )
+        if payload is None:
+            return None
+        return await self._send(payload, counts=counts)
 
     async def notify_active_orders(self, orders: list[Order]) -> None:
         """
@@ -195,6 +222,9 @@ class WebPushNotifier(Notifier):
                 quantity=event.quantity,
                 amount=event.amount,
                 message_id=event.message_id,
+                # Doręczenie i anulowanie niczego nie wymagają - rzeczy
+                # skończone nie dzwonią. Zwrot ma osobny typ i dzwoni.
+                silent=event.event_type == "order_status",
             )
         )
 
@@ -222,7 +252,6 @@ class WebPushNotifier(Notifier):
                 reason=notice.reason,
                 respond_by=notice.respond_by,
                 issue_id=notice.issue_id,
-                badge=1,
             )
         )
 
@@ -265,7 +294,7 @@ class WebPushNotifier(Notifier):
             )
         )
 
-    async def send_test(self, text: str) -> PushDeliveryReport:
+    async def send_test(self) -> PushDeliveryReport:
         """
         Testowe powiadomienie z przycisku w Ustawieniach telefonu.
 
@@ -277,20 +306,19 @@ class WebPushNotifier(Notifier):
           widział „wysłano do 1 urządzenia", a nic nie przychodziło;
         - **pomija godziny ciszy** - test o 22:30 przychodziłby bez dźwięku
           i wyglądałby na niedziałający, choć użytkownik sam o niego prosi.
+
+        Treść pochodzi z katalogu (`test_notification`). Dawniej tytuł
+        brzmiał "ORDLY", a treść "…z ORDLY" - razem z podpisem "from ORDLY",
+        który Safari dokłada sam, nazwa padała trzy razy.
         """
-        return await self._send(
-            PushPayload(
-                title="ORDLY",
-                body=push_payload.strip_html(text),
-                thread="sync",
-                url="/settings",
-                actions=[{"action": "open", "title": "Pokaż"}],
-            ),
-            respect_quiet_hours=False,
-        )
+        return await self._send(push_payload.test_notification(), respect_quiet_hours=False)
 
     async def _send(
-        self, payload: PushPayload, *, respect_quiet_hours: bool = True
+        self,
+        payload: PushPayload,
+        *,
+        respect_quiet_hours: bool = True,
+        counts: AttentionCounts | None = None,
     ) -> PushDeliveryReport:
         """
         Wysyła jedno powiadomienie do wszystkich zapisanych subskrypcji.
@@ -303,6 +331,19 @@ class WebPushNotifier(Notifier):
         if respect_quiet_hours and push_payload.is_quiet_hour(local_now().time()):
             payload = replace(payload, silent=True)
 
+        # Plakietka na ikonie = suma "Wymaga uwagi" z ekranu Start, liczona
+        # przy KAŻDYM powiadomieniu. Nie da się jej już ustawić "po swojemu"
+        # w pojedynczym builderze - wcześniej każdy robił to inaczej.
+        payload = replace(payload, badge=await self._badge(counts))
+        return await self._deliver(payload)
+
+    async def _deliver(self, payload: PushPayload) -> PushDeliveryReport:
+        """
+        Dostarcza GOTOWE powiadomienie (cisza i plakietka już nałożone)
+        do wszystkich subskrypcji. Oddzielone od `_send`, żeby testy mogły
+        sprawdzić samą decyzję - treść, dźwięk, plakietkę - bez bazy
+        i bez serwerów push.
+        """
         serialized = payload.to_json()
         outcomes: list[_SendOutcome] = []
 
@@ -319,6 +360,22 @@ class WebPushNotifier(Notifier):
             expired=outcomes.count("expired"),
             failed=outcomes.count("failed"),
         )
+
+    async def _badge(self, counts: AttentionCounts | None) -> int | None:
+        """
+        Liczba na ikonie. `None` = nie zmieniaj plakietki: gdy nie ma
+        licznika albo policzenie się nie udało - lepiej zostawić starą
+        liczbę niż pokazać zaniżoną.
+        """
+        if counts is None:
+            if self._attention_counter is None:
+                return None
+            try:
+                counts = await self._attention_counter()
+            except Exception as exc:  # noqa: BLE001 - powiadomienie ma wyjść mimo to
+                logger.warning("Plakietka push: nie udało się policzyć ({})", exc)
+                return None
+        return counts.badge
 
     async def _send_one(
         self,

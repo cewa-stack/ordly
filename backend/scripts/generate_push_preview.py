@@ -125,12 +125,35 @@ def _karty() -> list[Karta]:
             ),
         ),
         Karta(
-            builder="pending_packing",
-            kiedy="Raz dziennie o 9:00, jeśli coś czeka na spakowanie.",
-            payload=push_payload.pending_packing(
-                count=3, oldest_since="wczoraj 17:40", badge=3
+            builder="morning_brief",
+            kiedy=(
+                "Raz dziennie o 9:00, jeśli coś czeka (paczki, dyskusje albo zwroty). "
+                "Tylko telefon - Telegram dostaje swoje przypomnienie o 20:00."
+            ),
+            payload=push_payload.morning_brief(  # type: ignore[arg-type]
+                pending_count=3,
+                oldest_local=datetime(2026, 9, 21, 17, 40),
+                now_local=datetime(2026, 9, 22, 9, 0),
+                open_issues=2,
+                open_returns=1,
             ),
             czas="9:00",
+            uwaga=(
+                "Zastąpił wieczorne przypomnienie o pakowaniu (na telefonie wychodziło "
+                "o 20:00, z godziną w UTC - cofniętą o 2 h). Otwiera ekran Start."
+            ),
+        ),
+        Karta(
+            builder="order_cancelled",
+            kiedy="Gdy zamówienie zostanie anulowane. CICHE - niczego od Ciebie nie wymaga.",
+            payload=push_payload.order_cancelled(
+                marketplace="allegro",
+                amount=Decimal("30.50"),
+                currency="PLN",
+                products=[(50, "Butelki PET 30 ml")],
+                external_id=_ZAMOWIENIE,
+            ),
+            czas="16:12",
         ),
         Karta(
             builder="sync_failed",
@@ -205,6 +228,20 @@ def _karty() -> list[Karta]:
             czas="10:15",
         ),
         Karta(
+            builder="allegro_lokalnie_event (doręczono / anulowano)",
+            kiedy="Gdy mail z Allegro Lokalnie mówi o doręczeniu albo anulowaniu. CICHE.",
+            payload=push_payload.allegro_lokalnie_event(
+                event_type="order_status",
+                listing_title="100szt. Butelka Gorilla 10ml Liquid Aromat Baza olejki DIY",
+                quantity=4,
+                amount=Decimal("287.92"),
+                message_id="<notificationsfour.20260902120500@allegro.pl>",
+                silent=True,
+            ),
+            czas="12:05",
+            uwaga="Rzeczy skończone nie dzwonią - ta sama zasada co w aplikacji.",
+        ),
+        Karta(
             builder="olx_event (sprzedaż)",
             kiedy="Gdy ktoś kupi Twoje ogłoszenie z Przesyłką OLX.",
             payload=push_payload.olx_event(
@@ -237,6 +274,11 @@ def _karty() -> list[Karta]:
                 "identyczny („Wiadomości dotyczące ogłoszeń”) i sam z siebie nie mówi nic."
             ),
             czas="13:57",
+        ),
+        Karta(
+            builder="test_notification",
+            kiedy="Przycisk „Wyślij test” w Ustawieniach telefonu. Pomija godziny ciszy.",
+            payload=push_payload.test_notification(),
         ),
     ]
 
@@ -417,6 +459,9 @@ def build_html() -> str:
       z tego katalogu. Wspólna ścieżka <code>send_text</code> dodatkowo przepuszcza
       treść przez <code>strip_html</code> — na wypadek, gdyby ktoś w przyszłości
       wysłał tędy tekst pisany pod Telegram.<br><br>
+      <b>Plakietka:</b> liczba na ikonie aplikacji jest przy KAŻDYM powiadomieniu liczona
+      na Pi tak samo jak kafle na ekranie Start (Do spakowania + Dyskusje + Zwroty) -
+      dlatego nie ma jej na dymkach poniżej.<br><br>
       <b>Ikona:</b> jedna dla wszystkich powiadomień, ta sama co ikona aplikacji.
       Ikony per typ zdarzenia zostały odrzucone — iOS przy Web Push z PWA i tak
       pokazuje ikonę aplikacji, więc byłby to element widoczny wyłącznie tam,

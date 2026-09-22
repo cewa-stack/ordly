@@ -138,6 +138,28 @@ def register_shipping_reminder_job(
     logger.info("Zarejestrowano codzienny job przypomnienia o wysyłce (20:00)")
 
 
+def register_morning_brief_job(
+    scheduler: AsyncIOScheduler,
+    job_coroutine: Callable[[], Awaitable[None]],
+) -> None:
+    """
+    Rejestruje poranny raport push o 9:00 czasu polskiego (Europe/Warsaw).
+
+    Tylko telefon (Web Push). Zastąpił na telefonie wieczorne przypomnienie
+    o pakowaniu - Telegram dostaje swoje o 20:00 bez zmian.
+    """
+    scheduler.add_job(
+        job_coroutine,
+        trigger="cron",
+        hour=9,
+        minute=0,
+        id="morning_brief_job",
+        max_instances=1,
+        misfire_grace_time=1800,
+    )
+    logger.info("Zarejestrowano poranny raport push (9:00)")
+
+
 def register_telegram_cleanup_job(
     scheduler: AsyncIOScheduler,
     job_coroutine: Callable[[], Awaitable[None]],

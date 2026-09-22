@@ -46,6 +46,7 @@ from app.repositories.sqlite_telegram_message_repository import (
 from app.repositories.sqlite_token_store import SqliteTokenStore
 from app.services.allegro_lokalnie_orders_service import AllegroLokalnieOrdersService
 from app.services.assistant_actions import AssistantActionExecutor
+from app.services.attention_service import AttentionCounts, AttentionService
 from app.services.backup_service import BackupService
 from app.services.dashboard_service import DashboardService
 from app.services.events_service import EventsService
@@ -314,6 +315,7 @@ class Container:
                     session_scope_factory=self.session_scope,
                     vapid_private_key=self._settings.web_push.vapid_private_key.get_secret_value(),
                     vapid_claim_email=self._settings.web_push.vapid_claim_email,
+                    attention_counter=self.attention_counts,
                 )
             )
         return CompositeNotifier(notifiers)
@@ -340,7 +342,23 @@ class Container:
             session_scope_factory=self.session_scope,
             vapid_private_key=self._settings.web_push.vapid_private_key.get_secret_value(),
             vapid_claim_email=self._settings.web_push.vapid_claim_email,
+            attention_counter=self.attention_counts,
         )
+
+    async def attention_counts(self) -> AttentionCounts:
+        """
+        "Wymaga uwagi" z ekranu Start - dla plakietki push i porannego raportu.
+
+        Otwiera własną, krótką sesję: notifier działa poza cyklem żądania
+        HTTP, więc nie ma sesji, którą mógłby pożyczyć.
+        """
+        async with self.session_scope() as session:
+            service = AttentionService(
+                order_repository=SqliteOrderRepository(session),
+                return_repository=SqliteReturnRepository(session),
+                issues_service=self.issues_service(session),
+            )
+            return await service.counts()
 
     async def dispose(self) -> None:
         """Zamyka silnik bazy danych - wywoływane przy zamykaniu aplikacji."""
