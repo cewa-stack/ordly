@@ -117,6 +117,18 @@ export interface IssueMessage {
   created_at: string;
 }
 
+/** Szablon odpowiedzi - znaczniki `{...}` podstawia `fillTemplate`. */
+export interface ReplyTemplate {
+  id: number;
+  title: string;
+  body: string;
+}
+
+export interface ReplyTemplateInput {
+  title: string;
+  body: string;
+}
+
 export interface Session {
   baseUrl: string;
   username: string;

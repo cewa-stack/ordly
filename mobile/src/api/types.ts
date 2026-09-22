@@ -156,6 +156,13 @@ export interface IssueMessage {
   created_at: string;
 }
 
+/** Szablon odpowiedzi - znaczniki `{...}` podstawia `fillTemplate`. */
+export interface ReplyTemplate {
+  id: number;
+  title: string;
+  body: string;
+}
+
 export type MailSource = "allegro" | "allegro_lokalnie" | "olx" | "other";
 
 export interface MailMessage {

@@ -295,6 +295,23 @@ input[type="number"]::-webkit-inner-spin-button {
   }
 }
 
+/*
+ * Nowe zamowienie od ostatniego odswiezenia miga raz akcentem
+ * (`useNewIds`). Wypelnienie `backwards`, nie `both` - po animacji
+ * wiersz wraca do swoich klas, a hover dalej dziala.
+ */
+@keyframes o-row-flash {
+  from {
+    background-color: var(--teal-glow);
+  }
+  to {
+    background-color: transparent;
+  }
+}
+.o-row-flash {
+  animation: o-row-flash 1.6s ease-out 0.2s backwards;
+}
+
 /* =====================================================================
  * ORDLAK - maskotka jako komponent SVG (sekcja 6 instrukcji).
  *
@@ -367,6 +384,45 @@ input[type="number"]::-webkit-inner-spin-button {
   stroke-width: 2.6;
   stroke-linecap: round;
   opacity: 0.5;
+}
+/* Rekwizyty z pustych stanow. Tektura ma staly kolor, jak prawdziwa. */
+.ord-flap {
+  stroke: var(--skin);
+  stroke-width: 2.4;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  fill: none;
+  opacity: 0.6;
+}
+.ord-kraft {
+  fill: #b08a57;
+}
+.ord-kraft-top {
+  fill: #c7a06a;
+}
+.ord-kraft-side {
+  fill: #8c6a3e;
+}
+.ord-tape {
+  fill: var(--skin);
+  opacity: 0.55;
+}
+.ord-lens {
+  fill: #0b1a18;
+  stroke: var(--skin-dark);
+  stroke-width: 3;
+}
+.ord-lens-glint {
+  stroke: var(--skin);
+  stroke-width: 2;
+  stroke-linecap: round;
+  fill: none;
+  opacity: 0.7;
+}
+.ord-handle {
+  stroke: var(--skin-dark);
+  stroke-width: 5;
+  stroke-linecap: round;
 }
 .ord-mouth,
 .ord-mouth-worry {

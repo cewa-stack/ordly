@@ -19,6 +19,8 @@ import type {
   OrdlakSaveResult,
   OrdlakStatus,
   Order,
+  ReplyTemplate,
+  ReplyTemplateInput,
   ReturnItem,
   Session,
   Shipment,
@@ -52,6 +54,7 @@ export interface OrdlyBridge {
   orders: {
     list: () => Promise<BridgeResult<Order[]>>;
     search: (query: string) => Promise<BridgeResult<Order[]>>;
+    get: (externalId: string) => Promise<BridgeResult<Order>>;
     tracking: (externalId: string) => Promise<BridgeResult<Shipment>>;
     setFulfillment: (
       externalId: string,
@@ -66,6 +69,12 @@ export interface OrdlyBridge {
     list: () => Promise<BridgeResult<Issue[]>>;
     messages: (issueId: string) => Promise<BridgeResult<IssueMessage[]>>;
     reply: (issueId: string, text: string) => Promise<BridgeResult<null>>;
+  };
+  templates: {
+    list: () => Promise<BridgeResult<ReplyTemplate[]>>;
+    create: (input: ReplyTemplateInput) => Promise<BridgeResult<ReplyTemplate>>;
+    update: (id: number, input: ReplyTemplateInput) => Promise<BridgeResult<ReplyTemplate>>;
+    delete: (id: number) => Promise<BridgeResult<null>>;
   };
   stats: {
     get: () => Promise<BridgeResult<StatsSummary>>;

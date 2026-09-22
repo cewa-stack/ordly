@@ -30,6 +30,7 @@ import { TabHeading } from "@/components/TabHeading";
 import { ListEndNote } from "@/components/ListEndNote";
 import { useSync } from "@/store/sync";
 import { fulfillmentLabel, isShippedForDisplay } from "@/utils/format";
+import { useNewIds } from "@/utils/useNewIds";
 import type { Order } from "@/api/types";
 import type { RootStackParamList } from "@/navigation/types";
 
@@ -80,7 +81,9 @@ export function OrdersScreen() {
 
   const baseData = isSearching ? searchQuery.data : ordersQuery.data;
   const isPending = isSearching ? searchQuery.isPending : ordersQuery.isPending;
-  const isError = isSearching ? searchQuery.isError : ordersQuery.isError;
+  // Błąd bez danych. Z zapisanym stanem (brak połączenia z Pi) lista
+  // zostaje, a o braku połączenia mówi pasek nad zakładkami.
+  const isError = (isSearching ? searchQuery.isError : ordersQuery.isError) && !baseData;
 
   const counts = React.useMemo(() => {
     const map: Record<StatusFilter, number> = {
@@ -110,10 +113,17 @@ export function OrdersScreen() {
     await queryClient.invalidateQueries({ queryKey: ["orders"] });
   }
 
+  // Nowe od ostatniego odświeżenia - liczone z pełnej listy, nie z wyników
+  // wyszukiwania, żeby wpisanie frazy nie „odkrywało” starych zamówień.
+  const freshOrders = useNewIds(
+    ordersQuery.data ? (ordersQuery.data as Order[]).map((o) => o.external_id) : undefined
+  );
+
   function renderItem({ item }: { item: Order }) {
     return (
       <OrderRow
         order={item}
+        highlight={freshOrders.has(item.external_id)}
         onPress={() => navigation.navigate("OrderDetail", { externalId: item.external_id })}
       />
     );
@@ -175,9 +185,12 @@ export function OrdersScreen() {
           }
           ListEmptyComponent={
             <EmptyState
-              mascotPose={!isSearching && statusFilter === "Wszystkie" ? "sleep" : undefined}
+              mascotPose={
+                isSearching ? "think" : statusFilter === "Wszystkie" ? "sleep" : undefined
+              }
+              mascotProp={isSearching ? "magnifier" : undefined}
               icon={
-                isSearching || statusFilter !== "Wszystkie" ? (
+                !isSearching && statusFilter !== "Wszystkie" ? (
                   <ReceiptIcon size={24} color={c.tx2} />
                 ) : undefined
               }

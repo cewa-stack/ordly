@@ -148,7 +148,9 @@ export function OrderDetailScreen() {
     );
   }
 
-  if (order.isError || !order.data) {
+  // Bez `order.isError`: zapisane zamówienie (brak połączenia z Pi) ma
+  // się pokazać, nawet gdy odświeżenie się nie udało.
+  if (!order.data) {
     return (
       <View style={styles.screen}>
         <ErrorState message="Nie znaleziono zamówienia" onRetry={() => order.refetch()} />

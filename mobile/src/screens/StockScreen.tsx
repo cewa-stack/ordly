@@ -23,7 +23,7 @@ import { EmptyState } from "@/components/EmptyState";
 import { ErrorState } from "@/components/ErrorState";
 import { ListEndNote } from "@/components/ListEndNote";
 import { Skeleton } from "@/components/Skeleton";
-import { BoxIcon, SyncIcon } from "@/icons";
+import { SyncIcon } from "@/icons";
 import { formatDate, plural } from "@/utils/format";
 import type { MarketplaceOffer } from "@/api/types";
 
@@ -134,7 +134,7 @@ export function StockScreen() {
           <Skeleton height={80} radius={radii.lg} style={{ marginBottom: spacing.sm }} />
           <Skeleton height={80} radius={radii.lg} />
         </View>
-      ) : offers.isError ? (
+      ) : offers.isError && !offers.data ? (
         <View style={styles.listPadding}>
           {listHeader}
           <ErrorState onRetry={() => offers.refetch()} />
@@ -162,7 +162,8 @@ export function StockScreen() {
           }
           ListEmptyComponent={
             <EmptyState
-              icon={<BoxIcon size={24} color={c.tx2} />}
+              mascotPose={query.trim() ? "think" : "idle"}
+              mascotProp={query.trim() ? "magnifier" : "box"}
               title={query.trim() ? "Nie znaleziono oferty" : "Katalog jest pusty"}
               description={
                 query.trim()

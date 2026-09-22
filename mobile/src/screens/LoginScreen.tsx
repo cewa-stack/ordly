@@ -7,6 +7,11 @@
  *
  * Adres API pozostaje wymagany (apka musi wiedzieć, gdzie jest Twoje
  * Raspberry Pi) - zwykle Tailscale MagicDNS, patrz docs/01_app.md §4.
+ *
+ * Pole adresu startuje od `https://`: przez Tailscale działa WYŁĄCZNIE
+ * https, a dawne „http://” było pułapką, która kosztowała wieczór
+ * debugowania. Nie ma już też podpowiedzi „admin / admin” - ekran
+ * logowania widzi każdy, kto trafi na adres Pi.
  */
 import * as React from "react";
 import {
@@ -16,8 +21,10 @@ import {
   StyleSheet,
   Text,
   View,
+  useWindowDimensions,
 } from "react-native";
 import { StatusBar } from "expo-status-bar";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import type { Palette } from "@/theme/colors";
 import { useTheme, useThemedStyles } from "@/theme/theme";
@@ -27,16 +34,20 @@ import { useAuth } from "@/store/auth";
 import { FormField } from "@/components/FormField";
 import { PrimaryButton } from "@/components/PrimaryButton";
 import { Ordlak } from "@/components/Ordlak";
-import { GlowBackdrop } from "@/components/GlowBackdrop";
+import { Waybill } from "@/components/Waybill";
 import { EyeIcon, EyeOffIcon, LockIcon, ServerIcon, UserIcon } from "@/icons";
 
 export function LoginScreen() {
   const styles = useThemedStyles(createStyles);
-  const { c } = useTheme();
+  const { c, mode } = useTheme();
+  const { width: screenWidth } = useWindowDimensions();
+  // Etykieta na górze nie może wejść pod zegar, gdy formularz jest dłuższy
+  // niż ekran (mały telefon, otwarta klawiatura).
+  const insets = useSafeAreaInsets();
   const { baseUrl: storedBaseUrl, username: storedUsername, loginWithPassword, sessionExpiredMessage, clearSessionExpiredMessage } =
     useAuth();
-  const [serverUrl, setServerUrl] = React.useState(storedBaseUrl ?? "http://");
-  const [username, setUsername] = React.useState(storedUsername ?? "admin");
+  const [serverUrl, setServerUrl] = React.useState(storedBaseUrl ?? "https://");
+  const [username, setUsername] = React.useState(storedUsername ?? "");
   const [password, setPassword] = React.useState("");
   const [showPassword, setShowPassword] = React.useState(false);
   const [isSubmitting, setIsSubmitting] = React.useState(false);
@@ -76,13 +87,14 @@ export function LoginScreen() {
       style={styles.screen}
       behavior={Platform.OS === "ios" ? "padding" : undefined}
     >
-      <StatusBar style="light" />
-      <GlowBackdrop />
+      <StatusBar style={mode === "day" ? "dark" : "light"} />
       <ScrollView
-        contentContainerStyle={styles.content}
+        contentContainerStyle={[styles.content, { paddingTop: insets.top + spacing.lg }]}
         keyboardShouldPersistTaps="handled"
         showsVerticalScrollIndicator={false}
       >
+        {/* Mniejsza niż na blokadzie - tu pierwszeństwo ma formularz. */}
+        <Waybill width={Math.min(260, screenWidth - 2 * spacing.xl)} />
         <Ordlak state="idle" size={92} style={styles.mascot} />
         <Text style={styles.brandName}>ORDLY</Text>
         <Text style={styles.title}>Witaj z powrotem</Text>
@@ -96,7 +108,7 @@ export function LoginScreen() {
             icon={<ServerIcon size={17} color={c.acc} />}
             value={serverUrl}
             onChangeText={setServerUrl}
-            placeholder="http://raspberrypi:8000"
+            placeholder="https://twoje-pi.tailnet.ts.net"
             autoCapitalize="none"
             autoCorrect={false}
             keyboardType="url"
@@ -107,7 +119,7 @@ export function LoginScreen() {
             icon={<UserIcon size={17} color={c.tx2} />}
             value={username}
             onChangeText={setUsername}
-            placeholder="admin"
+            placeholder="Login"
             autoCapitalize="none"
             autoCorrect={false}
             error={Boolean(error)}
@@ -117,7 +129,7 @@ export function LoginScreen() {
             icon={<LockIcon size={17} color={c.tx2} />}
             value={password}
             onChangeText={setPassword}
-            placeholder="domyślnie: admin"
+            placeholder="Hasło"
             autoCapitalize="none"
             autoCorrect={false}
             secureTextEntry={!showPassword}
@@ -142,14 +154,6 @@ export function LoginScreen() {
           loading={isSubmitting}
           style={styles.cta}
         />
-
-        {isSubmitting ? null : (
-          <Text style={styles.hint}>
-            Domyślne dane logowania to <Text style={styles.hintBold}>admin</Text> /{" "}
-            <Text style={styles.hintBold}>admin</Text> — zmień je w pliku .env po pierwszym
-            uruchomieniu.
-          </Text>
-        )}
       </ScrollView>
     </KeyboardAvoidingView>
   );
@@ -207,17 +211,5 @@ const createStyles = (c: Palette) =>
   cta: {
     alignSelf: "stretch",
     marginTop: spacing.lg,
-  },
-  hint: {
-    ...typography.caption,
-    fontSize: 11.5,
-    color: c.tx3,
-    textAlign: "center",
-    marginTop: spacing.md,
-    lineHeight: 16,
-  },
-  hintBold: {
-    color: c.tx2,
-    fontFamily: family.display,
   },
 });

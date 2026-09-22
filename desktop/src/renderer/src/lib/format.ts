@@ -110,6 +110,23 @@ export function formatAge(iso: string): string {
   return `${days} dni`;
 }
 
+/** Po tylu godzinach czekajace zamowienie robi sie koralowe. */
+export const OVERDUE_AFTER_HOURS = 24;
+
+/**
+ * Ile zamowienie czeka na spakowanie - 1:1 z `mobile/src/utils/format.ts`.
+ * `short` miesci sie w kolumnie "Czas" (52 px): "40 min", "3 h", "3 dni".
+ * Godziny az do dwoch dob - "1 dzien" brzmi lagodniej, niz jest, a 30 h
+ * mowi wprost, ze termin juz minal.
+ */
+export function waitingLabel(iso: string, now = Date.now()): { short: string; overdue: boolean } {
+  const minutes = Math.max(0, Math.floor((now - parseApiDate(iso).getTime()) / 60_000));
+  const hours = Math.floor(minutes / 60);
+  const short =
+    minutes < 60 ? `${minutes} min` : hours < 48 ? `${hours} h` : `${Math.floor(hours / 24)} dni`;
+  return { short, overdue: hours >= OVERDUE_AFTER_HOURS };
+}
+
 /** `8 / 25` - stan magazynowy wobec progu/maksimum. */
 export function formatStock(value: number, max: number): string {
   return `${value} / ${max}`;

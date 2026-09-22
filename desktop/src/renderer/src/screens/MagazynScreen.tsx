@@ -432,6 +432,8 @@ export function MagazynScreen({ focusOffer, onFocusHandled }: MagazynScreenProps
 
         {!isLoading && offers.length === 0 && (
           <EmptyState
+            state="idle"
+            prop="box"
             title="Nie ma jeszcze żadnych ofert"
             description="Kliknij „Synchronizuj”, żeby pobrać to, co masz wystawione na marketplace'ach."
           />
@@ -439,6 +441,8 @@ export function MagazynScreen({ focusOffer, onFocusHandled }: MagazynScreenProps
 
         {!isLoading && offers.length > 0 && visible.length === 0 && (
           <EmptyState
+            state="think"
+            prop="magnifier"
             title="Nic nie pasuje do wyszukiwania"
             description="Zmień frazę albo wyczyść pole wyszukiwania."
           />

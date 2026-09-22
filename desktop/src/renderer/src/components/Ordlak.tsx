@@ -18,13 +18,65 @@
 
 export type OrdlakState = "idle" | "sync" | "think" | "happy" | "alert" | "sleep";
 
+/**
+ * Co Ordlak trzyma w rece. Notatnik to jego staly znak; reszta pojawia
+ * sie tylko w pustych stanach, zeby "pusta skrzynka" i "pusty magazyn"
+ * nie wygladaly tak samo. 1:1 z telefonowym Ordlakiem.
+ */
+export type OrdlakProp = "clipboard" | "envelope" | "box" | "magnifier";
+
 interface OrdlakProps {
   state?: OrdlakState;
   size?: number;
   className?: string;
+  prop?: OrdlakProp;
 }
 
-export function Ordlak({ state = "idle", size = 40, className = "" }: OrdlakProps) {
+/**
+ * Rekwizyt w prawej rece - w tym samym miejscu co notatnik, zeby ramka
+ * figury (a przez to wysrodkowanie i punkty obrotu) sie nie zmieniala.
+ */
+function PropShape({ prop }: { prop: OrdlakProp }) {
+  if (prop === "envelope") {
+    return (
+      <g transform="rotate(7 101 81)">
+        <rect className="ord-board" x="85" y="67" width="32" height="23" rx="3" />
+        <path className="ord-flap" d="M87.5 70 101 80.5 114.5 70" />
+      </g>
+    );
+  }
+  if (prop === "box") {
+    return (
+      <g transform="rotate(4 101 81)">
+        <path className="ord-kraft-top" d="M86 71l5-6h28l-5 6z" />
+        <path className="ord-kraft-side" d="M114 71l5-6v24l-5 6z" />
+        <rect className="ord-kraft" x="86" y="71" width="28" height="24" rx="1.5" />
+        <rect className="ord-tape" x="98" y="71" width="4.5" height="24" />
+        <path className="ord-tape" d="M98 71l5-6h4.5l-5 6z" />
+      </g>
+    );
+  }
+  if (prop === "magnifier") {
+    return (
+      <g>
+        <line className="ord-handle" x1="107.5" y1="84.5" x2="116" y2="94" />
+        <circle className="ord-lens" cx="100" cy="76" r="10.5" />
+        <path className="ord-lens-glint" d="M94.5 72.5a6.5 6.5 0 0 1 5-3.5" />
+      </g>
+    );
+  }
+  return (
+    <g transform="rotate(7 101 81)">
+      <rect className="ord-board" x="86" y="62" width="30" height="38" rx="5" />
+      <rect className="ord-clip" x="95" y="57" width="12" height="8" rx="3" />
+      <line className="ord-boardline" x1="92" y1="76" x2="110" y2="76" />
+      <line className="ord-boardline" x1="92" y1="84" x2="110" y2="84" />
+      <line className="ord-boardline" x1="92" y1="92" x2="104" y2="92" />
+    </g>
+  );
+}
+
+export function Ordlak({ state = "idle", size = 40, className = "", prop = "clipboard" }: OrdlakProps) {
   return (
     <span
       className={`ordlak ${className}`}
@@ -59,13 +111,7 @@ export function Ordlak({ state = "idle", size = 40, className = "" }: OrdlakProp
             </g>
             <path className="ord-mouth" d="M52 86q8 6 16 0" />
             <path className="ord-mouth-worry" d="M52 88q8-6 16 0" />
-            <g transform="rotate(7 101 81)">
-              <rect className="ord-board" x="86" y="62" width="30" height="38" rx="5" />
-              <rect className="ord-clip" x="95" y="57" width="12" height="8" rx="3" />
-              <line className="ord-boardline" x1="92" y1="76" x2="110" y2="76" />
-              <line className="ord-boardline" x1="92" y1="84" x2="110" y2="84" />
-              <line className="ord-boardline" x1="92" y1="92" x2="104" y2="92" />
-            </g>
+            <PropShape prop={prop} />
           </g>
           {/*
            * Fale MUSZA byc poza `.ord-figure`, jako rodzenstwo wewnatrz

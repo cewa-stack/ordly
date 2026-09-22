@@ -31,13 +31,19 @@ import {
   Pill,
 } from "../components/ui";
 import { Ordlak } from "../components/Ordlak";
+import { CountUp } from "../components/CountUp";
+import { SyncSweep } from "../components/SyncSweep";
 import { useSync } from "../lib/sync";
 import { useOrdlakState } from "../lib/ordlakState";
+import { useNewIds } from "../lib/useNewIds";
 import {
   formatCurrency,
+  formatDateTime,
   formatPlural,
   formatTime,
   parseApiDate,
+  toAmount,
+  waitingLabel,
 } from "../lib/format";
 import { displayFulfillmentLabel, displayFulfillmentTone, isPendingOrder } from "../lib/fulfillment";
 import type { ViewId } from "../components/Sidebar";
@@ -98,7 +104,7 @@ function MicroStat({
   unit,
 }: {
   label: string;
-  value: string;
+  value: React.ReactNode;
   unit: string;
 }) {
   return (
@@ -116,16 +122,30 @@ function MicroStat({
 
 /**
  * Wiersz listy "Wymaga uwagi" (sekcja 7). Szerokosci stale, w tej
- * kolejnosci: kanal 68 · nazwisko i pozycje flex-1 · godzina 50 prawo ·
- * kwota 94 prawo · status 96. Dzieki temu prawa krawedz listy jest
- * PROSTA, a nazwiska zaczynaja sie w jednej linii pionowej.
+ * kolejnosci: kanal 68 · nazwisko i pozycje flex-1 · czas czekania 50
+ * prawo · kwota 94 prawo · status 96. Dzieki temu prawa krawedz listy
+ * jest PROSTA, a nazwiska zaczynaja sie w jednej linii pionowej.
+ *
+ * Na tej liscie sa wylacznie zamowienia czekajace na spakowanie, wiec
+ * zamiast godziny zlozenia jest to, ile juz czekaja - po dobie koralowo.
  */
-function AttentionRow({ order, onOpen }: { order: Order; onOpen: () => void }) {
+function AttentionRow({
+  order,
+  onOpen,
+  fresh,
+}: {
+  order: Order;
+  onOpen: () => void;
+  fresh: boolean;
+}) {
   const items = order.products.map((product) => product.name).join(", ");
+  const waiting = waitingLabel(order.order_date);
   return (
     <button
       onClick={onOpen}
-      className="flex w-full items-center gap-3 border-b border-line px-4 py-2 text-left transition-colors duration-150 ease-ordly last:border-b-0 hover:bg-panel-2"
+      className={`flex w-full items-center gap-3 border-b border-line px-4 py-2 text-left transition-colors duration-150 ease-ordly last:border-b-0 hover:bg-panel-2 ${
+        fresh ? "o-row-flash" : ""
+      }`}
     >
       <MarketplaceBadge marketplace={order.marketplace} />
       <span className="min-w-0 flex-1">
@@ -134,8 +154,13 @@ function AttentionRow({ order, onOpen }: { order: Order; onOpen: () => void }) {
           {items || "brak pozycji"}
         </span>
       </span>
-      <span className="o-mono w-[50px] shrink-0 text-right text-[11px] text-text-3">
-        {formatTime(order.order_date)}
+      <span
+        title={`Czeka od ${formatDateTime(order.order_date)}`}
+        className={`o-mono w-[50px] shrink-0 text-right text-[11px] ${
+          waiting.overdue ? "text-coral" : "text-text-3"
+        }`}
+      >
+        {waiting.short}
       </span>
       <span className="o-mono w-[94px] shrink-0 whitespace-nowrap text-right text-[11.5px] text-text-2">
         {formatCurrency(order.total_amount)}
@@ -242,6 +267,9 @@ export function StartScreen({ onNavigate, onAsk, username }: StartScreenProps) {
   // widocznych wierszy, wiec licznik liczy to, co widac.
   const attention = pendingOrders.slice(0, 4);
   const timeline = todayEvents.slice(0, 4);
+  const freshOrders = useNewIds(
+    ordersQuery.data ? pendingOrders.map((order) => order.external_id) : undefined
+  );
 
   const firstName = username.split(/[\s._-]+/)[0] || username;
   const greeting = greetingFor(new Date().getHours());
@@ -313,6 +341,7 @@ export function StartScreen({ onNavigate, onAsk, username }: StartScreenProps) {
     >
       {/* ---------------------------------------------- karta powitalna */}
       <section className="relative flex h-[204px] shrink-0 items-center gap-5 overflow-hidden rounded-xl border border-line bg-panel px-6 py-4">
+        <SyncSweep phase={phase} />
         {/* Jedno zrodlo swiatla na karcie - bez zmywu na cala powierzchnie. */}
         <span
           aria-hidden="true"
@@ -336,17 +365,22 @@ export function StartScreen({ onNavigate, onAsk, username }: StartScreenProps) {
           <div className="mt-[13px] flex gap-[30px]">
             <MicroStat
               label="Dziś"
-              value={String(dashboard?.orders_today ?? todayOrders.length)}
+              value={<CountUp value={dashboard?.orders_today ?? todayOrders.length} />}
               unit="zamówień"
             />
             <MicroStat
               label="Do wysyłki"
-              value={String(dashboard?.orders_to_ship ?? pendingOrders.length)}
+              value={<CountUp value={dashboard?.orders_to_ship ?? pendingOrders.length} />}
               unit="paczek"
             />
             <MicroStat
               label="Przychód"
-              value={formatCurrency(revenueToday, { round: true }).replace(" zł", "")}
+              value={
+                <CountUp
+                  value={toAmount(revenueToday)}
+                  format={(v) => formatCurrency(v, { round: true }).replace(" zł", "")}
+                />
+              }
               unit="zł"
             />
           </div>
@@ -407,7 +441,7 @@ export function StartScreen({ onNavigate, onAsk, username }: StartScreenProps) {
         <KpiTile
           label="Do spakowania"
           tint="coral"
-          value={String(pendingOrders.length)}
+          value={<CountUp value={pendingOrders.length} />}
           delta={pendingOrders.length > 0 ? "czeka" : "czysto"}
           deltaTone={pendingOrders.length > 0 ? "wait" : "neutral"}
           onClick={() => onNavigate("zamowienia")}
@@ -415,7 +449,7 @@ export function StartScreen({ onNavigate, onAsk, username }: StartScreenProps) {
         <KpiTile
           label="Nowe dziś"
           tint="teal"
-          value={String(dashboard?.orders_today ?? todayOrders.length)}
+          value={<CountUp value={dashboard?.orders_today ?? todayOrders.length} />}
           delta={
             dashboard?.trend_percent
               ? `${dashboard.trend_percent > 0 ? "+" : ""}${Math.round(dashboard.trend_percent)}%`
@@ -427,14 +461,19 @@ export function StartScreen({ onNavigate, onAsk, username }: StartScreenProps) {
         <KpiTile
           label="Wartość dziś"
           tint="teal"
-          value={formatCurrency(revenueToday, { round: true })}
+          value={
+            <CountUp
+              value={toAmount(revenueToday)}
+              format={(v) => formatCurrency(v, { round: true })}
+            />
+          }
           series={dashboard?.revenue_last_7_days}
           onClick={() => onNavigate("statystyki")}
         />
         <KpiTile
           label="Rozjazd stanów"
           tint="amber"
-          value={String(mismatched.length)}
+          value={<CountUp value={mismatched.length} />}
           delta={uncounted.length > 0 ? `${uncounted.length} nieliczonych` : undefined}
           onClick={() => onNavigate("magazyn")}
         />
@@ -471,6 +510,7 @@ export function StartScreen({ onNavigate, onAsk, username }: StartScreenProps) {
               <AttentionRow
                 key={order.external_id}
                 order={order}
+                fresh={freshOrders.has(order.external_id)}
                 onOpen={() => onNavigate("zamowienia")}
               />
             ))}

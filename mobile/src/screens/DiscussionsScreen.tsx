@@ -1,7 +1,6 @@
 /**
- * Dyskusje i reklamacje — podgląd tylko do odczytu. Odpowiedzi wysyła się
- * z aplikacji desktopowej ORDLY (decyzja zakresu: mobile = podgląd + push,
- * bez akcji piszących).
+ * Dyskusje i reklamacje — lista wątków. Odpowiedź pisze się w wątku
+ * (IssueDetailScreen), z potwierdzeniem przed wysłaniem.
  */
 import * as React from "react";
 import { FlatList, RefreshControl, StyleSheet, Text, View } from "react-native";
@@ -51,7 +50,7 @@ export function DiscussionsScreen() {
           <Skeleton height={96} radius={radii.lg} style={{ marginBottom: spacing.sm }} />
           <Skeleton height={96} radius={radii.lg} />
         </View>
-      ) : issues.isError ? (
+      ) : issues.isError && !issues.data ? (
         <ErrorState onRetry={() => issues.refetch()} />
       ) : (
         <FlatList

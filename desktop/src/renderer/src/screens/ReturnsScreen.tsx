@@ -71,6 +71,7 @@ export function ReturnsScreen() {
 
       {!isLoading && (data ?? []).length === 0 && (
         <EmptyState
+          prop="box"
           title="Zero zwrotów"
           description="Wszystkie zamówienia idą gładko. Ordi da znać, gdy pojawi się nowy zwrot."
         />

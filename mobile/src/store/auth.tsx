@@ -11,6 +11,7 @@ import { loginWithCredentials } from "@/api/client";
 import { setUnauthorizedHandler } from "@/api/authEvents";
 import { setSession } from "@/api/session";
 import { deleteItemAsync, getItemAsync, setItemAsync } from "@/utils/secureStorage";
+import { clearOfflineCache } from "@/store/offlineCache";
 import {
   type BiometricLabel,
   clearBiometricEnrollment,
@@ -46,7 +47,14 @@ interface AuthState {
   loginWithPassword: (baseUrl: string, username: string, password: string) => Promise<void>;
   confirmBiometricEnroll: () => Promise<boolean>;
   skipBiometricPrompt: () => void;
-  unlockWithBiometric: () => Promise<boolean>;
+  /**
+   * Prawdziwy prompt Face ID/Touch ID. NIE odblokowuje - samo sprawdza.
+   * Ekran blokady po sukcesie gra krotkie budzenie Ordlaka i dopiero
+   * wtedy wola `finishUnlock`; inaczej ekran znikalby w tej samej
+   * klatce, w ktorej system potwierdzil twarz.
+   */
+  verifyBiometric: () => Promise<boolean>;
+  finishUnlock: () => void;
   useFallbackPasswordLogin: () => void;
   disableBiometric: () => Promise<void>;
   logout: () => Promise<void>;
@@ -153,12 +161,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setNeedsBiometricPrompt(false);
   }, []);
 
-  const unlockWithBiometric = React.useCallback(async () => {
-    const ok = await unlockWithBiometricUtil("Odblokuj ORDLY");
-    if (ok) {
-      setIsLocked(false);
-    }
-    return ok;
+  const verifyBiometric = React.useCallback(
+    () => unlockWithBiometricUtil("Odblokuj ORDLY"),
+    []
+  );
+
+  const finishUnlock = React.useCallback(() => {
+    setIsLocked(false);
   }, []);
 
   const useFallbackPasswordLogin = React.useCallback(() => {
@@ -175,6 +184,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const logout = React.useCallback(async () => {
+    // Zapisany stan na tryb bez połączenia to dane kupujących - nie
+    // zostają w telefonie po wylogowaniu.
+    clearOfflineCache();
     await Promise.all([
       deleteItemAsync(BASE_URL_KEY),
       deleteItemAsync(TOKEN_KEY),
@@ -222,7 +234,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       loginWithPassword,
       confirmBiometricEnroll,
       skipBiometricPrompt,
-      unlockWithBiometric,
+      verifyBiometric,
+      finishUnlock,
       useFallbackPasswordLogin,
       disableBiometric,
       logout,
@@ -242,7 +255,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       loginWithPassword,
       confirmBiometricEnroll,
       skipBiometricPrompt,
-      unlockWithBiometric,
+      verifyBiometric,
+      finishUnlock,
       useFallbackPasswordLogin,
       disableBiometric,
       logout,

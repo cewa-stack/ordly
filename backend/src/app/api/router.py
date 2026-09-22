@@ -28,6 +28,7 @@ from app.api.endpoints import (
     orders,
     ordlak,
     push,
+    reply_templates,
     returns,
     stats,
     stock,
@@ -59,6 +60,11 @@ mobile_api_router.include_router(
 )
 mobile_api_router.include_router(
     issues.router, tags=["mobile-issues"], dependencies=[Depends(require_api_token)]
+)
+mobile_api_router.include_router(
+    reply_templates.router,
+    tags=["mobile-reply-templates"],
+    dependencies=[Depends(require_api_token)],
 )
 mobile_api_router.include_router(
     mail.router, tags=["mobile-mail"], dependencies=[Depends(require_api_token)]

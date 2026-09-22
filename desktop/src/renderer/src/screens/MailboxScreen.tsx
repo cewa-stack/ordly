@@ -347,6 +347,7 @@ export function MailboxScreen() {
             {isLoading && <SkeletonRows rows={5} />}
             {!isLoading && (data ?? []).length === 0 && (
               <EmptyState
+                prop="envelope"
                 title="Nic w tym filtrze"
                 description="Zmień filtr kanału albo odznacz „tylko nieprzeczytane”."
               />

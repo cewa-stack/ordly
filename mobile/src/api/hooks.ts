@@ -29,6 +29,7 @@ import type {
   OrdlakConversation,
   OrdlakStatus,
   PushSubscribeBody,
+  ReplyTemplate,
   ReturnItem,
   Shipment,
   SyncResult,
@@ -191,8 +192,8 @@ export function useSendTestPush() {
 }
 
 // ---------------------------------------------------------------------
-// Zwroty, dyskusje, skrzynka - podgląd tylko do odczytu (bez akcji
-// piszących - te żyją wyłącznie w aplikacji desktopowej ORDLY).
+// Zwroty, dyskusje, skrzynka. Jedyna akcja pisząca to odpowiedź
+// w dyskusji - reszta to podgląd, a decyzje zapadają na desktopie.
 // ---------------------------------------------------------------------
 
 export function useReturns() {
@@ -215,6 +216,33 @@ export function useIssueMessages(issueId: string | undefined) {
     queryFn: () =>
       api.get<IssueMessage[]>(`/api/v1/issues/${encodeURIComponent(issueId!)}/messages`),
     enabled: Boolean(issueId),
+  });
+}
+
+/**
+ * Odpowiedź sprzedawcy w dyskusji - widzi ją kupujący i nie da się jej
+ * cofnąć, więc ekran pyta o potwierdzenie, zanim to zawoła.
+ */
+export function useReplyToIssue(issueId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (text: string) =>
+      api.post<void>(`/api/v1/issues/${encodeURIComponent(issueId)}/reply`, { text }),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ["issue-messages", issueId] });
+      void queryClient.invalidateQueries({ queryKey: ["issues"] });
+    },
+  });
+}
+
+/** Szablony odpowiedzi z Pi - te same co na desktopie, edytowane tam. */
+export function useReplyTemplates(enabled = true) {
+  return useQuery({
+    queryKey: ["reply-templates"],
+    queryFn: () => api.get<ReplyTemplate[]>("/api/v1/reply-templates"),
+    enabled,
+    retry: false,
+    staleTime: 5 * 60_000,
   });
 }
 

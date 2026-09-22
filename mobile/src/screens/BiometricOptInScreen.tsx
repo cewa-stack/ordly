@@ -6,7 +6,7 @@
  * korzyść, zanim pojawi się systemowy prompt.
  */
 import * as React from "react";
-import { Pressable, StyleSheet, Text, View } from "react-native";
+import { Pressable, StyleSheet, Text, View, useWindowDimensions } from "react-native";
 
 import type { Palette } from "@/theme/colors";
 import { useTheme, useThemedStyles } from "@/theme/theme";
@@ -14,13 +14,14 @@ import { family, radii, spacing, typography } from "@/theme/typography";
 import { useAuth } from "@/store/auth";
 import { PrimaryButton } from "@/components/PrimaryButton";
 import { Ordlak } from "@/components/Ordlak";
-import { GlowBackdrop } from "@/components/GlowBackdrop";
+import { Waybill } from "@/components/Waybill";
 import { FaceIdIcon } from "@/icons";
 
 export function BiometricOptInScreen() {
   const styles = useThemedStyles(createStyles);
   const { c } = useTheme();
-  const { biometricLabel, confirmBiometricEnroll, skipBiometricPrompt } = useAuth();
+  const { width: screenWidth } = useWindowDimensions();
+  const { biometricLabel, confirmBiometricEnroll, skipBiometricPrompt, username } = useAuth();
   const [busy, setBusy] = React.useState(false);
   const [error, setError] = React.useState(false);
 
@@ -36,8 +37,9 @@ export function BiometricOptInScreen() {
 
   return (
     <View style={styles.screen}>
-      <GlowBackdrop />
       <View style={styles.content}>
+        {/* Ta sama etykieta, która od następnego razu zamknie sklep. */}
+        <Waybill width={Math.min(260, screenWidth - 2 * spacing.xl)} recipient={username} />
         <Ordlak state="idle" size={88} />
 
         <View style={styles.faceCircle}>

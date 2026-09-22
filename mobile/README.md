@@ -69,8 +69,8 @@ npx expo start --web
 
 ```
 mobile/
-├── App.tsx                 # punkt wejścia: providery + nawigacja + PWA head tags
-├── public/                 # manifest.json, sw.js, icon.png - kopiowane 1:1 do web builda
+├── App.tsx                 # punkt wejścia: providery + nawigacja + cache na tryb offline
+├── public/                 # index.html (szablon z meta-tagami iOS), manifest.json, sw.js, ikony
 ├── src/
 │   ├── api/                # klient HTTP, sesja, hooki react-query, typy odpowiedzi
 │   ├── components/         # komponenty współdzielone (karty, wiersze, stany)

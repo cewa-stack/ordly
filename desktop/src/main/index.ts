@@ -11,6 +11,7 @@ import { registerMailboxIpc } from "./ipc/mailbox";
 import { registerOlxIpc } from "./ipc/olx";
 import { registerStatsIpc } from "./ipc/stats";
 import { registerOrdlakIpc } from "./ipc/ordlak";
+import { registerReplyTemplatesIpc } from "./ipc/replyTemplates";
 
 /**
  * Okno jest bezramkowe (`frame: false`) - wlasny pasek tytulowy w
@@ -139,6 +140,7 @@ app.whenReady().then(() => {
   registerOlxIpc();
   registerStatsIpc();
   registerOrdlakIpc();
+  registerReplyTemplatesIpc();
   createWindow();
 
   app.on("activate", () => {

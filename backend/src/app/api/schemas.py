@@ -21,6 +21,7 @@ from app.domain.entities.offer_stock_movement import OfferStockMovement
 from app.domain.entities.order import Order
 from app.domain.entities.order_return import ReturnRecord
 from app.domain.entities.ordlak_conversation import OrdlakConversation
+from app.domain.entities.reply_template import ReplyTemplate
 from app.domain.entities.shipment import Shipment
 from app.infrastructure.mail.mime import MailBodies, html_to_plain_text
 from app.repositories.sqlite_event_repository import EventRecord
@@ -285,6 +286,39 @@ class IssueReplyIn(BaseModel):
     """Ciało żądania `POST /api/v1/issues/{id}/reply`."""
 
     text: str = Field(min_length=1, max_length=20000)
+
+
+# --------------------------------------------------------------------------
+# Szablony odpowiedzi
+# --------------------------------------------------------------------------
+
+
+class ReplyTemplateIn(BaseModel):
+    """Ciało żądania `POST` i `PUT /api/v1/reply-templates`."""
+
+    title: str = Field(min_length=1, max_length=80)
+    body: str = Field(min_length=1, max_length=20000)
+
+    @field_validator("title", "body")
+    @classmethod
+    def _not_blank(cls, value: str) -> str:
+        """Same spacje to nie treść - szablon bez niej wstawiałby pustkę."""
+        if not value.strip():
+            raise ValueError("Pole nie może być puste.")
+        return value.strip()
+
+
+class ReplyTemplateOut(BaseModel):
+    """Szablon odpowiedzi - znaczniki `{...}` podstawia aplikacja, nie serwer."""
+
+    id: int
+    title: str
+    body: str
+
+
+def reply_template_out(template: ReplyTemplate) -> ReplyTemplateOut:
+    """Mapuje encję domenową ReplyTemplate na schemat odpowiedzi API."""
+    return ReplyTemplateOut(id=template.id, title=template.title, body=template.body)
 
 
 # --------------------------------------------------------------------------

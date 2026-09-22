@@ -36,6 +36,46 @@ export function parseApiDate(iso: string): Date {
   return new Date(trimmed.includes("T") && !hasZone ? `${trimmed}Z` : trimmed);
 }
 
+/** Po tylu godzinach czekające zamówienie robi się koralowe. */
+export const OVERDUE_AFTER_HOURS = 24;
+
+/**
+ * Ile zamówienie czeka na spakowanie: „czeka 40 min”, „czeka 3 h”,
+ * „czeka 3 dni”. Godziny aż do dwóch dób - „czeka 1 dzień” brzmi
+ * łagodniej, niż jest, a 30 h mówi wprost, że termin już minął.
+ */
+export function waitingLabel(iso: string, now = Date.now()): { text: string; overdue: boolean } {
+  const minutes = Math.max(0, Math.floor((now - parseApiDate(iso).getTime()) / 60_000));
+  const hours = Math.floor(minutes / 60);
+  const text =
+    minutes < 60
+      ? `czeka ${minutes} min`
+      : hours < 48
+        ? `czeka ${hours} h`
+        : `czeka ${Math.floor(hours / 24)} dni`;
+  return { text, overdue: hours >= OVERDUE_AFTER_HOURS };
+}
+
+/**
+ * Ostatnia synchronizacja z Pi - `last_sync_human` z `/dashboard` to
+ * polski czas „RRRR-MM-DD GG:MM” (albo „jeszcze nie wykonano” tuż po
+ * restarcie usługi). Pi synchronizuje co minutę, więc kwadrans ciszy
+ * znaczy, że synchronizacja stanęła - wtedy `stale`.
+ */
+export function lastSyncLabel(
+  human: string | undefined,
+  now = Date.now()
+): { text: string; stale: boolean } | null {
+  if (!human) return null;
+  const match = /^(\d{4})-(\d{2})-(\d{2}) (\d{2}):(\d{2})$/.exec(human.trim());
+  if (!match) return { text: "Allegro jeszcze nie sprawdzone od startu Pi", stale: false };
+  const [, y, mo, d, h, mi] = match.map(Number);
+  const minutes = Math.floor((now - new Date(y, mo - 1, d, h, mi).getTime()) / 60_000);
+  if (minutes < 1) return { text: "Allegro sprawdzone przed chwilą", stale: false };
+  if (minutes < 60) return { text: `Allegro sprawdzone ${minutes} min temu`, stale: minutes >= 15 };
+  return { text: `Allegro sprawdzone o ${match[4]}:${match[5]}`, stale: true };
+}
+
 export function formatDate(isoDate: string): string {
   const date = parseApiDate(isoDate);
   return date.toLocaleString("pl-PL", {

@@ -161,10 +161,12 @@ Wklej wynik do `.env` (`VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY`,
 
 **Strona apki (PWA, `mobile/`)**: `src/push/webPush.ts` rejestruje
 `public/sw.js` (service worker obsługujący tylko `push`/`notificationclick`,
-celowo bez cache'owania app shellu — to osobny temat, patrz Faza 3) i
-wstrzykuje `<link rel="manifest">` + meta-tagi `apple-mobile-web-app-*`
-wymagane przez iOS Safari, żeby "Dodaj do ekranu początkowego" otwierało
-PWA w trybie standalone. Włączanie/wyłączanie i test wysyłki: karta
+celowo bez cache'owania app shellu — to osobny temat, patrz Faza 3).
+`<link rel="manifest">` i meta-tagi `apple-mobile-web-app-*` wymagane przez
+iOS Safari, żeby "Dodaj do ekranu początkowego" otwierało PWA w trybie
+standalone, są w statycznym szablonie `mobile/public/index.html` - iOS czyta
+je przy uruchomieniu, zanim ruszy skrypt, więc wstawianie ich z JS nie
+działało (jasny pas paska stanu nad ciemną aplikacją). Włączanie/wyłączanie i test wysyłki: karta
 "Powiadomienia push" w ekranie Ustawienia (`PushNotificationsCard.tsx`),
 widoczna wyłącznie w kompilacji web.
 

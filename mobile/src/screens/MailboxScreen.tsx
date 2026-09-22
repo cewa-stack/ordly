@@ -77,7 +77,7 @@ export function MailboxScreen() {
           <Skeleton height={84} radius={radii.lg} style={{ marginBottom: spacing.sm }} />
           <Skeleton height={84} radius={radii.lg} />
         </View>
-      ) : mail.isError ? (
+      ) : mail.isError && !mail.data ? (
         <ErrorState onRetry={() => mail.refetch()} />
       ) : (
         <FlatList
@@ -100,6 +100,7 @@ export function MailboxScreen() {
           ListEmptyComponent={
             <EmptyState
               mascotPose="sleep"
+              mascotProp="envelope"
               title="Skrzynka jest pusta"
               description="Ordi pokazuje tu maile od Allegro i OLX. Jeśli spodziewasz się wiadomości, a nic nie przychodzi — sprawdź stan skrzynki w Ustawieniach na desktopie."
             />

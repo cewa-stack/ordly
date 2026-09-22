@@ -148,6 +148,20 @@ const ORDERS: Order[] = [
   },
 ];
 
+/** Szablony z migracji 0013 - edytowalne w podgladzie, znikaja po odswiezeniu. */
+let templates = [
+  {
+    id: 1,
+    title: "Potwierdzenie zgłoszenia",
+    body: "Dzień dobry,\n\ndziękuję za zgłoszenie. Sprawdzam sprawę i wracam z odpowiedzią najpóźniej jutro do południa.\n\nPozdrawiam",
+  },
+  {
+    id: 2,
+    title: "Wysłane — numer przesyłki",
+    body: "Dzień dobry,\n\npaczka jest już w drodze. Numer przesyłki: {numer_przesylki}.\n\nDziękuję za zakup i pozdrawiam",
+  },
+];
+
 export function installMockBridge(): void {
   const bridge = {
     auth: {
@@ -212,6 +226,8 @@ export function installMockBridge(): void {
     orders: {
       list: () => ok(ORDERS),
       search: () => ok(ORDERS),
+      get: (externalId: string) =>
+        ok(ORDERS.find((order) => order.external_id === externalId) ?? ORDERS[0]),
       tracking: (externalId: string) =>
         ok({
           order_external_id: externalId,
@@ -277,6 +293,22 @@ export function installMockBridge(): void {
         ]),
       messages: () => ok([]),
       reply: () => ok(null),
+    },
+    templates: {
+      list: () => ok(templates),
+      create: (input: { title: string; body: string }) => {
+        const created = { id: Math.max(0, ...templates.map((t) => t.id)) + 1, ...input };
+        templates = [...templates, created];
+        return ok(created);
+      },
+      update: (id: number, input: { title: string; body: string }) => {
+        templates = templates.map((t) => (t.id === id ? { id, ...input } : t));
+        return ok({ id, ...input });
+      },
+      delete: (id: number) => {
+        templates = templates.filter((t) => t.id !== id);
+        return ok(null);
+      },
     },
     stats: {
       get: () =>

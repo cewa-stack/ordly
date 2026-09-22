@@ -37,11 +37,11 @@ import { ThemeProvider, useTheme } from "@/theme/theme";
 import { navigationThemeFor } from "@/navigation/theme";
 import { RootNavigator } from "@/navigation/RootNavigator";
 import { Ordlak } from "@/components/Ordlak";
-import { injectPwaHeadTags, registerServiceWorker } from "@/push/webPush";
+import { registerServiceWorker } from "@/push/webPush";
 import { SyncProvider } from "@/store/sync";
+import { persistOfflineCache, restoreOfflineCache } from "@/store/offlineCache";
 
-// Efekt uboczny na `document` - no-op na natywnym iOS/Android (guard w środku).
-injectPwaHeadTags();
+// No-op na natywnym iOS/Android (guard w środku).
 void registerServiceWorker();
 
 const queryClient = new QueryClient({
@@ -52,6 +52,11 @@ const queryClient = new QueryClient({
     },
   },
 });
+
+// Ostatni stan danych na wypadek braku połączenia z Pi (tylko PWA).
+// Wczytany PRZED pierwszym renderem, żeby ekrany nie mignęły pustką.
+restoreOfflineCache(queryClient);
+persistOfflineCache(queryClient);
 
 /** Ekran ładowania przy starcie (odczyt sesji) - marka zamiast pustej klatki. */
 function SplashGate({ children }: { children: React.ReactNode }) {

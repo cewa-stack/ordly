@@ -21,54 +21,9 @@ export function isWebPushSupported(): boolean {
   );
 }
 
-/**
- * Wstrzykuje manifest PWA i meta-tagi wymagane przez iOS Safari, żeby
- * "Dodaj do ekranu początkowego" otwierało apkę w trybie standalone
- * (bez paska adresu) zamiast zwykłej karty przeglądarki. Safari **ignoruje**
- * `display: standalone` z manifest.json i wymaga tych starszych,
- * webkit-owych meta-tagów - stąd dublowanie z manifest.json.
- */
-export function injectPwaHeadTags(): void {
-  if (Platform.OS !== "web" || typeof document === "undefined") {
-    return;
-  }
-
-  if (!document.querySelector('link[rel="manifest"]')) {
-    const manifestLink = document.createElement("link");
-    manifestLink.rel = "manifest";
-    manifestLink.href = "/manifest.json";
-    document.head.appendChild(manifestLink);
-  }
-
-  const metaTags: Array<[string, string]> = [
-    ["apple-mobile-web-app-capable", "yes"],
-    ["apple-mobile-web-app-status-bar-style", "black-translucent"],
-    ["apple-mobile-web-app-title", "ORDLY"],
-    ["theme-color", "#0A1413"],
-  ];
-  for (const [name, content] of metaTags) {
-    if (!document.querySelector(`meta[name="${name}"]`)) {
-      const meta = document.createElement("meta");
-      meta.name = name;
-      meta.content = content;
-      document.head.appendChild(meta);
-    }
-  }
-
-  // Ikona ekranu glownego iPhone'a. iOS nie czyta ikon z manifestu - bierze
-  // WYLACZNIE `apple-touch-icon`. Plik ma 180 x 180 (rozmiar natywny ekranu
-  // glownego), jest pelnym kwadratem bez przezroczystosci i bez wlasnych
-  // zaokraglen: maske nakłada system. Stara ikona miala narysowany
-  // zaokraglony kwadrat na bialym tle, wiec na telefonie wychodzila
-  // podwojna ramka.
-  if (!document.querySelector('link[rel="apple-touch-icon"]')) {
-    const touchIcon = document.createElement("link");
-    touchIcon.rel = "apple-touch-icon";
-    touchIcon.setAttribute("sizes", "180x180");
-    touchIcon.href = "/apple-touch-icon.png";
-    document.head.appendChild(touchIcon);
-  }
-}
+// Manifest, meta-tagi iOS i `apple-touch-icon` są w statycznym
+// `public/index.html` - iOS czyta je przy uruchomieniu, zanim ruszy
+// jakikolwiek skrypt, więc wstawianie ich stąd nie działało.
 
 export async function registerServiceWorker(): Promise<ServiceWorkerRegistration | null> {
   if (!isWebPushSupported()) {

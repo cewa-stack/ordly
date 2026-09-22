@@ -40,6 +40,12 @@ export interface Palette {
   violet: string;
   /** kolor cienia karty i galki */
   shadow: string;
+  /** papier etykiety nadawczej (ekran blokady) */
+  paper: string;
+  /** tasma pakowa - wypelnienie, krawedz i nadruk */
+  tape: string;
+  tapeEdge: string;
+  tapeInk: string;
 }
 
 export const night: Palette = {
@@ -58,6 +64,12 @@ export const night: Palette = {
   amber: "#F5C065",
   violet: "#A79BFF",
   shadow: "rgba(0,0,0,.9)",
+  // Noca tasma jest przezroczysta i lapie tylko odrobine tealu - jak
+  // prawdziwa tasma w polmroku, a nie brazowa plama na ciemnym tle.
+  paper: "#12221F",
+  tape: "rgba(95,217,204,.17)",
+  tapeEdge: "rgba(95,217,204,.34)",
+  tapeInk: "rgba(95,217,204,.75)",
 };
 
 export const day: Palette = {
@@ -76,6 +88,10 @@ export const day: Palette = {
   amber: "#8A6218",
   violet: "#4F44C4",
   shadow: "rgba(15,26,23,.4)",
+  paper: "#FFFFFF",
+  tape: "rgba(190,140,70,.32)",
+  tapeEdge: "rgba(150,105,40,.35)",
+  tapeInk: "#7A5616",
 };
 
 /**

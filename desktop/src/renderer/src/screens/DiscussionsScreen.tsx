@@ -5,6 +5,10 @@
  * (`--teal-dim`), plus pole odpowiedzi z szablonami. Szablony realnie
  * wstawiaja tresc do pola (sekcja 9.1 pkt 10) - wczesniej ikona
  * szablonu nie robila nic.
+ *
+ * Szablony przychodza z Pi (te same co na telefonie, edycja w
+ * Ustawieniach), a login, numer zamowienia i numer przesylki podstawia
+ * `fillTemplate` z danych tego watku.
  */
 import * as React from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
@@ -23,6 +27,7 @@ import {
 import { useToast } from "../lib/toast";
 import { formatAge, formatDateTime } from "../lib/format";
 import { htmlToPlainText, looksLikeHtml, sanitizeMessageHtml } from "../lib/sanitizeHtml";
+import { fillTemplate, hasTemplateGap, useReplyTemplates } from "../lib/replyTemplate";
 import type { Issue } from "../types/api";
 
 /**
@@ -53,25 +58,6 @@ const STATUS_TONE: Record<string, PillTone> = {
   CLAIM_REJECTED: "mute",
 };
 
-/** Szablony odpowiedzi - tresc wg regul tonu z sekcji 7.1: konkret, bez sprytu. */
-const TEMPLATES: { name: string; text: string }[] = [
-  {
-    name: "Potwierdzenie zgłoszenia",
-    text: "Dzień dobry,\n\ndziękuję za zgłoszenie. Sprawdzam sprawę i wracam z odpowiedzią najpóźniej jutro do południa.\n\nPozdrawiam",
-  },
-  {
-    name: "Wysyłka w toku",
-    text: "Dzień dobry,\n\npaczka jest już spakowana i trafi do kuriera dzisiaj. Numer przesyłki wyślę, gdy tylko go otrzymam.\n\nPozdrawiam",
-  },
-  {
-    name: "Prośba o zdjęcia",
-    text: "Dzień dobry,\n\nżeby szybciej rozwiązać sprawę, proszę o 2-3 zdjęcia produktu i opakowania. Na tej podstawie od razu zaproponuję rozwiązanie.\n\nPozdrawiam",
-  },
-  {
-    name: "Zwrot przyjęty",
-    text: "Dzień dobry,\n\nzwrot przyjęty. Zwrot środków uruchamiam po odbiorze przesyłki - księgowanie zajmuje zwykle 2-3 dni robocze.\n\nPozdrawiam",
-  },
-];
 
 /**
  * Tresc jednej wiadomosci w watku.
@@ -128,6 +114,21 @@ function Conversation({ issue }: { issue: Issue }) {
   const [text, setText] = React.useState("");
   const [templatesOpen, setTemplatesOpen] = React.useState(false);
   const scrollRef = React.useRef<HTMLDivElement>(null);
+  const templatesQuery = useReplyTemplates();
+
+  // Numer przesylki do szablonu. Tylko przy otwartym menu szablonow -
+  // przegladanie watkow nie ma po co pytac Pi o kazde zamowienie.
+  const orderQuery = useQuery({
+    queryKey: ["order", issue.order_external_id],
+    queryFn: async () => {
+      const result = await window.ordly.orders.get(issue.order_external_id);
+      if (!result.ok) throw new Error(result.message);
+      return result.data;
+    },
+    enabled: templatesOpen && Boolean(issue.order_external_id),
+    retry: false,
+  });
+  const gap = hasTemplateGap(text);
 
   const threadQuery = useQuery({
     queryKey: ["issue-thread", issue.external_id],
@@ -214,17 +215,40 @@ function Conversation({ issue }: { issue: Issue }) {
 
       <div className="relative shrink-0">
         {templatesOpen && (
-          <div className="absolute bottom-full left-0 right-0 z-10 mb-2 overflow-hidden rounded-md border border-line-2 bg-panel shadow-palette">
-            {TEMPLATES.map((template) => (
+          <div className="absolute bottom-full left-0 right-0 z-10 mb-2 max-h-[260px] overflow-y-auto rounded-md border border-line-2 bg-panel shadow-palette">
+            {templatesQuery.isLoading && (
+              <p className="px-3.5 py-2.5 text-[12px] text-text-3">Pobieram szablony…</p>
+            )}
+            {templatesQuery.isError && (
+              <p className="px-3.5 py-2.5 text-[12px] leading-relaxed text-coral">
+                Nie udało się pobrać szablonów.{" "}
+                {templatesQuery.error instanceof Error ? templatesQuery.error.message : ""}
+              </p>
+            )}
+            {templatesQuery.data?.length === 0 && (
+              <p className="px-3.5 py-2.5 text-[12px] text-text-3">
+                Brak szablonów — dodasz je w Ustawieniach.
+              </p>
+            )}
+            {templatesQuery.data?.map((template) => (
               <button
-                key={template.name}
+                key={template.id}
+                // Czekamy na zamowienie, zeby nie wstawic luki tam, gdzie
+                // numer przesylki za chwile bylby znany.
+                disabled={template.body.includes("{numer_przesylki}") && orderQuery.isLoading}
                 onClick={() => {
-                  setText(template.text);
+                  setText(
+                    fillTemplate(template.body, {
+                      login: issue.buyer_login,
+                      orderId: issue.order_external_id,
+                      trackingNumber: orderQuery.data?.tracking_number ?? null,
+                    })
+                  );
                   setTemplatesOpen(false);
                 }}
-                className="block w-full border-b border-line px-3.5 py-2.5 text-left text-[12px] text-text-2 last:border-b-0 hover:bg-panel-2 hover:text-text"
+                className="block w-full border-b border-line px-3.5 py-2.5 text-left text-[12px] text-text-2 last:border-b-0 hover:bg-panel-2 hover:text-text disabled:opacity-50"
               >
-                {template.name}
+                {template.title}
               </button>
             ))}
           </div>
@@ -252,11 +276,14 @@ function Conversation({ issue }: { issue: Issue }) {
                 Wątek zamknięty przez Allegro
               </span>
             )}
+            {issue.chat_active && gap && (
+              <span className="text-[10.5px] text-coral">Uzupełnij pole w ‹ › przed wysłaniem</span>
+            )}
             <Button
               className="ml-auto !px-3.5 !py-[7px] !text-[12px]"
               onClick={() => replyMutation.mutate()}
               disabled={
-                !issue.chat_active || text.trim().length === 0 || replyMutation.isPending
+                !issue.chat_active || text.trim().length === 0 || gap || replyMutation.isPending
               }
               icon={<SendIcon size={13} />}
             >

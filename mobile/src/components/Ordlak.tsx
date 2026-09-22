@@ -30,6 +30,18 @@ import { useTheme } from "@/theme/theme";
 
 export type OrdlakState = "idle" | "sync" | "think" | "happy" | "alert" | "sleep";
 
+/**
+ * Co Ordlak trzyma w ręce. Notatnik to jego stały znak; reszta pojawia
+ * się tylko w pustych stanach, żeby „pusta skrzynka” i „pusty magazyn”
+ * nie wyglądały tak samo. 1:1 z desktopowym Ordlakiem.
+ */
+export type OrdlakProp = "clipboard" | "envelope" | "box" | "magnifier";
+
+/** Karton w rękach Ordlaka - kolor tektury jest stały, jak prawdziwy. */
+const KRAFT = "#B08A57";
+const KRAFT_TOP = "#C7A06A";
+const KRAFT_SIDE = "#8C6A3E";
+
 /** Przesuniecie z sekcji 6: 64 - 72.41 oraz 64 - 64.5. */
 const SHIFT_X = -8.4;
 const SHIFT_Y = -0.5;
@@ -48,6 +60,78 @@ interface OrdlakProps {
   state?: OrdlakState;
   size?: number;
   style?: StyleProp<ViewStyle>;
+  prop?: OrdlakProp;
+}
+
+/**
+ * Rekwizyt w prawej ręce - w tym samym miejscu co notatnik, żeby ramka
+ * figury (a przez to wyśrodkowanie i punkty obrotu) się nie zmieniała.
+ */
+function PropShape({
+  prop,
+  skin,
+  skinDark,
+  boardFill,
+}: {
+  prop: OrdlakProp;
+  skin: string;
+  skinDark: string;
+  boardFill: string;
+}) {
+  if (prop === "envelope") {
+    return (
+      <G rotation={7} origin="101, 81">
+        <Rect x="85" y="67" width="32" height="23" rx="3" fill={boardFill} stroke={skinDark} strokeWidth={2.6} />
+        <Path
+          d="M87.5 70 101 80.5 114.5 70"
+          stroke={skin}
+          strokeWidth={2.4}
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          fill="none"
+          opacity={0.6}
+        />
+      </G>
+    );
+  }
+  if (prop === "box") {
+    return (
+      <G rotation={4} origin="101, 81">
+        <Path d="M86 71l5-6h28l-5 6z" fill={KRAFT_TOP} />
+        <Path d="M114 71l5-6v24l-5 6z" fill={KRAFT_SIDE} />
+        <Rect x="86" y="71" width="28" height="24" rx="1.5" fill={KRAFT} />
+        <Rect x="98" y="71" width="4.5" height="24" fill={skin} opacity={0.55} />
+        <Path d="M98 71l5-6h4.5l-5 6z" fill={skin} opacity={0.55} />
+      </G>
+    );
+  }
+  if (prop === "magnifier") {
+    return (
+      <G>
+        <Line x1="107.5" y1="84.5" x2="116" y2="94" stroke={skinDark} strokeWidth={5} strokeLinecap="round" />
+        <Circle cx="100" cy="76" r="10.5" fill={boardFill} stroke={skinDark} strokeWidth={3} />
+        <Path d="M94.5 72.5a6.5 6.5 0 0 1 5-3.5" stroke={skin} strokeWidth={2} strokeLinecap="round" fill="none" opacity={0.7} />
+      </G>
+    );
+  }
+  return (
+    <G rotation={7} origin="101, 81">
+      <Rect
+        x="86"
+        y="62"
+        width="30"
+        height="38"
+        rx="5"
+        fill={boardFill}
+        stroke={skinDark}
+        strokeWidth={2.6}
+      />
+      <Rect x="95" y="57" width="12" height="8" rx="3" fill={skinDark} />
+      <Line x1="92" y1="76" x2="110" y2="76" stroke={skin} strokeWidth={2.6} strokeLinecap="round" opacity={0.5} />
+      <Line x1="92" y1="84" x2="110" y2="84" stroke={skin} strokeWidth={2.6} strokeLinecap="round" opacity={0.5} />
+      <Line x1="92" y1="92" x2="104" y2="92" stroke={skin} strokeWidth={2.6} strokeLinecap="round" opacity={0.5} />
+    </G>
+  );
 }
 
 /** Petla 0->1 o stalym czasie. Zwraca wartosc do interpolacji. */
@@ -94,7 +178,7 @@ function Layer({
   );
 }
 
-export function Ordlak({ state = "idle", size = 40, style }: OrdlakProps) {
+export function Ordlak({ state = "idle", size = 40, style, prop = "clipboard" }: OrdlakProps) {
   const { c, reduceMotion } = useTheme();
   const scale = size / VIEW;
 
@@ -323,22 +407,7 @@ export function Ordlak({ state = "idle", size = 40, style }: OrdlakProps) {
                 opacity={state === "sleep" ? 0.4 : 1}
               />
             )}
-            <G rotation={7} origin="101, 81">
-              <Rect
-                x="86"
-                y="62"
-                width="30"
-                height="38"
-                rx="5"
-                fill={boardFill}
-                stroke={skinDark}
-                strokeWidth={2.6}
-              />
-              <Rect x="95" y="57" width="12" height="8" rx="3" fill={skinDark} />
-              <Line x1="92" y1="76" x2="110" y2="76" stroke={skin} strokeWidth={2.6} strokeLinecap="round" opacity={0.5} />
-              <Line x1="92" y1="84" x2="110" y2="84" stroke={skin} strokeWidth={2.6} strokeLinecap="round" opacity={0.5} />
-              <Line x1="92" y1="92" x2="104" y2="92" stroke={skin} strokeWidth={2.6} strokeLinecap="round" opacity={0.5} />
-            </G>
+            <PropShape prop={prop} skin={skin} skinDark={skinDark} boardFill={boardFill} />
           </G>
         </Svg>
 

@@ -13,7 +13,7 @@
  * wysokość niezależnie od długości nazwy kupującego.
  */
 import * as React from "react";
-import { Pressable, StyleSheet, Text, View } from "react-native";
+import { Animated, Pressable, StyleSheet, Text, View } from "react-native";
 
 import {
   CHANNEL_LABEL,
@@ -26,11 +26,19 @@ import type { Palette } from "@/theme/colors";
 import { useTheme, useThemedStyles } from "@/theme/theme";
 import { fonts, radii } from "@/theme/typography";
 import type { Order } from "@/api/types";
-import { displayFulfillmentLabel, formatMoney, parseApiDate } from "@/utils/format";
+import {
+  displayFulfillmentLabel,
+  formatMoney,
+  isPendingFulfillment,
+  parseApiDate,
+  waitingLabel,
+} from "@/utils/format";
 
 interface OrderRowProps {
   order: Order;
   onPress?: () => void;
+  /** Zamówienie doszło przy ostatnim odświeżeniu - wiersz raz mignie. */
+  highlight?: boolean;
 }
 
 /**
@@ -46,9 +54,25 @@ function shortStamp(iso: string): string {
   return `${date.toLocaleDateString("pl-PL", { day: "numeric", month: "short" })} ${time}`;
 }
 
-export function OrderRow({ order, onPress }: OrderRowProps) {
+export function OrderRow({ order, onPress, highlight = false }: OrderRowProps) {
   const styles = useThemedStyles(createStyles);
-  const { c, mode } = useTheme();
+  const { c, mode, reduceMotion } = useTheme();
+  const flash = React.useRef(new Animated.Value(0)).current;
+
+  React.useEffect(() => {
+    if (!highlight || reduceMotion) return;
+    flash.setValue(1);
+    Animated.timing(flash, {
+      toValue: 0,
+      duration: 1400,
+      delay: 250,
+      useNativeDriver: true,
+    }).start();
+  }, [highlight, reduceMotion, flash]);
+
+  // Czekające zamówienie mówi, OD KIEDY czeka - godzina złożenia sama
+  // tego nie powie, gdy zamówienie jest z wczoraj.
+  const waiting = isPendingFulfillment(order) ? waitingLabel(order.order_date) : null;
 
   const label = displayFulfillmentLabel(order);
   const tone = toneStyle(ORDER_TONE[label] ?? "mute", c);
@@ -70,6 +94,10 @@ export function OrderRow({ order, onPress }: OrderRowProps) {
       )}, ${label}`}
       style={({ pressed }) => [styles.card, pressed && styles.pressed]}
     >
+      <Animated.View
+        pointerEvents="none"
+        style={[styles.flash, { backgroundColor: c.acc, opacity: Animated.multiply(flash, 0.16) }]}
+      />
       <View style={[styles.channel, { backgroundColor: channel.background }]}>
         <Text style={[styles.channelLabel, { color: channel.text }]} numberOfLines={1}>
           {channelLabel}
@@ -81,7 +109,12 @@ export function OrderRow({ order, onPress }: OrderRowProps) {
           {order.buyer_login}
         </Text>
         <Text style={styles.meta} numberOfLines={1}>
-          {order.external_id.slice(0, 8).toUpperCase()} · {shortStamp(order.order_date)}
+          {order.external_id.slice(0, 8).toUpperCase()} ·{" "}
+          {waiting ? (
+            <Text style={waiting.overdue ? { color: c.coral } : undefined}>{waiting.text}</Text>
+          ) : (
+            shortStamp(order.order_date)
+          )}
         </Text>
       </View>
 
@@ -113,6 +146,10 @@ const createStyles = (c: Palette) =>
     },
     pressed: {
       opacity: 0.85,
+    },
+    flash: {
+      ...StyleSheet.absoluteFillObject,
+      borderRadius: radii.lg,
     },
     channel: {
       // STAŁE 60 px - bez tego nazwiska nie stoją w jednej linii pionowej.

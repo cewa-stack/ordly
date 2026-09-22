@@ -25,6 +25,7 @@ const ordly = {
   orders: {
     list: () => ipcRenderer.invoke("ordly:orders:list"),
     search: (query: string) => ipcRenderer.invoke("ordly:orders:search", query),
+    get: (externalId: string) => ipcRenderer.invoke("ordly:orders:get", externalId),
     tracking: (externalId: string) => ipcRenderer.invoke("ordly:orders:tracking", externalId),
     setFulfillment: (externalId: string, status: string) =>
       ipcRenderer.invoke("ordly:orders:setFulfillment", externalId, status),
@@ -38,6 +39,14 @@ const ordly = {
     messages: (issueId: string) => ipcRenderer.invoke("ordly:issues:messages", issueId),
     reply: (issueId: string, text: string) =>
       ipcRenderer.invoke("ordly:issues:reply", issueId, text),
+  },
+  templates: {
+    list: () => ipcRenderer.invoke("ordly:templates:list"),
+    create: (input: { title: string; body: string }) =>
+      ipcRenderer.invoke("ordly:templates:create", input),
+    update: (id: number, input: { title: string; body: string }) =>
+      ipcRenderer.invoke("ordly:templates:update", id, input),
+    delete: (id: number) => ipcRenderer.invoke("ordly:templates:delete", id),
   },
   stats: {
     get: () => ipcRenderer.invoke("ordly:stats:get"),

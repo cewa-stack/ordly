@@ -14,20 +14,37 @@
  * na błąd. W RN nie ma `mask-image`, więc robi to nakładka z gradientem.
  */
 import * as React from "react";
-import { Pressable, RefreshControl, ScrollView, StyleSheet, Text, View } from "react-native";
+import {
+  Animated,
+  Easing,
+  Pressable,
+  RefreshControl,
+  ScrollView,
+  StyleSheet,
+  Text,
+  View,
+} from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
 import { useNavigation } from "@react-navigation/native";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 
-import type { Palette } from "@/theme/colors";
+import { withAlpha, type Palette } from "@/theme/colors";
 import { useTheme, useThemedStyles } from "@/theme/theme";
 import { fonts, radii, spacing } from "@/theme/typography";
 import { TabHeading } from "@/components/TabHeading";
 import { Ordlak, type OrdlakState } from "@/components/Ordlak";
 import { OrderRow } from "@/components/OrderRow";
+import { CountUp } from "@/components/CountUp";
 import { useDashboard, useIssues, useOrders, useReturns } from "@/api/hooks";
-import { useSync } from "@/store/sync";
-import { formatMoney, isPendingFulfillment, parseApiDate } from "@/utils/format";
+import { useSync, type SyncPhase } from "@/store/sync";
+import {
+  formatMoney,
+  isPendingFulfillment,
+  lastSyncLabel,
+  parseApiDate,
+  plural,
+} from "@/utils/format";
+import { useNewIds } from "@/utils/useNewIds";
 import type { Issue, Order, ReturnItem } from "@/api/types";
 import type { RootStackParamList } from "@/navigation/types";
 
@@ -42,13 +59,15 @@ type Tint = "acc" | "coral" | "violet" | "amber";
 function Tile({
   label,
   value,
+  format,
   unit,
   delta,
   tint,
   onPress,
 }: {
   label: string;
-  value: string;
+  value: number;
+  format?: (value: number) => string;
   unit?: string;
   delta?: string;
   tint: Tint;
@@ -72,9 +91,7 @@ function Tile({
         </Text>
       </View>
       <View style={styles.tileValueRow}>
-        <Text style={styles.tileValue} numberOfLines={1}>
-          {value}
-        </Text>
+        <CountUp value={value} format={format} style={styles.tileValue} numberOfLines={1} />
         {unit ? <Text style={styles.tileUnit}>{unit}</Text> : null}
       </View>
       {delta ? (
@@ -86,11 +103,92 @@ function Tile({
   );
 }
 
+/**
+ * Postęp synchronizacji - karta Ordlaka wypełnia się od lewej do prawej.
+ *
+ * Wcześniej karta miała stałą poświatę w lewym górnym rogu. Jej
+ * zaokrąglona krawędź kończyła się mniej więcej w połowie karty, więc
+ * na telefonie czytała się jak pasek postępu zatrzymany na 45% - także
+ * wtedy, gdy nic się nie działo. Karta w spoczynku jest teraz gładka,
+ * a wypełnienie pojawia się WYŁĄCZNIE w trakcie synchronizacji.
+ *
+ * `/orders/sync` nie raportuje postępu, więc wypełnienie jest uczciwie
+ * niepewne: szybko do 70%, potem pełznie ku 94% i dopiero odpowiedź
+ * serwera domyka je do 100%. Nieudana synchronizacja nie domyka paska -
+ * gaśnie tam, gdzie stanął.
+ */
+function SyncSweep({ phase }: { phase: SyncPhase }) {
+  const styles = useThemedStyles(createStyles);
+  const { c, reduceMotion } = useTheme();
+  const [width, setWidth] = React.useState(0);
+  const progress = React.useRef(new Animated.Value(0)).current;
+  const opacity = React.useRef(new Animated.Value(0)).current;
+
+  React.useEffect(() => {
+    const timing = (value: Animated.Value, toValue: number, duration: number, easing = Easing.linear) =>
+      Animated.timing(value, {
+        toValue,
+        duration: reduceMotion ? 0 : duration,
+        easing,
+        useNativeDriver: true,
+      });
+
+    let animation: Animated.CompositeAnimation;
+    if (phase === "working") {
+      progress.setValue(0);
+      opacity.setValue(1);
+      animation = Animated.sequence([
+        timing(progress, 0.7, 1400, Easing.out(Easing.cubic)),
+        timing(progress, 0.94, 14000, Easing.out(Easing.quad)),
+      ]);
+    } else if (phase === "success") {
+      // Domknięcie + chwila na zobaczenie pełnego paska. Razem 1620 ms,
+      // mieści się w fazie sukcesu (1900 ms w `store/sync`).
+      animation = Animated.sequence([
+        timing(progress, 1, 320, Easing.out(Easing.cubic)),
+        Animated.delay(reduceMotion ? 0 : 700),
+        timing(opacity, 0, 600),
+      ]);
+    } else {
+      // Spoczynek: po sukcesie pasek już zgasł, po porażce gaśnie teraz.
+      animation = timing(opacity, 0, 260);
+    }
+    animation.start();
+    return () => animation.stop();
+  }, [phase, reduceMotion, progress, opacity]);
+
+  // Warstwa ma szerokość karty i wjeżdża z lewej (`translateX`), a nie
+  // rośnie (`width`) - przesunięcie idzie natywnym sterownikiem.
+  const translateX = progress.interpolate({
+    inputRange: [0, 1],
+    outputRange: [-width, 0],
+  });
+
+  return (
+    <View
+      style={StyleSheet.absoluteFill}
+      pointerEvents="none"
+      onLayout={(event) => setWidth(event.nativeEvent.layout.width)}
+    >
+      <Animated.View style={[StyleSheet.absoluteFill, { opacity, transform: [{ translateX }] }]}>
+        {/* Wypełnienie gęstnieje ku czołu - wiadomo, w którą stronę idzie. */}
+        <LinearGradient
+          colors={[withAlpha(c.acc, 0.03), withAlpha(c.acc, 0.13)]}
+          start={{ x: 0, y: 0.5 }}
+          end={{ x: 1, y: 0.5 }}
+          style={StyleSheet.absoluteFill}
+        />
+        <View style={[styles.sweepBar, { backgroundColor: c.acc }]} />
+      </Animated.View>
+    </View>
+  );
+}
+
 export function StartScreen() {
   const styles = useThemedStyles(createStyles);
   const { c } = useTheme();
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
-  const { phase, sync } = useSync();
+  const { phase, subtitle, sync } = useSync();
 
   const dashboard = useDashboard();
   const ordersQuery = useOrders();
@@ -128,7 +226,9 @@ export function StartScreen() {
   const cardTitle =
     phase === "working"
       ? "Synchronizuję Allegro"
-      : openIssues.length > 0
+      : phase === "success"
+        ? "Zsynchronizowano"
+        : openIssues.length > 0
         ? "Ktoś czeka na odpowiedź"
         : pending.length > 0
           ? "Są paczki do spakowania"
@@ -137,14 +237,36 @@ export function StartScreen() {
   const cardBody =
     phase === "working"
       ? "Pobieram zamówienia i zwroty z Allegro. Chwilę to potrwa."
-      : openIssues.length > 0
-        ? `${openIssues.length === 1 ? "Jedna dyskusja jest" : `${openIssues.length} dyskusje są`} otwarte. Odpowiedz, zanim kupujący zdąży się zniecierpliwić.`
+      : phase === "success"
+        ? subtitle
+        : openIssues.length > 0
+        ? `${
+            openIssues.length === 1
+              ? "Jedna dyskusja jest otwarta"
+              : `${openIssues.length} ${plural(openIssues.length, "dyskusja jest otwarta", "dyskusje są otwarte", "dyskusji jest otwartych")}`
+          }. Odpowiedz, zanim kupujący zdąży się zniecierpliwić.`
         : pending.length > 0
-          ? `${pending.length === 1 ? "Jedno zamówienie czeka" : `${pending.length} zamówień czeka`} na spakowanie. Pakowanie zatwierdzisz na desktopie.`
+          ? `${
+              pending.length === 1
+                ? "Jedno zamówienie czeka"
+                : `${pending.length} ${plural(pending.length, "zamówienie czeka", "zamówienia czekają", "zamówień czeka")}`
+            } na spakowanie. Pakowanie zatwierdzisz na desktopie.`
           : "Zero zaległości. Dotknij, żeby sprawdzić kanały jeszcze raz.";
 
   const refreshing =
     ordersQuery.isRefetching || issuesQuery.isRefetching || dashboard.isRefetching;
+
+  // "N min temu" ma się zmieniać także między odświeżeniami danych.
+  const [, tick] = React.useReducer((n: number) => n + 1, 0);
+  React.useEffect(() => {
+    const timer = setInterval(tick, 30_000);
+    return () => clearInterval(timer);
+  }, []);
+  const lastSync = lastSyncLabel(dashboard.data?.last_sync_human);
+
+  const freshOrders = useNewIds(
+    ordersQuery.data ? pending.map((o) => o.external_id) : undefined
+  );
 
   return (
     <View style={styles.screen}>
@@ -171,20 +293,23 @@ export function StartScreen() {
             accessibilityLabel="Synchronizuj z Allegro"
             style={({ pressed }) => [styles.ordCard, pressed && styles.pressed]}
           >
-            {/* Poświata - jedno źródło światła, wycięte przez overflow karty. */}
-            <LinearGradient
-              colors={[c.accDim, "transparent"]}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 1 }}
-              style={styles.ordGlow}
-              pointerEvents="none"
-            />
+            <SyncSweep phase={phase} />
             <Ordlak state={state} size={62} />
             <View style={styles.ordCopy}>
               <Text style={styles.ordTitle} numberOfLines={1}>
                 {cardTitle}
               </Text>
               <Text style={styles.ordBody}>{cardBody}</Text>
+              {/* Pi synchronizuje samo co minutę - ta linia mówi, że to
+                  działa, a kwadrans ciszy robi się koralowy. */}
+              {phase === "idle" && lastSync ? (
+                <Text
+                  style={[styles.ordSync, lastSync.stale && { color: c.coral }]}
+                  numberOfLines={1}
+                >
+                  {lastSync.text}
+                </Text>
+              ) : null}
             </View>
           </Pressable>
 
@@ -192,28 +317,29 @@ export function StartScreen() {
           <View style={styles.tiles}>
             <Tile
               label="Do spakowania"
-              value={String(pending.length)}
+              value={pending.length}
               tint="coral"
               delta={pending.length > 0 ? "czeka" : "czysto"}
               onPress={() => navigation.navigate("Main", { screen: "Orders" })}
             />
             <Tile
               label="Wartość dziś"
-              value={formatMoney(dashboard.data?.revenue_today ?? 0, "PLN", { round: true }).replace(" zł", "")}
+              value={Number(dashboard.data?.revenue_today ?? 0)}
+              format={(v) => formatMoney(v, "PLN", { round: true }).replace(" zł", "")}
               unit="zł"
               tint="acc"
-              delta={`${todayCount} ${todayCount === 1 ? "zamówienie" : "zamówień"}`}
+              delta={`${todayCount} ${plural(todayCount, "zamówienie", "zamówienia", "zamówień")}`}
             />
             <Tile
               label="Dyskusje"
-              value={String(openIssues.length)}
+              value={openIssues.length}
               tint="violet"
               delta={openIssues.length > 0 ? "czeka na odpowiedź" : "nikt nie pyta"}
               onPress={() => navigation.navigate("Discussions")}
             />
             <Tile
               label="Zwroty"
-              value={String(openReturns.length)}
+              value={openReturns.length}
               tint="amber"
               delta={openReturns.length > 0 ? "do obsłużenia" : "brak"}
               onPress={() => navigation.navigate("Returns")}
@@ -228,6 +354,7 @@ export function StartScreen() {
                 <OrderRow
                   key={order.external_id}
                   order={order}
+                  highlight={freshOrders.has(order.external_id)}
                   onPress={() =>
                     navigation.navigate("OrderDetail", { externalId: order.external_id })
                   }
@@ -286,13 +413,12 @@ const createStyles = (c: Palette) =>
       paddingHorizontal: 18,
       overflow: "hidden",
     },
-    ordGlow: {
+    sweepBar: {
       position: "absolute",
-      left: -30,
-      top: -40,
-      width: 200,
-      height: 180,
-      borderRadius: 100,
+      left: 0,
+      right: 0,
+      bottom: 0,
+      height: 2,
     },
     ordCopy: {
       flex: 1,
@@ -306,6 +432,12 @@ const createStyles = (c: Palette) =>
     ordBody: {
       ...fonts.body,
       color: c.tx2,
+    },
+    ordSync: {
+      ...fonts.mono,
+      fontSize: 10,
+      color: c.tx3,
+      marginTop: 2,
     },
 
     tiles: {

@@ -17,6 +17,7 @@ from app.database.models.ordlak_conversation_model import (
 )
 from app.database.models.product_model import ProductModel
 from app.database.models.push_subscription_model import PushSubscriptionModel
+from app.database.models.reply_template_model import ReplyTemplateModel
 from app.database.models.return_model import ReturnModel
 from app.database.models.settings_model import SettingsModel
 from app.database.models.shipment_model import ShipmentModel
@@ -34,6 +35,7 @@ __all__ = [
     "OrderModel",
     "ProductModel",
     "PushSubscriptionModel",
+    "ReplyTemplateModel",
     "ReturnModel",
     "SettingsModel",
     "ShipmentModel",

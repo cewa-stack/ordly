@@ -20,12 +20,14 @@ import { StyleSheet, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
 import { useTheme } from "@/theme/theme";
+import { OfflineBanner } from "@/components/OfflineBanner";
 import { MainTabs } from "./MainTabs";
 
 export function MainShell() {
   const { c } = useTheme();
   return (
     <SafeAreaView style={[styles.root, { backgroundColor: c.bg }]} edges={["top"]}>
+      <OfflineBanner />
       <View style={styles.content}>
         <MainTabs />
       </View>

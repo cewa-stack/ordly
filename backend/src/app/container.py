@@ -37,6 +37,7 @@ from app.repositories.sqlite_ordlak_conversation_repository import (
 from app.repositories.sqlite_push_subscription_repository import (
     SqlitePushSubscriptionRepository,
 )
+from app.repositories.sqlite_reply_template_repository import SqliteReplyTemplateRepository
 from app.repositories.sqlite_return_repository import SqliteReturnRepository
 from app.repositories.sqlite_shipment_repository import SqliteShipmentRepository
 from app.repositories.sqlite_sms_history_repository import SqliteSmsHistoryRepository
@@ -325,6 +326,10 @@ class Container:
     ) -> SqlitePushSubscriptionRepository:
         """Buduje repozytorium subskrypcji Web Push dla endpointów API."""
         return SqlitePushSubscriptionRepository(session)
+
+    def reply_template_repository(self, session: AsyncSession) -> SqliteReplyTemplateRepository:
+        """Buduje repozytorium szablonów odpowiedzi dla endpointów API."""
+        return SqliteReplyTemplateRepository(session)
 
     def web_push_status(self) -> tuple[str, bool]:
         """Zwraca (klucz publiczny VAPID, czy Web Push jest skonfigurowany) dla API."""

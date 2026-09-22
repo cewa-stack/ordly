@@ -1,7 +1,7 @@
 /**
  * Wiersz dyskusji/reklamacji — typ (pastylka primary), temat, kupujący +
  * zamówienie, status (pastylka kolorowa), data ostatniej wiadomości.
- * Dotknięcie otwiera wątek tylko do odczytu (IssueDetailScreen).
+ * Dotknięcie otwiera wątek z polem odpowiedzi (IssueDetailScreen).
  */
 import * as React from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";

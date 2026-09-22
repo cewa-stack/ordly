@@ -42,7 +42,7 @@ export function ReturnsScreen() {
           <Skeleton height={100} radius={radii.lg} style={{ marginBottom: spacing.sm }} />
           <Skeleton height={100} radius={radii.lg} />
         </View>
-      ) : returns.isError ? (
+      ) : returns.isError && !returns.data ? (
         <ErrorState onRetry={() => returns.refetch()} />
       ) : (
         <FlatList
@@ -65,6 +65,7 @@ export function ReturnsScreen() {
           ListEmptyComponent={
             <EmptyState
               mascotPose="sleep"
+              mascotProp="box"
               title="Zero zwrotów"
               description="Wszystkie zamówienia idą gładko — żaden kupujący niczego nie zwraca."
             />

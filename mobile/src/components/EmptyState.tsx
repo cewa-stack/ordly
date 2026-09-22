@@ -10,7 +10,7 @@ import { Pressable, StyleSheet, Text, View } from "react-native";
 import type { Palette } from "@/theme/colors";
 import { useThemedStyles } from "@/theme/theme";
 import { radii, spacing, typography } from "@/theme/typography";
-import { Ordlak, type OrdlakState } from "./Ordlak";
+import { Ordlak, type OrdlakProp, type OrdlakState } from "./Ordlak";
 
 interface EmptyStateProps {
   icon?: React.ReactNode;
@@ -20,6 +20,8 @@ interface EmptyStateProps {
    * swiecic. Pominiete = brak maskotki (tylko ikona, jesli podana).
    */
   mascotPose?: OrdlakState;
+  /** Rekwizyt w ręce - koperta w Poczcie, karton w Magazynie, lupa w wyszukiwaniu. */
+  mascotProp?: OrdlakProp;
   title: string;
   description?: string;
   actionLabel?: string;
@@ -29,6 +31,7 @@ interface EmptyStateProps {
 export function EmptyState({
   icon,
   mascotPose,
+  mascotProp,
   title,
   description,
   actionLabel,
@@ -38,7 +41,7 @@ export function EmptyState({
   return (
     <View style={styles.container}>
       {mascotPose ? (
-        <Ordlak state={mascotPose} size={76} style={styles.mascot} />
+        <Ordlak state={mascotPose} prop={mascotProp} size={76} style={styles.mascot} />
       ) : icon ? (
         <View style={styles.iconWrap}>{icon}</View>
       ) : null}

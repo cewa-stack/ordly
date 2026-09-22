@@ -44,15 +44,18 @@ import {
   formatTime,
   parseApiDate,
   toAmount,
+  waitingLabel,
 } from "../lib/format";
 import {
   ORDER_FILTER_LABEL,
   displayFulfillmentLabel,
   displayFulfillmentTone,
+  isPendingOrder,
   isShippedForDisplay,
   matchesOrderFilter,
   type OrderFilter,
 } from "../lib/fulfillment";
+import { useNewIds } from "../lib/useNewIds";
 import type { MarketplaceOffer, Order } from "../types/api";
 
 type SortMode = "newest" | "amount";
@@ -62,6 +65,9 @@ type SortMode = "newest" | "amount";
  * zmienia oba - inaczej rozjazd jest kwestia czasu.
  *
  * wybor · kanal · kupujacy/pozycje · numer · status · wartosc · czas
+ *
+ * "Czas" to godzina zlozenia, a przy zamowieniu czekajacym na spakowanie -
+ * ile juz czeka (po dobie koralowo). Godzina zostaje w podpowiedzi.
  */
 const GRID_COLUMNS = "22px 68px minmax(0,1fr) 76px 88px 92px 52px";
 
@@ -436,6 +442,8 @@ export function ZamowieniaScreen({ focusOrderId, onFocusHandled }: ZamowieniaScr
   }, [data, filter, sort]);
 
   const selected = visible.find((order) => order.external_id === selectedId) ?? visible[0];
+  // Nowe od ostatniego odswiezenia - raz migna akcentem.
+  const freshOrders = useNewIds(data?.map((order) => order.external_id));
 
   /** Licznik przy kazdym chipie - liczy to, co chip naprawde pokaze. */
   const filterCounts = React.useMemo(() => {
@@ -610,6 +618,7 @@ export function ZamowieniaScreen({ focusOrderId, onFocusHandled }: ZamowieniaScr
             {isLoading && <SkeletonRows rows={6} />}
             {!isLoading && visible.length === 0 && (
               <EmptyState
+                prop={filter === "all" ? "box" : "magnifier"}
                 title={filter === "all" ? "Brak zamówień" : "Nic w tym filtrze"}
                 description={
                   filter === "all"
@@ -621,6 +630,7 @@ export function ZamowieniaScreen({ focusOrderId, onFocusHandled }: ZamowieniaScr
             {visible.map((order) => {
               const isSelected = selected?.external_id === order.external_id;
               const items = order.products.map((product) => product.name).join(", ");
+              const waiting = isPendingOrder(order) ? waitingLabel(order.order_date) : null;
               return (
                 <div
                   key={order.external_id}
@@ -635,7 +645,7 @@ export function ZamowieniaScreen({ focusOrderId, onFocusHandled }: ZamowieniaScr
                   }}
                   className={`relative grid cursor-pointer items-center gap-2.5 border-b border-line px-4 py-[11px] text-left transition-colors duration-150 ease-ordly [&>*]:min-w-0 ${
                     isSelected ? "bg-panel-2" : "hover:bg-panel-2"
-                  }`}
+                  } ${freshOrders.has(order.external_id) ? "o-row-flash" : ""}`}
                   style={{ gridTemplateColumns: GRID_COLUMNS }}
                 >
                   {/* Pasek 2 px na lewej krawedzi - ten sam wzorzec co nawigacja. */}
@@ -672,9 +682,20 @@ export function ZamowieniaScreen({ focusOrderId, onFocusHandled }: ZamowieniaScr
                   <span className="o-mono whitespace-nowrap text-right text-[11.5px] text-text-2">
                     {formatCurrency(order.total_amount)}
                   </span>
-                  <span className="o-mono whitespace-nowrap text-right text-[11px] text-text-3">
-                    {formatTime(order.order_date)}
-                  </span>
+                  {waiting ? (
+                    <span
+                      title={`Czeka od ${formatDateTime(order.order_date)}`}
+                      className={`o-mono whitespace-nowrap text-right text-[11px] ${
+                        waiting.overdue ? "text-coral" : "text-text-2"
+                      }`}
+                    >
+                      {waiting.short}
+                    </span>
+                  ) : (
+                    <span className="o-mono whitespace-nowrap text-right text-[11px] text-text-3">
+                      {formatTime(order.order_date)}
+                    </span>
+                  )}
                 </div>
               );
             })}

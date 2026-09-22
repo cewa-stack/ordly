@@ -11,6 +11,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { RefreshIcon } from "../icons";
 import { Button, MiniButton, SectionLabel } from "../components/ui";
 import { ConfirmDialog } from "../components/Modal";
+import { ReplyTemplatesSettings } from "../components/ReplyTemplatesSettings";
 import { useAuth } from "../lib/auth";
 import { useToast } from "../lib/toast";
 import { formatDateTime } from "../lib/format";
@@ -227,6 +228,11 @@ export function UstawieniaScreen() {
           {backupMutation.isPending ? "Tworzę…" : "Utwórz kopię teraz"}
         </Button>
       </Row>
+
+      <div className="mt-4">
+        <SectionLabel>Szablony odpowiedzi</SectionLabel>
+      </div>
+      <ReplyTemplatesSettings />
 
       <div className="mt-4">
         <SectionLabel>Sesja</SectionLabel>

@@ -9,7 +9,7 @@
  * rozmiaru kropki.
  */
 import * as React from "react";
-import { Ordlak, type OrdlakState } from "./Ordlak";
+import { Ordlak, type OrdlakProp, type OrdlakState } from "./Ordlak";
 
 // ------------------------------------------------------------------ Przycisk
 
@@ -275,7 +275,8 @@ export function KpiTile({
   onClick,
 }: {
   label: string;
-  value: string;
+  /** Tekst albo `<CountUp>` - liczba, ktora przelicza sie po synchronizacji. */
+  value: React.ReactNode;
   tint: KpiTint;
   delta?: string;
   deltaTone?: "up" | "wait" | "neutral";
@@ -507,16 +508,19 @@ export function InitialAvatar({
  */
 export function EmptyState({
   state = "sleep",
+  prop,
   title,
   description,
 }: {
   state?: OrdlakState;
+  /** Rekwizyt w rece - koperta w Poczcie, karton w Magazynie, lupa w wyszukiwaniu. */
+  prop?: OrdlakProp;
   title: string;
   description: string;
 }) {
   return (
     <div className="flex flex-col items-center justify-center gap-3.5 px-6 py-14 text-center">
-      <Ordlak state={state} size={88} />
+      <Ordlak state={state} prop={prop} size={88} />
       <h4 className="o-panel-title text-[15px]">{title}</h4>
       <p className="max-w-[280px] text-[12.5px] leading-[1.55] text-text-3">{description}</p>
     </div>

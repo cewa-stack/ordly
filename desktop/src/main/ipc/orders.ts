@@ -24,6 +24,19 @@ export function registerOrdersIpc(): void {
     })
   );
 
+  // Jedno zamowienie - np. numer przesylki do szablonu odpowiedzi, gdy
+  // dyskusja dotyczy zamowienia spoza 100 ostatnich z listy.
+  ipcMain.handle("ordly:orders:get", async (_event, externalId: string) =>
+    toResult(async () => {
+      const session = requireSession();
+      return apiRequest(
+        session.baseUrl,
+        session.token,
+        `/api/v1/orders/${encodeURIComponent(externalId)}`
+      );
+    })
+  );
+
   ipcMain.handle("ordly:orders:tracking", async (_event, externalId: string) =>
     toResult(async () => {
       const session = requireSession();
