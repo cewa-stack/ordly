@@ -55,10 +55,17 @@ export function injectPwaHeadTags(): void {
     }
   }
 
+  // Ikona ekranu glownego iPhone'a. iOS nie czyta ikon z manifestu - bierze
+  // WYLACZNIE `apple-touch-icon`. Plik ma 180 x 180 (rozmiar natywny ekranu
+  // glownego), jest pelnym kwadratem bez przezroczystosci i bez wlasnych
+  // zaokraglen: maske nakłada system. Stara ikona miala narysowany
+  // zaokraglony kwadrat na bialym tle, wiec na telefonie wychodzila
+  // podwojna ramka.
   if (!document.querySelector('link[rel="apple-touch-icon"]')) {
     const touchIcon = document.createElement("link");
     touchIcon.rel = "apple-touch-icon";
-    touchIcon.href = "/icon.png";
+    touchIcon.setAttribute("sizes", "180x180");
+    touchIcon.href = "/apple-touch-icon.png";
     document.head.appendChild(touchIcon);
   }
 }
