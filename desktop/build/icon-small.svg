@@ -1,0 +1,28 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="256" height="256" viewBox="0 0 256 256">
+  <defs>
+    <linearGradient id="base" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#0E1C1A"/><stop offset="1" stop-color="#0A1615"/>
+    </linearGradient>
+    <radialGradient id="key" cx="0.16" cy="-0.06" r="0.95">
+      <stop offset="0" stop-color="#1F7D80" stop-opacity=".72"/>
+      <stop offset=".62" stop-color="#1F7D80" stop-opacity="0"/>
+    </radialGradient>
+    <radialGradient id="halo" cx="0.47" cy="0.52" r="0.38">
+      <stop offset="0" stop-color="#5FD9CC" stop-opacity=".2"/>
+      <stop offset="1" stop-color="#5FD9CC" stop-opacity="0"/>
+    </radialGradient>
+    <clipPath id="kafel"><rect x="0" y="0" width="256" height="256" rx="48"/></clipPath>
+  </defs>
+  <g clip-path="url(#kafel)">
+    <rect x="0" y="0" width="256" height="256" fill="url(#base)"/>
+    <rect x="0" y="0" width="256" height="256" fill="url(#key)"/>
+    <rect x="0" y="0" width="256" height="256" fill="url(#halo)"/>
+  </g>
+  
+  <g transform="translate(128 134) scale(2) translate(-60 -66)">
+    <line x1="60" y1="46" x2="60" y2="24" stroke="#3EAAAF" stroke-width="6" stroke-linecap="round"/>
+    <circle cx="60" cy="21" r="9" fill="#5FD9CC"/>
+    <rect x="22" y="42" width="76" height="70" rx="30" fill="#5FD9CC"/>
+    <ellipse cx="45" cy="74" rx="9.5" ry="11" fill="#062120"/>
+    <ellipse cx="75" cy="74" rx="9.5" ry="11" fill="#062120"/>
+  </g></svg>
