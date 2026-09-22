@@ -584,3 +584,102 @@ class TestOlx:
 
         assert payload.url.startswith("/mailbox/")
         assert payload.collapse_key == "olx:<olx-6@olx.pl>"
+
+
+# ----------------------------------------------------------------------
+# Propozycje "Nokturn" (2026-09-22) - buildery czekajace na akceptacje
+# podgladu. Testujemy je juz teraz, bo podglad jest z nich generowany.
+# ----------------------------------------------------------------------
+
+
+class TestOrderCancelled:
+    def test_jest_ciche_i_bez_loginu_kupujacego(self):
+        payload = push_payload.order_cancelled(
+            marketplace="allegro",
+            amount=Decimal("60.94"),
+            currency="PLN",
+            products=[(2, "Butelki PET 30 ml")],
+            external_id="A-1",
+        )
+
+        assert payload.silent is True
+        assert payload.title == "Zamówienie anulowane"
+        assert "Allegro" in payload.body
+        assert "60,94" in payload.body
+        assert len(payload.title) <= 24
+
+
+class TestSinceLabel:
+    def test_dzisiaj(self):
+        assert (
+            push_payload.since_label(datetime(2026, 9, 22, 7, 12), datetime(2026, 9, 22, 9, 0))
+            == "dziś 7:12"
+        )
+
+    def test_wczoraj(self):
+        assert (
+            push_payload.since_label(datetime(2026, 9, 21, 17, 40), datetime(2026, 9, 22, 9, 0))
+            == "wczoraj 17:40"
+        )
+
+    def test_starsze_w_dniach(self):
+        assert (
+            push_payload.since_label(datetime(2026, 9, 18, 10, 0), datetime(2026, 9, 22, 9, 0))
+            == "4 dni"
+        )
+
+
+class TestMorningBrief:
+    NOW = datetime(2026, 9, 22, 9, 0)
+
+    def test_nic_nie_czeka_nic_nie_wychodzi(self):
+        assert (
+            push_payload.morning_brief(pending_count=0, oldest_local=None, now_local=self.NOW)
+            is None
+        )
+
+    def test_tytul_niesie_najpilniejsze_a_tresc_reszte(self):
+        payload = push_payload.morning_brief(
+            pending_count=3,
+            oldest_local=datetime(2026, 9, 21, 17, 40),
+            now_local=self.NOW,
+            open_issues=2,
+            open_returns=1,
+        )
+
+        assert payload is not None
+        assert payload.title == "3 do spakowania"
+        assert payload.body == "Najstarsze od wczoraj 17:40 · 2 dyskusje · 1 zwrot"
+        # Od redesignu Start pokazuje dokladnie te trzy liczby.
+        assert payload.url == "/start"
+
+    def test_bez_zamowien_tytul_mowi_o_dyskusjach(self):
+        payload = push_payload.morning_brief(
+            pending_count=0, oldest_local=None, now_local=self.NOW, open_issues=5
+        )
+
+        assert payload is not None
+        assert payload.title == "5 dyskusji czeka"
+
+    def test_tytul_miesci_sie_na_ekranie_blokady(self):
+        payload = push_payload.morning_brief(
+            pending_count=0, oldest_local=None, now_local=self.NOW, open_issues=22
+        )
+
+        assert payload is not None
+        assert len(payload.title) <= 24
+
+
+class TestAttentionBadge:
+    def test_suma_wymaga_uwagi_z_ekranu_start(self):
+        assert push_payload.attention_badge(pending=3, open_issues=2, open_returns=1) == 6
+
+
+class TestTestNotification:
+    def test_tytul_mowi_co_sprawdzasz_i_miesci_sie(self):
+        payload = push_payload.test_notification()
+
+        assert payload.title == "Powiadomienia działają"
+        assert len(payload.title) <= 24
+        # "from ORDLY" dokłada Safari - treść nie musi powtarzać nazwy.
+        assert "ORDLY" not in payload.body

@@ -546,6 +546,154 @@ def pending_packing(
     )
 
 
+# --------------------------------------------------------------------------
+# PROPOZYCJE "Nokturn" (2026-09-22) - czekaja na akceptacje podgladu.
+#
+# Te buildery istnieja juz w katalogu, zeby podglad powstawal z PRAWDZIWEGO
+# kodu (regula katalogu), ale WEB_PUSH_NOTIFIER ICH JESZCZE NIE WOLA - na
+# telefonie nic sie nie zmienia, dopoki podglad nie zostanie zaakceptowany.
+# --------------------------------------------------------------------------
+
+
+def order_cancelled(
+    *,
+    marketplace: str,
+    amount: Decimal,
+    currency: str,
+    products: list[tuple[int, str]],
+    external_id: str,
+    badge: int | None = None,
+) -> PushPayload:
+    """
+    Anulowane zamówienie - CICHE z definicji.
+
+    Zastępuje treść budowaną dotąd wprost w `WebPushNotifier`, poza
+    katalogiem: miała login kupującego na ekranie blokady (wbrew zasadzie
+    "login zostaje w aplikacji") i nie było jej w podglądzie.
+
+    Ciche, bo anulowanie niczego od Ciebie nie wymaga - to zamknięta
+    historia. Ta sama zasada co w aplikacji: rzeczy skończone nie świecą
+    (Nokturn, zasada 2), więc i nie dzwonią.
+    """
+    return PushPayload(
+        title="Zamówienie anulowane",
+        body=f"{_channel_label(marketplace)} · {_items(products)} — {_money(amount, currency)}",
+        thread="orders",
+        url=f"/orders/{external_id}",
+        silent=True,
+        badge=badge,
+        collapse_key=f"order:{external_id}",
+    )
+
+
+def since_label(oldest_local: datetime, now_local: datetime) -> str:
+    """
+    "od kiedy" po ludzku: `dziś 7:12`, `wczoraj 17:40`, `3 dni`.
+
+    Przyjmuje czas LOKALNY. Dotychczasowy kod formatował `order_date`
+    (zapisany w UTC) wprost przez `strftime`, więc latem przypomnienie
+    o 9:00 podawało godzinę cofniętą o 2 h - i bez słowa "wczoraj".
+    """
+    days = (now_local.date() - oldest_local.date()).days
+    hour = f"{oldest_local.hour}:{oldest_local.minute:02d}"
+    if days <= 0:
+        return f"dziś {hour}"
+    if days == 1:
+        return f"wczoraj {hour}"
+    return f"{days} dni"
+
+
+def morning_brief(
+    *,
+    pending_count: int,
+    oldest_local: datetime | None,
+    now_local: datetime,
+    open_issues: int = 0,
+    open_returns: int = 0,
+    badge: int | None = None,
+) -> PushPayload | None:
+    """
+    Poranny raport o 9:00 - następca `pending_packing`.
+
+    Mówi o WSZYSTKIM, co czeka, w jednym powiadomieniu, zamiast osobnego
+    przypomnienia o pakowaniu. Tytuł niesie najpilniejszą rzecz, treść -
+    resztę, tylko te pozycje, które są większe od zera.
+
+    Otwiera ekran Start, a nie listę zamówień: od redesignu Start jest
+    miejscem, gdzie widać dokładnie te same trzy liczby (Do spakowania,
+    Dyskusje, Zwroty).
+
+    `None` = nic nie czeka, powiadomienie nie wychodzi. Pusty raport o 9:00
+    byłby hałasem.
+    """
+    if pending_count <= 0 and open_issues <= 0 and open_returns <= 0:
+        return None
+
+    reszta: list[str] = []
+    if pending_count > 0:
+        title = f"{pending_count} do spakowania"
+        if oldest_local is not None:
+            reszta.append(f"najstarsze od {since_label(oldest_local, now_local)}")
+    elif open_issues > 0:
+        title = f"{open_issues} {_word(open_issues, 'dyskusja czeka', 'dyskusje czekają', 'dyskusji czeka')}"
+    else:
+        title = f"{open_returns} {_word(open_returns, 'zwrot czeka', 'zwroty czekają', 'zwrotów czeka')}"
+
+    if pending_count > 0 and open_issues > 0:
+        reszta.append(f"{open_issues} {_word(open_issues, 'dyskusja', 'dyskusje', 'dyskusji')}")
+    if (pending_count > 0 or open_issues > 0) and open_returns > 0:
+        reszta.append(f"{open_returns} {_word(open_returns, 'zwrot', 'zwroty', 'zwrotów')}")
+
+    body = " · ".join(reszta) if reszta else "Szczegóły na ekranie Start."
+    return PushPayload(
+        title=title,
+        body=body[:1].upper() + body[1:],
+        thread="orders",
+        url="/start",
+        badge=badge,
+        collapse_key="brief",
+    )
+
+
+def test_notification() -> PushPayload:
+    """
+    Testowe powiadomienie z przycisku w Ustawieniach.
+
+    Dotąd tytuł brzmiał "ORDLY", a treść kończyła się "z ORDLY" - razem
+    z podpisem "from ORDLY", który Safari dokłada sam, nazwa padała trzy
+    razy, a o tym, co się sprawdza, nie mówiło nic.
+    """
+    return PushPayload(
+        title="Powiadomienia działają",
+        body="Tak Ordlak da znać o sprzedaży, dyskusji albo awarii.",
+        thread="sync",
+        url="/settings",
+        actions=[_ACTION_SHOW],
+    )
+
+
+def _word(n: int, one: str, few: str, many: str) -> str:
+    """Polska odmiana przez liczbę - 1 / 2-4 / 5+ (nastolatki jak 5+)."""
+    last, last_two = n % 10, n % 100
+    if n == 1:
+        return one
+    if 2 <= last <= 4 and not 12 <= last_two <= 14:
+        return few
+    return many
+
+
+def attention_badge(*, pending: int, open_issues: int, open_returns: int) -> int:
+    """
+    Liczba na ikonie aplikacji = suma "Wymaga uwagi" z ekranu Start.
+
+    Dotąd każde powiadomienie ustawiało plakietkę po swojemu: nowe
+    zamówienie nie ruszało jej wcale, dyskusja wbijała na sztywno 1
+    (kasując np. 4), przypomnienie o 9:00 liczyło tylko zamówienia.
+    Liczba na ikonie nie zgadzała się z niczym, co pokazuje aplikacja.
+    """
+    return max(0, pending) + max(0, open_issues) + max(0, open_returns)
+
+
 def _orders_word(n: int, *, genitive: bool = False) -> str:
     """
     Polska odmiana „zamówienie" po liczebniku.
