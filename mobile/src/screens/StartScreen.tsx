@@ -39,6 +39,7 @@ import { useDashboard, useIssues, useOrders, useReturns } from "@/api/hooks";
 import { useSync, type SyncPhase } from "@/store/sync";
 import {
   formatMoney,
+  isOpenReturn,
   isPendingFulfillment,
   lastSyncLabel,
   parseApiDate,
@@ -47,12 +48,6 @@ import {
 import { useNewIds } from "@/utils/useNewIds";
 import type { Issue, Order, ReturnItem } from "@/api/types";
 import type { RootStackParamList } from "@/navigation/types";
-
-/**
- * Zwroty, które nie wymagają już niczego od sprzedawcy - te same, które
- * ekran Zwroty pokazuje wygaszone.
- */
-const CLOSED_RETURNS = new Set(["COMMISSION_REFUNDED", "CANCELLED", "REJECTED"]);
 
 type Tint = "acc" | "coral" | "violet" | "amber";
 
@@ -198,9 +193,7 @@ export function StartScreen() {
   const orders = (ordersQuery.data ?? []) as Order[];
   const pending = orders.filter(isPendingFulfillment);
   const openIssues = ((issuesQuery.data ?? []) as Issue[]).filter((i) => i.chat_active);
-  const openReturns = ((returnsQuery.data ?? []) as ReturnItem[]).filter(
-    (r) => !CLOSED_RETURNS.has(r.status)
-  );
+  const openReturns = ((returnsQuery.data ?? []) as ReturnItem[]).filter(isOpenReturn);
 
   const todayCount =
     dashboard.data?.orders_today ??

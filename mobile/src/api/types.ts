@@ -131,6 +131,10 @@ export interface ReturnItem {
   status: string;
   products_summary: string;
   return_date: string;
+  /** Nazwa statusu z backendu - ta sama w bocie i push. */
+  status_label?: string;
+  /** Wynik wspólnej reguły backendu `return_requires_action`. */
+  requires_action?: boolean;
 }
 
 export type IssueType = "DISPUTE" | "CLAIM";

@@ -2,14 +2,18 @@
 
 from __future__ import annotations
 
-from sqlalchemy import func, select
+from typing import Any
+
+from sqlalchemy import func, select, update
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.database.models.order_model import OrderModel
 from app.database.models.return_model import ReturnModel
 from app.domain.entities.order_return import OrderReturn, ReturnRecord
 from app.domain.exceptions.domain_exceptions import DuplicateReturnError
 from app.domain.interfaces.return_repository import ReturnRepository
+from app.domain.returns import CLOSED_RETURN_STATUSES
 
 
 class SqliteReturnRepository(ReturnRepository):
@@ -68,21 +72,65 @@ class SqliteReturnRepository(ReturnRepository):
     async def get_recent(self, limit: int = 50, offset: int = 0) -> list[ReturnRecord]:
         """Zwraca ostatnie zwroty posortowane malejąco po dacie zwrotu."""
         stmt = (
-            select(ReturnModel)
+            self._select_with_order_status()
             .order_by(ReturnModel.return_date.desc())
             .limit(limit)
             .offset(offset)
         )
         result = await self._session.execute(stmt)
-        return [
-            ReturnRecord(
-                external_id=m.external_id,
-                marketplace=m.marketplace,
-                order_external_id=m.order_external_id,
-                buyer_login=m.buyer_login,
-                status=m.status,
-                products_summary=m.products_summary,
-                return_date=m.return_date,
+        return [self._to_record(model, order_status) for model, order_status in result.all()]
+
+    async def get_status(self, marketplace: str, external_id: str) -> str | None:
+        stmt = select(ReturnModel.status).where(
+            ReturnModel.marketplace == marketplace,
+            ReturnModel.external_id == external_id,
+        )
+        result = await self._session.execute(stmt)
+        return result.scalar_one_or_none()
+
+    async def update_status(self, marketplace: str, external_id: str, status: str) -> None:
+        stmt = (
+            update(ReturnModel)
+            .where(
+                ReturnModel.marketplace == marketplace,
+                ReturnModel.external_id == external_id,
             )
-            for m in result.scalars().all()
-        ]
+            .values(status=status)
+        )
+        await self._session.execute(stmt)
+        await self._session.flush()
+
+    async def get_open(self, marketplace: str, limit: int) -> list[ReturnRecord]:
+        stmt = (
+            self._select_with_order_status()
+            .where(
+                ReturnModel.marketplace == marketplace,
+                func.upper(ReturnModel.status).not_in(list(CLOSED_RETURN_STATUSES)),
+            )
+            .order_by(ReturnModel.return_date.desc())
+            .limit(limit)
+        )
+        result = await self._session.execute(stmt)
+        return [self._to_record(model, order_status) for model, order_status in result.all()]
+
+    @staticmethod
+    def _select_with_order_status() -> Any:
+        """Zwrot + status zamówienia, którego dotyczy (lewe złączenie)."""
+        return select(ReturnModel, OrderModel.status).outerjoin(
+            OrderModel,
+            (OrderModel.marketplace == ReturnModel.marketplace)
+            & (OrderModel.external_id == ReturnModel.order_external_id),
+        )
+
+    @staticmethod
+    def _to_record(model: ReturnModel, order_status: str | None) -> ReturnRecord:
+        return ReturnRecord(
+            external_id=model.external_id,
+            marketplace=model.marketplace,
+            order_external_id=model.order_external_id,
+            buyer_login=model.buyer_login,
+            status=model.status,
+            products_summary=model.products_summary,
+            return_date=model.return_date,
+            order_status=order_status,
+        )

@@ -40,6 +40,10 @@ class FakeMarketplacePlugin(MarketplacePlugin):
         self.get_order_errors: dict[str, AllegroApiError] = {}
         self.get_order_calls: list[str] = []
         self.tracking_calls: list[str] = []
+        # Zwroty dostępne tylko przez GET pojedynczego zwrotu (poza listą).
+        self.single_returns: dict[str, OrderReturn] = {}
+        self.get_return_errors: dict[str, AllegroApiError] = {}
+        self.get_return_calls: list[str] = []
         self.authenticate_called = False
         self.refresh_token_called = False
 
@@ -62,6 +66,17 @@ class FakeMarketplacePlugin(MarketplacePlugin):
         if self.should_raise_returns_api_error:
             raise AllegroApiError(503, "Serwis testowy: symulowana niedostępność zwrotów")
         return self.returns_to_return
+
+    async def get_customer_return(self, external_id: str) -> OrderReturn:
+        self.get_return_calls.append(external_id)
+        if external_id in self.get_return_errors:
+            raise self.get_return_errors[external_id]
+        if external_id in self.single_returns:
+            return self.single_returns[external_id]
+        found = next((r for r in self.returns_to_return if r.external_id == external_id), None)
+        if found is None:
+            raise AllegroApiError(404, "Nie znaleziono zwrotu (fake)")
+        return found
 
     async def get_issues(self) -> list[Issue]:
         if self.should_raise_issues_api_error:

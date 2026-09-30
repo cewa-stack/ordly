@@ -25,6 +25,7 @@ from app.domain.entities.order import Order
 from app.domain.entities.order_return import OrderReturn
 from app.domain.entities.push_subscription import PushSubscription
 from app.domain.interfaces.notifier import Notifier
+from app.domain.returns import return_status_label
 from app.infrastructure.webpush import push_payload
 from app.infrastructure.webpush.order_batcher import OrderPushBatcher
 from app.infrastructure.webpush.push_payload import PushPayload
@@ -158,7 +159,7 @@ class WebPushNotifier(Notifier):
             push_payload.new_return(
                 external_id=order_return.external_id,
                 products_summary=order_return.products_summary,
-                reason=order_return.status,
+                reason=return_status_label(order_return.status),
             )
         )
 

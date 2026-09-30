@@ -170,6 +170,16 @@ class AllegroPlugin(MarketplacePlugin):
         raw_returns = response.get("customerReturns", [])
         return [map_customer_return_to_domain(raw) for raw in raw_returns]
 
+    async def get_customer_return(self, external_id: str) -> OrderReturn:
+        """Pobiera pojedynczy zwrot (`GET /order/customer-returns/{id}`, beta)."""
+        access_token = await self._get_valid_access_token()
+        raw = await self._api_client.get(
+            f"/order/customer-returns/{external_id}",
+            access_token,
+            accept=_BETA_ACCEPT_HEADER,
+        )
+        return map_customer_return_to_domain(raw)
+
     async def get_order(self, external_id: str) -> Order:
         """Pobiera szczegóły pojedynczego zamówienia po jego numerze."""
         access_token = await self._get_valid_access_token()

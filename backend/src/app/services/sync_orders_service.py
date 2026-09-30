@@ -46,6 +46,7 @@ from app.domain.interfaces.marketplace_plugin import MarketplacePlugin
 from app.domain.interfaces.order_repository import OrderRepository
 from app.domain.interfaces.return_repository import ReturnRepository
 from app.domain.interfaces.shipment_repository import ShipmentRepository
+from app.domain.returns import UNKNOWN_RETURN_STATUS, return_requires_action
 from app.infrastructure.plugins.allegro.exceptions import AllegroApiError
 from app.shared.dto.stats_dto import SyncResult
 from app.utils.time import utc_now
@@ -365,10 +366,11 @@ class SyncOrdersService:
 
         new_returns: list[OrderReturn] = []
         for order_return in returns:
-            already_exists = await self._return_repository.exists(
+            stored_status = await self._return_repository.get_status(
                 order_return.marketplace, order_return.external_id
             )
-            if already_exists:
+            if stored_status is not None:
+                await self._sync_return_status(order_return, stored_status)
                 continue
 
             try:
@@ -380,14 +382,76 @@ class SyncOrdersService:
                 )
                 continue
 
-            new_returns.append(order_return)
             logger.info(
-                "Zapisano nowy zwrot {} dla zamówienia {}",
+                "Zapisano nowy zwrot {} dla zamówienia {} (status {})",
                 order_return.external_id,
                 order_return.order_external_id,
+                order_return.status,
             )
+            # Zwrot, który już przy pierwszym zobaczeniu jest zakończony
+            # (np. pierwsza synchronizacja po instalacji, zwrot sprzed tygodni),
+            # nie może przyjść jako "Nowy zwrot" do obsługi.
+            if await self._return_requires_action(order_return):
+                new_returns.append(order_return)
 
+        await self._refresh_returns_outside_window({r.external_id for r in returns})
         return new_returns
+
+    async def _return_requires_action(self, order_return: OrderReturn) -> bool:
+        order = await self._order_repository.get_by_external_id(order_return.order_external_id)
+        return return_requires_action(order_return.status, order.status if order else None)
+
+    async def _sync_return_status(self, fresh: OrderReturn, stored_status: str) -> bool:
+        """
+        Utrwala zmianę statusu znanego zwrotu.
+
+        Dotąd synchronizacja zapisywała zwrot raz i nigdy więcej nie
+        patrzyła na jego status - zwrot zgłoszony (CREATED) zostawał
+        "do obsługi" na zawsze, choć na Allegro pieniądze dawno wróciły,
+        a prowizja została zwrócona.
+
+        Niepełna odpowiedź (brak statusu) niczego nie nadpisuje.
+
+        Returns:
+            True, gdy status został zmieniony.
+        """
+        if fresh.status in ("", UNKNOWN_RETURN_STATUS) or fresh.status == stored_status:
+            return False
+        assert self._return_repository is not None
+        await self._return_repository.update_status(
+            fresh.marketplace, fresh.external_id, fresh.status
+        )
+        logger.info(
+            "Zwrot {} zmienił status: {} -> {}", fresh.external_id, stored_status, fresh.status
+        )
+        return True
+
+    async def _refresh_returns_outside_window(self, fetched_ids: set[str]) -> None:
+        """
+        Dopytuje o otwarte zwroty, których nie było w pobranej liście.
+
+        Lista zwrotów z Allegro ma limit 50 - otwarty zwrot spoza niej
+        zamarzałby w bazie. Zasady jak przy zamówieniach: max
+        `_MAX_OUT_OF_WINDOW_REFRESHES` na cykl, 404 = pomiń, inny błąd =
+        przerwij do następnego cyklu, dane lokalne zostają.
+        """
+        assert self._return_repository is not None
+        candidates = await self._return_repository.get_open(
+            self._plugin.marketplace_code, _REFRESH_CANDIDATES_LIMIT
+        )
+        stale = [r for r in candidates if r.external_id not in fetched_ids]
+        for record in stale[:_MAX_OUT_OF_WINDOW_REFRESHES]:
+            try:
+                fresh = await self._plugin.get_customer_return(record.external_id)
+            except NotImplementedError:
+                return
+            except AllegroApiError as exc:
+                if exc.status_code == _HTTP_NOT_FOUND:
+                    logger.debug("Zwrot {} niedostępny w Allegro (404)", record.external_id)
+                    continue
+                logger.warning("Odświeżanie zwrotów spoza listy przerwane - Allegro: {}", exc)
+                return
+            await self._sync_return_status(fresh, record.status)
 
     async def publish_sync_events(self, result: SyncResult) -> None:
         """

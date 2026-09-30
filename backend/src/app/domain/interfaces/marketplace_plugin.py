@@ -62,6 +62,15 @@ class MarketplacePlugin(ABC):
         """
         return []
 
+    async def get_customer_return(self, external_id: str) -> OrderReturn:
+        """
+        Pobiera aktualny stan pojedynczego zwrotu po jego identyfikatorze.
+
+        Używane do dopytania o zwroty, które wypadły z listy
+        `get_customer_returns`. Domyślnie nieobsługiwane.
+        """
+        raise NotImplementedError
+
     async def get_issues(self) -> list[Issue]:
         """
         Pobiera listę dyskusji i reklamacji pozakupowych z marketplace.

@@ -52,3 +52,7 @@ class ReturnRecord:
     status: str
     products_summary: str
     return_date: datetime
+    #: Status zamówienia, którego dotyczy zwrot (None = zamówienia nie ma
+    #: w bazie). Anulowane zamówienie zamyka zwrot - patrz
+    #: app/domain/returns.py:return_requires_action.
+    order_status: str | None = None

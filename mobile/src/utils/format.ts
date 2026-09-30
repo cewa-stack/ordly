@@ -241,12 +241,39 @@ export function issueStatusTone(status: string): IssueStatusTone {
  */
 const RETURN_STATUS_LABELS: Record<string, string> = {
   CREATED: "Zgłoszony",
+  DISPATCHED: "Nadany przez kupującego",
+  IN_TRANSIT: "W drodze",
+  DELIVERED: "Dostarczony - zwróć pieniądze",
+  FINISHED: "Pieniądze zwrócone",
+  FINISHED_APT: "Zwrócone przez Allegro Protect",
+  REJECTED: "Odrzucony",
   COMMISSION_REFUND_CLAIMED: "Prowizja do zwrotu",
   COMMISSION_REFUNDED: "Prowizja zwrócona",
+  WAREHOUSE_DELIVERED: "W magazynie Allegro",
+  WAREHOUSE_VERIFICATION: "Weryfikacja w magazynie",
   CANCELLED: "Anulowany",
-  REJECTED: "Odrzucony",
 };
 
-export function returnStatusLabel(status: string): string {
-  return RETURN_STATUS_LABELS[status] ?? status;
+export function returnStatusLabel(status: string, backendLabel?: string): string {
+  return backendLabel ?? RETURN_STATUS_LABELS[status] ?? status;
+}
+
+/**
+ * Zwroty zamknięte (pieniądze zwrócone, prowizja zwrócona/do zwrotu,
+ * odrzucony, anulowany) - zapas dla starszego Pi bez `requires_action`.
+ * Źródło prawdy: backend, app/domain/returns.py (1:1 z desktopem).
+ */
+const CLOSED_RETURN_STATUSES = new Set([
+  "FINISHED",
+  "FINISHED_APT",
+  "REJECTED",
+  "COMMISSION_REFUND_CLAIMED",
+  "COMMISSION_REFUNDED",
+  "CANCELLED",
+]);
+
+/** Zwrot czeka na ruch sprzedawcy - liczy się do kafla i plakietki „Zwroty”. */
+export function isOpenReturn(item: { status: string; requires_action?: boolean }): boolean {
+  if (typeof item.requires_action === "boolean") return item.requires_action;
+  return !CLOSED_RETURN_STATUSES.has(item.status);
 }

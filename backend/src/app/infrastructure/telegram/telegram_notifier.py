@@ -11,6 +11,7 @@ from app.domain.entities.olx_event import OlxEvent
 from app.domain.entities.order import Order
 from app.domain.entities.order_return import OrderReturn
 from app.domain.interfaces.notifier import Notifier
+from app.domain.returns import return_status_label
 from app.shared.dto.reminder_dto import ShippingReminderData
 
 #: Nagłówki zdarzeń z Allegro Lokalnie - emoji + pogrubiona nazwa, tak
@@ -99,7 +100,7 @@ class TelegramNotifier(Notifier):
             f"· zamówienie #{html.quote(order_return.order_external_id)}\n\n"
             f"👤 {html.quote(order_return.buyer_login)}\n"
             f"🛍️ {html.quote(order_return.products_summary)}\n"
-            f"📋 Status: {html.quote(order_return.status)}\n"
+            f"📋 Status: {html.quote(return_status_label(order_return.status))}\n"
             f"🕐 Zgłoszono: {order_return.created_at.strftime('%d.%m.%Y %H:%M')}"
         )
         await self.send_text(text)

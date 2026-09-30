@@ -24,6 +24,7 @@ from app.domain.entities.ordlak_conversation import OrdlakConversation
 from app.domain.entities.reply_template import ReplyTemplate
 from app.domain.entities.shipment import Shipment
 from app.domain.fulfillment import requires_packing
+from app.domain.returns import return_requires_action, return_status_label
 from app.infrastructure.mail.mime import MailBodies, html_to_plain_text
 from app.repositories.sqlite_event_repository import EventRecord
 from app.services.dashboard_service import DashboardSummary
@@ -213,6 +214,11 @@ class ReturnOut(BaseModel):
     status: str
     products_summary: str
     return_date: UtcDatetime
+    #: Nazwa statusu dla człowieka - ta sama w bocie i push.
+    status_label: str
+    #: Wynik wspólnej reguły `return_requires_action` - z tej flagi aplikacje
+    #: liczą "Zwroty do obsługi", zamiast trzymać własną listę statusów.
+    requires_action: bool
 
 
 def return_out(record: ReturnRecord) -> ReturnOut:
@@ -225,6 +231,8 @@ def return_out(record: ReturnRecord) -> ReturnOut:
         status=record.status,
         products_summary=record.products_summary,
         return_date=record.return_date,
+        status_label=return_status_label(record.status),
+        requires_action=return_requires_action(record.status, record.order_status),
     )
 
 
