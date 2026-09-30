@@ -26,6 +26,7 @@ from app.core.event_bus.events import (
     OrderCreated,
     OrderPackingStarted,
     OrderReturnCreated,
+    ReturnStatusChanged,
     SyncFinished,
     SyncStarted,
 )
@@ -46,7 +47,13 @@ from app.domain.interfaces.marketplace_plugin import MarketplacePlugin
 from app.domain.interfaces.order_repository import OrderRepository
 from app.domain.interfaces.return_repository import ReturnRepository
 from app.domain.interfaces.shipment_repository import ShipmentRepository
-from app.domain.returns import UNKNOWN_RETURN_STATUS, return_requires_action
+from app.domain.returns import (
+    RETURN_CHANGE_SOURCE_ALLEGRO,
+    UNKNOWN_RETURN_STATUS,
+    ReturnStatusChange,
+    is_reopening,
+    return_requires_action,
+)
 from app.infrastructure.plugins.allegro.exceptions import AllegroApiError
 from app.shared.dto.stats_dto import SyncResult
 from app.utils.time import utc_now
@@ -162,7 +169,7 @@ class SyncOrdersService:
             if change.packing_started:
                 packing_started_orders.append(refreshed)
 
-        new_returns = await self._sync_customer_returns()
+        new_returns, return_changes = await self._sync_customer_returns()
 
         return SyncResult(
             new_orders_count=len(new_orders),
@@ -171,6 +178,7 @@ class SyncOrdersService:
             cancelled_orders=tuple(cancelled_orders),
             new_returns=tuple(new_returns),
             packing_started_orders=tuple(packing_started_orders),
+            return_status_changes=tuple(return_changes),
         )
 
     async def _sync_existing_order_status(self, order: Order) -> _ExistingOrderChange:
@@ -344,7 +352,9 @@ class SyncOrdersService:
 
         return refreshed
 
-    async def _sync_customer_returns(self) -> list[OrderReturn]:
+    async def _sync_customer_returns(
+        self,
+    ) -> tuple[list[OrderReturn], list[ReturnStatusChange]]:
         """
         Pobiera zwroty klientów z marketplace i zapisuje nowe.
 
@@ -353,7 +363,7 @@ class SyncOrdersService:
         następnym cyklu (zasada odporności projektu).
         """
         if self._return_repository is None:
-            return []
+            return [], []
 
         try:
             returns = await self._plugin.get_customer_returns()
@@ -362,15 +372,18 @@ class SyncOrdersService:
                 "Nie udało się pobrać zwrotów klientów - pominięto w tym cyklu: {}",
                 exc,
             )
-            return []
+            return [], []
 
         new_returns: list[OrderReturn] = []
+        changes: list[ReturnStatusChange] = []
         for order_return in returns:
             stored_status = await self._return_repository.get_status(
                 order_return.marketplace, order_return.external_id
             )
             if stored_status is not None:
-                await self._sync_return_status(order_return, stored_status)
+                change = await self._sync_return_status(order_return, stored_status)
+                if change is not None:
+                    changes.append(change)
                 continue
 
             try:
@@ -394,14 +407,18 @@ class SyncOrdersService:
             if await self._return_requires_action(order_return):
                 new_returns.append(order_return)
 
-        await self._refresh_returns_outside_window({r.external_id for r in returns})
-        return new_returns
+        changes.extend(
+            await self._refresh_returns_outside_window({r.external_id for r in returns})
+        )
+        return new_returns, changes
 
     async def _return_requires_action(self, order_return: OrderReturn) -> bool:
         order = await self._order_repository.get_by_external_id(order_return.order_external_id)
         return return_requires_action(order_return.status, order.status if order else None)
 
-    async def _sync_return_status(self, fresh: OrderReturn, stored_status: str) -> bool:
+    async def _sync_return_status(
+        self, fresh: OrderReturn, stored_status: str
+    ) -> ReturnStatusChange | None:
         """
         Utrwala zmianę statusu znanego zwrotu.
 
@@ -410,13 +427,23 @@ class SyncOrdersService:
         "do obsługi" na zawsze, choć na Allegro pieniądze dawno wróciły,
         a prowizja została zwrócona.
 
-        Niepełna odpowiedź (brak statusu) niczego nie nadpisuje.
+        Niepełna odpowiedź (brak statusu) niczego nie nadpisuje. Zakończony
+        zwrot nie wraca do obsługi: otwarty status po zamkniętym to
+        nieaktualna odpowiedź (patrz is_reopening) - zostaje odrzucony.
 
         Returns:
-            True, gdy status został zmieniony.
+            Zapis zmiany do historii albo None, gdy nic nie zmieniono.
         """
         if fresh.status in ("", UNKNOWN_RETURN_STATUS) or fresh.status == stored_status:
-            return False
+            return None
+        if is_reopening(stored_status, fresh.status):
+            logger.warning(
+                "Zwrot {}: Allegro podało {} po zakończeniu ({}) - pomijam nieaktualny status",
+                fresh.external_id,
+                fresh.status,
+                stored_status,
+            )
+            return None
         assert self._return_repository is not None
         await self._return_repository.update_status(
             fresh.marketplace, fresh.external_id, fresh.status
@@ -424,9 +451,19 @@ class SyncOrdersService:
         logger.info(
             "Zwrot {} zmienił status: {} -> {}", fresh.external_id, stored_status, fresh.status
         )
-        return True
+        return ReturnStatusChange(
+            external_id=fresh.external_id,
+            marketplace=fresh.marketplace,
+            order_external_id=fresh.order_external_id,
+            previous_status=stored_status,
+            new_status=fresh.status,
+            source=RETURN_CHANGE_SOURCE_ALLEGRO,
+            changed_at=utc_now(),
+        )
 
-    async def _refresh_returns_outside_window(self, fetched_ids: set[str]) -> None:
+    async def _refresh_returns_outside_window(
+        self, fetched_ids: set[str]
+    ) -> list[ReturnStatusChange]:
         """
         Dopytuje o otwarte zwroty, których nie było w pobranej liście.
 
@@ -440,18 +477,22 @@ class SyncOrdersService:
             self._plugin.marketplace_code, _REFRESH_CANDIDATES_LIMIT
         )
         stale = [r for r in candidates if r.external_id not in fetched_ids]
+        changes: list[ReturnStatusChange] = []
         for record in stale[:_MAX_OUT_OF_WINDOW_REFRESHES]:
             try:
                 fresh = await self._plugin.get_customer_return(record.external_id)
             except NotImplementedError:
-                return
+                break
             except AllegroApiError as exc:
                 if exc.status_code == _HTTP_NOT_FOUND:
                     logger.debug("Zwrot {} niedostępny w Allegro (404)", record.external_id)
                     continue
                 logger.warning("Odświeżanie zwrotów spoza listy przerwane - Allegro: {}", exc)
-                return
-            await self._sync_return_status(fresh, record.status)
+                break
+            change = await self._sync_return_status(fresh, record.status)
+            if change is not None:
+                changes.append(change)
+        return changes
 
     async def publish_sync_events(self, result: SyncResult) -> None:
         """
@@ -476,6 +517,11 @@ class SyncOrdersService:
         for order_return in result.new_returns:
             await self._event_bus.publish(
                 OrderReturnCreated(occurred_at=utc_now(), order_return=order_return)
+            )
+
+        for change in result.return_status_changes:
+            await self._event_bus.publish(
+                ReturnStatusChanged(occurred_at=change.changed_at, change=change)
             )
 
         await self._event_bus.publish(

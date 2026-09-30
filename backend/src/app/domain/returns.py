@@ -26,6 +26,9 @@ o nowym zwrocie wychodzi tylko dla zwrotu wymagającego działania).
 
 from __future__ import annotations
 
+from dataclasses import dataclass
+from datetime import datetime
+
 RETURN_CREATED = "CREATED"
 RETURN_DISPATCHED = "DISPATCHED"
 RETURN_IN_TRANSIT = "IN_TRANSIT"
@@ -97,6 +100,43 @@ def return_requires_action(status: str | None, order_status: str | None = None) 
     if is_closed_return_status(status):
         return False
     return (order_status or "").upper() != _CANCELLED_ORDER_STATUS
+
+
+#: Skąd przyszła zmiana statusu zwrotu - trafia do historii (audytu).
+RETURN_CHANGE_SOURCE_ALLEGRO = "allegro"
+
+
+@dataclass(frozen=True, slots=True)
+class ReturnStatusChange:
+    """Jedna zmiana statusu zwrotu - wpis historii: kiedy, skąd, z czego na co."""
+
+    external_id: str
+    marketplace: str
+    order_external_id: str
+    previous_status: str
+    new_status: str
+    source: str
+    changed_at: datetime
+
+    @property
+    def closes_return(self) -> bool:
+        """Czy ta zmiana zakończyła sprawę (otwarty -> zamknięty)."""
+        return not is_closed_return_status(self.previous_status) and is_closed_return_status(
+            self.new_status
+        )
+
+
+def is_reopening(previous_status: str, new_status: str) -> bool:
+    """
+    Czy zmiana cofałaby zakończony zwrot do otwartego statusu.
+
+    Oś statusów zwrotu na Allegro idzie tylko do przodu (zgłoszony ->
+    w drodze -> dostarczony -> zakończony). Otwarty status po zamkniętym
+    to nieaktualna odpowiedź, a nie nowy fakt - nie wolno nią przywrócić
+    zwrotu do obsługi. Zmiany między zamkniętymi (np. FINISHED ->
+    COMMISSION_REFUND_CLAIMED -> COMMISSION_REFUNDED) są dozwolone.
+    """
+    return is_closed_return_status(previous_status) and not is_closed_return_status(new_status)
 
 
 def return_status_label(status: str) -> str:

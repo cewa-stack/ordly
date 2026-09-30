@@ -15,6 +15,7 @@ from app.domain.entities.dispute_notice import DisputeNotice
 from app.domain.entities.olx_event import OlxEvent
 from app.domain.entities.order import Order
 from app.domain.entities.order_return import OrderReturn
+from app.domain.returns import ReturnStatusChange
 
 
 @dataclass(frozen=True, slots=True)
@@ -60,6 +61,18 @@ class OrderReturnCreated(DomainEvent):
     """Emitowane, gdy synchronizacja wykryje nowy zwrot produktów z zamówienia."""
 
     order_return: OrderReturn
+
+
+@dataclass(frozen=True, slots=True)
+class ReturnStatusChanged(DomainEvent):
+    """
+    Emitowane, gdy synchronizacja utrwali nowy status znanego zwrotu.
+
+    Subskrybent zapisuje zmianę w audycie (tabela events), dzięki czemu
+    w logach aplikacji widać, kiedy i skąd zwrot został zamknięty.
+    """
+
+    change: ReturnStatusChange
 
 
 @dataclass(frozen=True, slots=True)
