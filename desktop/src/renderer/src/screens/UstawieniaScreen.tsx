@@ -12,6 +12,7 @@ import { RefreshIcon } from "../icons";
 import { Button, MiniButton, SectionLabel } from "../components/ui";
 import { ConfirmDialog } from "../components/Modal";
 import { ReplyTemplatesSettings } from "../components/ReplyTemplatesSettings";
+import { WholesalerTemplatesSettings } from "../components/WholesalerTemplatesSettings";
 import { useAuth } from "../lib/auth";
 import { useToast } from "../lib/toast";
 import { formatDateTime } from "../lib/format";
@@ -233,6 +234,11 @@ export function UstawieniaScreen() {
         <SectionLabel>Szablony odpowiedzi</SectionLabel>
       </div>
       <ReplyTemplatesSettings />
+
+      <div className="mt-4">
+        <SectionLabel>Szablony maili do hurtowni</SectionLabel>
+      </div>
+      <WholesalerTemplatesSettings />
 
       <div className="mt-4">
         <SectionLabel>Sesja</SectionLabel>

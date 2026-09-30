@@ -156,7 +156,27 @@ export interface Wholesaler {
   email: string;
   contactPerson?: string;
   items: WholesalerItem[];
+  /** Przypisany szablon maila; brak = szablon domyslny. */
+  templateId?: string;
 }
+
+/**
+ * Szablon maila do hurtowni - lokalny, jak same hurtownie. Wariant
+ * "inquiry" idzie wtedy, gdy w mailu nie ma zaznaczonych pozycji.
+ */
+export interface WholesalerTemplate {
+  id: string;
+  name: string;
+  subject: string;
+  body: string;
+  inquirySubject: string;
+  inquiryBody: string;
+  isDefault: boolean;
+}
+
+export type WholesalerTemplateInput = Omit<WholesalerTemplate, "id" | "isDefault"> & {
+  id?: string;
+};
 
 export interface WholesalerOrderRecord {
   id: string;

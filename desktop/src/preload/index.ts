@@ -102,9 +102,22 @@ const ordly = {
       email: string;
       contactPerson?: string;
       items: { name: string; quantity: number }[];
+      templateId?: string;
     }) => ipcRenderer.invoke("ordly:wholesalers:save", input),
     delete: (id: string) => ipcRenderer.invoke("ordly:wholesalers:delete", id),
     history: () => ipcRenderer.invoke("ordly:wholesalers:history"),
+    templates: () => ipcRenderer.invoke("ordly:wholesalers:templates"),
+    saveTemplate: (input: {
+      id?: string;
+      name: string;
+      subject: string;
+      body: string;
+      inquirySubject: string;
+      inquiryBody: string;
+    }) => ipcRenderer.invoke("ordly:wholesalers:saveTemplate", input),
+    setDefaultTemplate: (id: string) =>
+      ipcRenderer.invoke("ordly:wholesalers:setDefaultTemplate", id),
+    deleteTemplate: (id: string) => ipcRenderer.invoke("ordly:wholesalers:deleteTemplate", id),
     sendOrder: (payload: {
       wholesalerId: string;
       wholesalerName: string;

@@ -10,7 +10,12 @@
  * tam, gdzie zlamalaby sie prawdziwa aplikacja.
  */
 import type { OrdlyBridge } from "../src/renderer/src/types/ordly-bridge";
-import type { Order } from "../src/renderer/src/types/api";
+import type {
+  Order,
+  Wholesaler,
+  WholesalerTemplate,
+  WholesalerTemplateInput,
+} from "../src/renderer/src/types/api";
 
 const ok = <T,>(data: T) => Promise.resolve({ ok: true as const, data });
 
@@ -159,6 +164,69 @@ let templates = [
     id: 2,
     title: "Wysłane — numer przesyłki",
     body: "Dzień dobry,\n\npaczka jest już w drodze. Numer przesyłki: {numer_przesylki}.\n\nDziękuję za zakup i pozdrawiam",
+  },
+];
+
+let wholesalerTemplates: WholesalerTemplate[] = [
+  {
+    id: "tpl-standard",
+    name: "Standardowe zamówienie",
+    subject: "Zamówienie - {produkty}",
+    body: `Dzień dobry {osoba_kontaktowa},
+
+Chciałbym złożyć zamówienie na następujące produkty:
+
+{lista_pozycji}
+
+Proszę o potwierdzenie dostępności i przewidywanego terminu dostawy.
+
+Pozdrawiam`,
+    inquirySubject: "Zapytanie",
+    inquiryBody: `Dzień dobry {osoba_kontaktowa},
+
+`,
+    isDefault: true,
+  },
+  {
+    id: "tpl-opakowania",
+    name: "Opakowania - stała współpraca",
+    subject: "Zamówienie {data} - {hurtownia}",
+    body: `Dzień dobry {osoba_kontaktowa},
+
+proszę o kolejną dostawę:
+
+{lista_pozycji}
+
+Płatność jak zwykle przelewem.
+
+Pozdrawiam serdecznie`,
+    inquirySubject: "Pytanie - {hurtownia}",
+    inquiryBody: `Dzień dobry {osoba_kontaktowa},
+
+
+
+Pozdrawiam serdecznie`,
+    isDefault: false,
+  },
+];
+
+let wholesalers: Wholesaler[] = [
+  {
+    id: "w-1",
+    name: "Hurtownia Woskowa",
+    email: "zamowienia@przyklad.test",
+    contactPerson: "Pani Anno",
+    items: [
+      { name: "Wosk sojowy 1 kg", quantity: 5 },
+      { name: "Knot bawełniany 15 cm", quantity: 100 },
+    ],
+  },
+  {
+    id: "w-2",
+    name: "Szkło i Opakowania",
+    email: "biuro@przyklad.test",
+    items: [{ name: "Słoik szklany 220 ml", quantity: 40 }],
+    templateId: "tpl-opakowania",
   },
 ];
 
@@ -410,10 +478,40 @@ export function installMockBridge(): void {
       saveReply: () => ok({ saved: false, path: null }),
     },
     wholesalers: {
-      list: () => Promise.resolve([]),
-      save: (input: unknown) => Promise.resolve(input),
-      delete: () => Promise.resolve(),
+      list: () => Promise.resolve(wholesalers.map((w) => ({ ...w }))),
+      save: (input: Wholesaler) => {
+        const saved = { ...input, id: input.id ?? crypto.randomUUID() };
+        if (!saved.templateId) delete saved.templateId;
+        wholesalers = [...wholesalers.filter((w) => w.id !== saved.id), saved];
+        return Promise.resolve(saved);
+      },
+      delete: (id: string) => {
+        wholesalers = wholesalers.filter((w) => w.id !== id);
+        return Promise.resolve();
+      },
       history: () => Promise.resolve([]),
+      templates: () => Promise.resolve(wholesalerTemplates.map((t) => ({ ...t }))),
+      saveTemplate: (input: WholesalerTemplateInput) => {
+        const existing = wholesalerTemplates.find((t) => t.id === input.id);
+        const saved: WholesalerTemplate = existing
+          ? { ...existing, ...input, id: existing.id }
+          : { ...input, id: crypto.randomUUID(), isDefault: false };
+        wholesalerTemplates = existing
+          ? wholesalerTemplates.map((t) => (t.id === saved.id ? saved : t))
+          : [...wholesalerTemplates, saved];
+        return Promise.resolve(saved);
+      },
+      setDefaultTemplate: (id: string) => {
+        wholesalerTemplates = wholesalerTemplates.map((t) => ({ ...t, isDefault: t.id === id }));
+        return Promise.resolve();
+      },
+      deleteTemplate: (id: string) => {
+        wholesalerTemplates = wholesalerTemplates.filter((t) => t.id !== id);
+        wholesalers = wholesalers.map((w) =>
+          w.templateId === id ? { ...w, templateId: undefined } : w
+        );
+        return Promise.resolve();
+      },
       sendOrder: () => ok(null),
     },
     window: {

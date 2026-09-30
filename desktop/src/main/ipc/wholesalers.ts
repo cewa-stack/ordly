@@ -4,11 +4,16 @@ import { requireSession } from "../lib/tokenStore";
 import { toResult } from "../lib/result";
 import {
   type Wholesaler,
+  type WholesalerTemplate,
   appendOrderHistory,
   deleteWholesaler,
+  deleteWholesalerTemplate,
   listOrderHistory,
+  listWholesalerTemplates,
   listWholesalers,
   saveWholesaler,
+  saveWholesalerTemplate,
+  setDefaultWholesalerTemplate,
 } from "../lib/wholesalerStore";
 
 interface SendOrderPayload {
@@ -33,6 +38,22 @@ export function registerWholesalersIpc(): void {
   });
 
   ipcMain.handle("ordly:wholesalers:history", () => listOrderHistory());
+
+  ipcMain.handle("ordly:wholesalers:templates", () => listWholesalerTemplates());
+
+  ipcMain.handle(
+    "ordly:wholesalers:saveTemplate",
+    (_event, input: Omit<WholesalerTemplate, "id" | "isDefault"> & { id?: string }) =>
+      saveWholesalerTemplate(input)
+  );
+
+  ipcMain.handle("ordly:wholesalers:setDefaultTemplate", (_event, id: string) => {
+    setDefaultWholesalerTemplate(id);
+  });
+
+  ipcMain.handle("ordly:wholesalers:deleteTemplate", (_event, id: string) => {
+    deleteWholesalerTemplate(id);
+  });
 
   ipcMain.handle("ordly:wholesalers:sendOrder", async (_event, payload: SendOrderPayload) =>
     toResult(async () => {

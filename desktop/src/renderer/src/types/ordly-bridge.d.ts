@@ -30,6 +30,8 @@ import type {
   Wholesaler,
   WholesalerOrderRecord,
   WholesalerOrderSendPayload,
+  WholesalerTemplate,
+  WholesalerTemplateInput,
 } from "./api";
 
 export interface OrdlyBridge {
@@ -122,6 +124,10 @@ export interface OrdlyBridge {
     save: (input: Omit<Wholesaler, "id"> & { id?: string }) => Promise<Wholesaler>;
     delete: (id: string) => Promise<void>;
     history: () => Promise<WholesalerOrderRecord[]>;
+    templates: () => Promise<WholesalerTemplate[]>;
+    saveTemplate: (input: WholesalerTemplateInput) => Promise<WholesalerTemplate>;
+    setDefaultTemplate: (id: string) => Promise<void>;
+    deleteTemplate: (id: string) => Promise<void>;
     sendOrder: (payload: WholesalerOrderSendPayload) => Promise<BridgeResult<null>>;
   };
   window: {

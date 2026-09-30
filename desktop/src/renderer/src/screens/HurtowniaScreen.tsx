@@ -24,6 +24,7 @@ import { ConfirmDialog, Modal } from "../components/Modal";
 import { WholesalerOrderModal } from "../components/WholesalerOrderModal";
 import { useToast } from "../lib/toast";
 import { formatDateTime, formatPlural } from "../lib/format";
+import { resolveWholesalerTemplate, useWholesalerTemplates } from "../lib/wholesalerTemplate";
 import type { Wholesaler, WholesalerItem } from "../types/api";
 
 const inputClass =
@@ -41,6 +42,18 @@ function WholesalerFormModal({
   const [name, setName] = React.useState(wholesaler?.name ?? "");
   const [email, setEmail] = React.useState(wholesaler?.email ?? "");
   const [contactPerson, setContactPerson] = React.useState(wholesaler?.contactPerson ?? "");
+  const templatesQuery = useWholesalerTemplates();
+  const templates = templatesQuery.data ?? [];
+  const defaultTemplate = templates.find((t) => t.isDefault);
+  // "" = szablon domyslny. Przypisanie do usunietego szablonu tez czytamy
+  // jako domyslny, bo tak wlasnie zachowa sie okno zamowienia.
+  const [templateId, setTemplateId] = React.useState(wholesaler?.templateId ?? "");
+  // Dopoki lista szablonow sie nie wczytala, zapis nie moze skasowac przypisania.
+  const effectiveTemplateId = !templatesQuery.data
+    ? templateId
+    : templates.some((t) => t.id === templateId && !t.isDefault)
+      ? templateId
+      : "";
   // Pusty wiersz na koncu, zeby dopisanie pozycji nie wymagalo najpierw
   // klikniecia "Dodaj pozycję" - pusta nazwa i tak wypada przy zapisie.
   const [items, setItems] = React.useState<WholesalerItem[]>([
@@ -62,6 +75,7 @@ function WholesalerFormModal({
         items: items
           .filter((item) => item.name.trim().length > 0)
           .map((item) => ({ name: item.name.trim(), quantity: Math.max(1, item.quantity) })),
+        templateId: effectiveTemplateId || undefined,
       }),
     onSuccess: (saved) => {
       void queryClient.invalidateQueries({ queryKey: ["wholesalers"] });
@@ -112,6 +126,29 @@ function WholesalerFormModal({
             placeholder="opcjonalnie - trafia do powitania w mailu"
             className={inputClass}
           />
+        </label>
+        <label className="flex flex-col gap-1.5">
+          <span className="o-eyebrow">Szablon maila</span>
+          <select
+            value={effectiveTemplateId}
+            onChange={(e) => setTemplateId(e.target.value)}
+            disabled={templatesQuery.isLoading}
+            className={inputClass}
+          >
+            <option value="">
+              {defaultTemplate ? `Domyślny - ${defaultTemplate.name}` : "Domyślny"}
+            </option>
+            {templates
+              .filter((t) => !t.isDefault)
+              .map((t) => (
+                <option key={t.id} value={t.id}>
+                  {t.name}
+                </option>
+              ))}
+          </select>
+          <span className="text-[11px] text-text-3">
+            Treść szablonów zmienisz w Ustawieniach → Szablony maili do hurtowni.
+          </span>
         </label>
         <div className="flex flex-col gap-1.5">
           <span className="o-eyebrow">Co się tu zamawia</span>
@@ -175,6 +212,8 @@ export function HurtowniaScreen() {
     queryKey: ["wholesaler-history"],
     queryFn: () => window.ordly.wholesalers.history(),
   });
+
+  const templatesQuery = useWholesalerTemplates();
 
   const deleteMutation = useMutation({
     mutationFn: (id: string) => window.ordly.wholesalers.delete(id),
@@ -240,6 +279,11 @@ export function HurtowniaScreen() {
                 ? "brak zapisanych pozycji"
                 : formatPlural(wholesaler.items.length, ["pozycja", "pozycje", "pozycji"])}
             </p>
+            {templatesQuery.data && (
+              <p className="o-mono truncate text-[10.5px] text-text-3">
+                szablon: {resolveWholesalerTemplate(templatesQuery.data, wholesaler.templateId)?.name}
+              </p>
+            )}
             {/* Przycisk jest zawsze aktywny - pusta lista pozycji nie jest
                 powodem, zeby nie dalo sie napisac do hurtowni (zapytanie
                 o cennik, termin, nowy produkt). */}

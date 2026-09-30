@@ -13,7 +13,11 @@ import * as React from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Modal } from "./Modal";
 import { Button, Stepper } from "./ui";
-import { buildWholesalerBody, buildWholesalerSubject } from "../lib/wholesalerTemplate";
+import {
+  renderWholesalerEmail,
+  resolveWholesalerTemplate,
+  useWholesalerTemplates,
+} from "../lib/wholesalerTemplate";
 import { formatPlural } from "../lib/format";
 import { useToast } from "../lib/toast";
 import type { Wholesaler } from "../types/api";
@@ -50,13 +54,21 @@ export function WholesalerOrderModal({
   const [subject, setSubject] = React.useState("");
   const [body, setBody] = React.useState("");
   const [bodyTouched, setBodyTouched] = React.useState(false);
+  // Jednorazowa zmiana szablonu w tym mailu; null = szablon przypisany hurtowni.
+  const [templateOverride, setTemplateOverride] = React.useState<string | null>(null);
+  const { data: templates } = useWholesalerTemplates();
 
   const selected = (wholesalers ?? []).find((w) => w.id === selectedId) ?? null;
   const items = React.useMemo(() => selected?.items ?? [], [selected]);
+  const activeTemplate = resolveWholesalerTemplate(
+    templates,
+    templateOverride ?? selected?.templateId
+  );
 
   React.useEffect(() => {
     if (!open) return;
     setSelectedId(preselected?.id ?? "__new__");
+    setTemplateOverride(null);
     setBodyTouched(false);
   }, [open, preselected]);
 
@@ -88,15 +100,12 @@ export function WholesalerOrderModal({
   React.useEffect(() => {
     if (!open) return;
     if (bodyTouched) return;
-    setSubject(buildWholesalerSubject(orderItems));
-    const target: Wholesaler = selected ?? {
-      id: "",
-      name: newName || "Hurtownia",
-      email: newEmail,
-      items: [],
-    };
-    setBody(buildWholesalerBody(target, orderItems));
-  }, [open, orderItems, selected, newName, newEmail, bodyTouched]);
+    if (!activeTemplate) return;
+    const recipient = selected ?? { name: newName || "Hurtownia" };
+    const email = renderWholesalerEmail(activeTemplate, recipient, orderItems);
+    setSubject(email.subject);
+    setBody(email.body);
+  }, [open, orderItems, selected, newName, bodyTouched, activeTemplate]);
 
   const sendMutation = useMutation({
     mutationFn: async () => {
@@ -109,6 +118,8 @@ export function WholesalerOrderModal({
           name: newName.trim(),
           email: newEmail.trim(),
           items: orderItems,
+          templateId:
+            activeTemplate && !activeTemplate.isDefault ? activeTemplate.id : undefined,
         });
         void queryClient.invalidateQueries({ queryKey: ["wholesalers"] });
       }
@@ -184,7 +195,10 @@ export function WholesalerOrderModal({
           <span className="o-eyebrow">Hurtownia</span>
           <select
             value={selectedId}
-            onChange={(event) => setSelectedId(event.target.value)}
+            onChange={(event) => {
+              setSelectedId(event.target.value);
+              setTemplateOverride(null);
+            }}
             className={inputClass}
           >
             <option value="__new__">+ Nowa hurtownia</option>
@@ -264,6 +278,29 @@ export function WholesalerOrderModal({
             );
           })}
         </div>
+
+        {(templates ?? []).length > 1 && (
+          <label className="flex flex-col gap-1.5">
+            <span className="o-eyebrow">Szablon</span>
+            <select
+              value={activeTemplate?.id ?? ""}
+              onChange={(event) => {
+                // Wybor szablonu to swiadome "uloz mail od nowa", wiec
+                // nadpisuje tez reczne poprawki tematu i tresci.
+                setTemplateOverride(event.target.value);
+                setBodyTouched(false);
+              }}
+              className={inputClass}
+            >
+              {(templates ?? []).map((template) => (
+                <option key={template.id} value={template.id}>
+                  {template.name}
+                  {template.isDefault ? " (domyślny)" : ""}
+                </option>
+              ))}
+            </select>
+          </label>
+        )}
 
         <label className="flex flex-col gap-1.5">
           <span className="o-eyebrow">Temat</span>
