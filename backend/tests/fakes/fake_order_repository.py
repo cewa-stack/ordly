@@ -7,10 +7,10 @@ from datetime import datetime
 
 from app.domain.entities.order import Order
 from app.domain.fulfillment import (
-    ACTIVE_FULFILLMENT_STATUSES,
     FULFILLMENT_NEW,
     REFRESHABLE_FULFILLMENT_STATUSES,
-    SHIPPED_FULFILLMENT_STATUSES,
+    awaits_shipment,
+    requires_packing,
 )
 from app.domain.interfaces.order_repository import OrderRepository
 
@@ -47,11 +47,7 @@ class FakeOrderRepository(OrderRepository):
             o
             for o in self._orders
             if o.order_date >= since
-            and o.status.upper() != "CANCELLED"
-            and (
-                o.fulfillment_status is None
-                or o.fulfillment_status.upper() not in SHIPPED_FULFILLMENT_STATUSES
-            )
+            and awaits_shipment(o.status, o.fulfillment_status, o.tracking_number)
         ]
         return sorted(unshipped, key=lambda o: o.order_date, reverse=True)
 
@@ -59,10 +55,8 @@ class FakeOrderRepository(OrderRepository):
         new_status = [
             o
             for o in self._orders
-            if o.status.upper() != "CANCELLED"
-            and o.tracking_number is None
-            and o.fulfillment_status is not None
-            and o.fulfillment_status.upper() == FULFILLMENT_NEW
+            if requires_packing(o.status, o.fulfillment_status, o.tracking_number)
+            and (o.fulfillment_status or "").upper() == FULFILLMENT_NEW
         ]
         return sorted(new_status, key=lambda o: o.order_date, reverse=True)
 
@@ -70,10 +64,7 @@ class FakeOrderRepository(OrderRepository):
         active = [
             o
             for o in self._orders
-            if o.status.upper() != "CANCELLED"
-            and o.tracking_number is None
-            and o.fulfillment_status is not None
-            and o.fulfillment_status.upper() in ACTIVE_FULFILLMENT_STATUSES
+            if requires_packing(o.status, o.fulfillment_status, o.tracking_number)
         ]
         return sorted(active, key=lambda o: o.order_date, reverse=True)[:limit]
 

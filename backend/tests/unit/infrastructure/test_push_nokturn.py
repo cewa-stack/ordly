@@ -218,7 +218,9 @@ class TestRegulaDoSpakowania:
     @pytest.mark.parametrize(
         ("zamowienie", "czeka"),
         [
-            (_order(fulfillment=None), True),
+            # etap nieznany (NULL) nie czeka - bot liczył tak od dawna, apki
+            # nie, i stąd zamówienie sprzed 170 dni wisiało w "do spakowania"
+            (_order(fulfillment=None), False),
             (_order(fulfillment="NEW"), True),
             (_order(fulfillment="PROCESSING"), True),
             # spakowane - czeka już tylko na kuriera
@@ -288,8 +290,9 @@ class TestAttentionService:
         counts = await service.counts()
 
         assert zamowienia.limit == 100  # tyle pobiera GET /orders w obu aplikacjach
-        assert (counts.pending, counts.open_issues, counts.open_returns) == (2, 2, 2)
-        assert counts.badge == 6
+        # "c" (etap NULL) nie czeka - wspólna reguła requires_packing.
+        assert (counts.pending, counts.open_issues, counts.open_returns) == (1, 2, 2)
+        assert counts.badge == 5
 
     async def test_awaria_allegro_daje_nieznana_liczbe_dyskusji(self):
         service = AttentionService(

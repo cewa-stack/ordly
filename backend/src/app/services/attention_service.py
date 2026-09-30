@@ -27,6 +27,7 @@ from datetime import datetime
 from loguru import logger
 
 from app.domain.entities.order import Order
+from app.domain.fulfillment import requires_packing
 from app.domain.interfaces.order_repository import OrderRepository
 from app.domain.interfaces.return_repository import ReturnRepository
 from app.services.issues_service import IssuesService
@@ -40,26 +41,14 @@ RETURNS_WINDOW = 50
 #: aplikacje pokazują wygaszone (desktop ShellLayout, mobile StartScreen).
 CLOSED_RETURN_STATUSES = frozenset({"COMMISSION_REFUNDED", "CANCELLED", "REJECTED"})
 
-_SHIPPED = frozenset({"SENT", "PICKED_UP"})
-_WAITING_FOR_PACKING = frozenset({"NEW", "PROCESSING"})
-
-
 def is_pending_packing(order: Order) -> bool:
     """
-    Zamówienie czeka na spakowanie - 1:1 z `isPendingOrder` (desktop).
-
-    Anulowane odpada, nawet gdy Allegro zostawiło mu etap NEW. Wysłane
-    odpada też wtedy, gdy ORDLY samo wykryło numer przesyłki, zanim status
-    zmienił się na Allegro. Spakowane (READY_FOR_SHIPMENT) czeka już tylko
-    na kuriera, więc do "do spakowania" się nie liczy.
+    Zamówienie czeka na spakowanie - wspólna reguła domenowa
+    `requires_packing` (app/domain/fulfillment.py). Aplikacje dostają jej
+    wynik gotowy w polu `requires_packing` z `GET /orders`, więc nie
+    liczą niczego po swojemu.
     """
-    status = (order.status or "").upper()
-    fulfillment = (order.fulfillment_status or "").upper() or None
-    if status == "CANCELLED" or fulfillment == "CANCELLED":
-        return False
-    if (fulfillment in _SHIPPED) or order.tracking_number:
-        return False
-    return fulfillment is None or fulfillment in _WAITING_FOR_PACKING
+    return requires_packing(order.status, order.fulfillment_status, order.tracking_number)
 
 
 @dataclass(frozen=True, slots=True)

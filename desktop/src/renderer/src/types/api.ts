@@ -75,6 +75,8 @@ export interface Order {
   tracking_number: string | null;
   order_date: string;
   products: OrderProduct[];
+  /** Wynik wspolnej reguly backendu `requires_packing` - zrodlo prawdy dla "Do spakowania". */
+  requires_packing?: boolean;
 }
 
 export interface SyncResult {

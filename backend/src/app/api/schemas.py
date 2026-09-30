@@ -23,6 +23,7 @@ from app.domain.entities.order_return import ReturnRecord
 from app.domain.entities.ordlak_conversation import OrdlakConversation
 from app.domain.entities.reply_template import ReplyTemplate
 from app.domain.entities.shipment import Shipment
+from app.domain.fulfillment import requires_packing
 from app.infrastructure.mail.mime import MailBodies, html_to_plain_text
 from app.repositories.sqlite_event_repository import EventRecord
 from app.services.dashboard_service import DashboardSummary
@@ -112,6 +113,9 @@ class OrderOut(BaseModel):
     tracking_number: str | None
     order_date: UtcDatetime
     products: list[OrderProductOut]
+    #: Wynik wspólnej reguły `requires_packing` - z tej flagi desktop
+    #: i telefon liczą "Do spakowania", zamiast powielać regułę u siebie.
+    requires_packing: bool
 
 
 def order_out(order: Order) -> OrderOut:
@@ -126,6 +130,9 @@ def order_out(order: Order) -> OrderOut:
         fulfillment_status=order.fulfillment_status,
         tracking_number=order.tracking_number,
         order_date=order.order_date,
+        requires_packing=requires_packing(
+            order.status, order.fulfillment_status, order.tracking_number
+        ),
         products=[
             OrderProductOut(
                 external_id=p.external_id,

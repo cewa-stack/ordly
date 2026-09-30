@@ -30,6 +30,7 @@ const FULFILLMENT_LABELS: Record<string, string> = {
   PICKED_UP: "Odebrane",
   SUSPENDED: "Wstrzymane",
   CANCELLED: "Anulowane",
+  RETURNED: "Zwrócone",
 };
 
 /**
@@ -50,6 +51,7 @@ const FULFILLMENT_TONES: Record<string, PillTone> = {
   PICKED_UP: "mute",
   SUSPENDED: "hot",
   CANCELLED: "mute",
+  RETURNED: "mute",
 };
 
 /** Minimum pol zamowienia potrzebne do decyzji o etapie obslugi. */
@@ -57,6 +59,8 @@ interface OrderStatusFields {
   status: string;
   fulfillment_status: string | null;
   tracking_number: string | null;
+  /** Gotowy wynik reguly backendu (`requires_packing` z GET /orders). */
+  requires_packing?: boolean;
 }
 
 const RAW_SHIPPED_STATUSES = new Set(["SENT", "PICKED_UP"]);
@@ -74,13 +78,19 @@ export function isShippedForDisplay(order: OrderStatusFields): boolean {
   return (status !== null && RAW_SHIPPED_STATUSES.has(status)) || Boolean(order.tracking_number);
 }
 
+/**
+ * Etap nieznany (NULL) to rekord, ktorego Allegro jeszcze nie potwierdzilo -
+ * nie "Nowe". Pokazywanie go jako "Nowe" przy jednoczesnym niewliczaniu do
+ * "Do spakowania" lamaloby zasade "zamowienie nie moze byc jednoczesnie
+ * obsluzone i widoczne jako nowe".
+ */
 export function fulfillmentLabel(status: string | null): string {
-  if (!status) return "Nowe";
+  if (!status) return "Brak danych";
   return FULFILLMENT_LABELS[status] ?? status;
 }
 
 export function fulfillmentTone(status: string | null): PillTone {
-  if (!status) return "hot";
+  if (!status) return "mute";
   return FULFILLMENT_TONES[status] ?? "mute";
 }
 
@@ -111,15 +121,17 @@ export function isCancelledOrder(order: OrderStatusFields): boolean {
 /**
  * Zamowienie czeka na spakowanie - liczy sie do "do zrobienia".
  *
- * Anulowane odpada nawet wtedy, gdy Allegro zostawilo mu etap NEW -
- * wczesniej takie zamowienie wisialo w liczniku na zawsze. Wykryty
- * numer przesylki tez zdejmuje zamowienie z tej listy, nawet gdy Allegro
- * jeszcze nie zmienilo statusu - patrz isShippedForDisplay.
+ * Zrodlem prawdy jest backend: pole `requires_packing` z GET /orders to
+ * wynik tej samej reguly, z ktorej licza bot, plakietka push i poranny
+ * raport (app/domain/fulfillment.py). Lokalna regula to tylko zapas na
+ * starsze Pi bez tego pola - i jest jej wierna kopia: anulowane odpada,
+ * wykryty numer przesylki odpada, etap nieznany (NULL) NIE czeka.
  */
 export function isPendingOrder(order: OrderStatusFields): boolean {
-  if (isShippedForDisplay(order)) return false;
+  if (typeof order.requires_packing === "boolean") return order.requires_packing;
+  if (isShippedForDisplay(order) || isCancelledOrder(order)) return false;
   const status = order.fulfillment_status;
-  return !isCancelledOrder(order) && (!status || status === "NEW" || status === "PROCESSING");
+  return status === "NEW" || status === "PROCESSING";
 }
 
 export type OrderFilter = "all" | "pack" | "ready" | "sent";

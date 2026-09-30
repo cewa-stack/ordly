@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from datetime import datetime
 
-from sqlalchemy import func, or_, select, update
+from sqlalchemy import ColumnElement, and_, func, or_, select, update
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
@@ -17,15 +17,30 @@ from app.domain.entities.order import Order
 from app.domain.entities.product import Product
 from app.domain.exceptions.domain_exceptions import DuplicateOrderError
 from app.domain.fulfillment import (
-    ACTIVE_FULFILLMENT_STATUSES,
+    AWAITING_SHIPMENT_FULFILLMENT_STATUSES,
     FULFILLMENT_NEW,
+    PACKING_FULFILLMENT_STATUSES,
     REFRESHABLE_FULFILLMENT_STATUSES,
-    SHIPPED_FULFILLMENT_STATUSES,
 )
 from app.domain.interfaces.order_repository import OrderRepository
 from app.utils.time import utc_now
 
 _CANCELLED_STATUS = "CANCELLED"
+
+
+def _open_without_waybill(fulfillment_statuses: frozenset[str]) -> ColumnElement[bool]:
+    """
+    Lustro SQL reguł `requires_packing` / `awaits_shipment` z
+    app/domain/fulfillment.py: nieanulowane, bez numeru przesyłki, z etapem
+    z podanego zbioru (NULL do żadnego zbioru nie należy). Zapytanie musi
+    mieć lewe złączenie z `shipments`. Zgodność z regułą w Pythonie pilnuje
+    test tests/integration/repositories/test_order_rules_parity.py.
+    """
+    return and_(
+        func.upper(OrderModel.status) != _CANCELLED_STATUS,
+        func.upper(OrderModel.fulfillment_status).in_(list(fulfillment_statuses)),
+        ShipmentModel.tracking_number.is_(None),
+    )
 
 
 class SqliteOrderRepository(OrderRepository):
@@ -120,10 +135,11 @@ class SqliteOrderRepository(OrderRepository):
         """
         Zwraca niewysłane zamówienia utworzone od podanej daty.
 
-        Niewysłane = status realizacji nie jest SENT/PICKED_UP ORAZ brak
-        zapisanego numeru przewozowego. Zamówienia anulowane są pomijane.
-        Lewe złączenie z shipments pozwala wykryć numer przewozowy zapisany
-        wcześniej komendą /tracking (jedna przesyłka na zamówienie).
+        Niewysłane = reguła `awaits_shipment` (etap NEW / PROCESSING /
+        READY_FOR_SHIPMENT, bez numeru przesyłki, nieanulowane). Wcześniej
+        liczyło się tu wszystko poza SENT/PICKED_UP - także zamówienia
+        zwrócone, wstrzymane, do odbioru osobistego i z etapem NULL, które
+        nabijały kafel "Do wysyłki".
         """
         stmt = (
             select(OrderModel)
@@ -131,14 +147,7 @@ class SqliteOrderRepository(OrderRepository):
             .outerjoin(ShipmentModel, ShipmentModel.order_id == OrderModel.id)
             .where(
                 OrderModel.order_date >= since,
-                func.upper(OrderModel.status) != _CANCELLED_STATUS,
-                or_(
-                    OrderModel.fulfillment_status.is_(None),
-                    func.upper(OrderModel.fulfillment_status).not_in(
-                        list(SHIPPED_FULFILLMENT_STATUSES)
-                    ),
-                ),
-                ShipmentModel.tracking_number.is_(None),
+                _open_without_waybill(AWAITING_SHIPMENT_FULFILLMENT_STATUSES),
             )
             .order_by(OrderModel.order_date.desc())
         )
@@ -158,11 +167,11 @@ class SqliteOrderRepository(OrderRepository):
             .options(selectinload(OrderModel.products), selectinload(OrderModel.shipment))
             .outerjoin(ShipmentModel, ShipmentModel.order_id == OrderModel.id)
             .where(
-                func.upper(OrderModel.status) != _CANCELLED_STATUS,
-                func.upper(OrderModel.fulfillment_status) == FULFILLMENT_NEW,
+                # Podzbiór `requires_packing`: tylko nietknięte (NEW).
                 # Wykryty numer przesyłki = paczka nadana, nawet gdy
                 # Allegro zostawiło etap NEW - tak samo jak w aplikacjach.
-                ShipmentModel.tracking_number.is_(None),
+                _open_without_waybill(PACKING_FULFILLMENT_STATUSES),
+                func.upper(OrderModel.fulfillment_status) == FULFILLMENT_NEW,
             )
             .order_by(OrderModel.order_date.desc())
         )
@@ -181,13 +190,7 @@ class SqliteOrderRepository(OrderRepository):
             select(OrderModel)
             .options(selectinload(OrderModel.products), selectinload(OrderModel.shipment))
             .outerjoin(ShipmentModel, ShipmentModel.order_id == OrderModel.id)
-            .where(
-                func.upper(OrderModel.status) != _CANCELLED_STATUS,
-                func.upper(OrderModel.fulfillment_status).in_(
-                    list(ACTIVE_FULFILLMENT_STATUSES)
-                ),
-                ShipmentModel.tracking_number.is_(None),
-            )
+            .where(_open_without_waybill(PACKING_FULFILLMENT_STATUSES))
             .order_by(OrderModel.order_date.desc())
             .limit(limit)
         )

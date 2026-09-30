@@ -33,6 +33,8 @@ export interface Order {
   tracking_number: string | null;
   order_date: string;
   products: OrderProduct[];
+  /** Wynik wspólnej reguły backendu `requires_packing` - źródło prawdy dla „Do spakowania”. */
+  requires_packing?: boolean;
 }
 
 export interface Shipment {

@@ -42,7 +42,16 @@ SHIPPED_FULFILLMENT_STATUSES = frozenset({FULFILLMENT_SENT, FULFILLMENT_PICKED_U
 
 # Statusy, w których zamówienie jest wciąż "w toku" i powinno pozostać
 # widoczne na czacie po nocnym czyszczeniu (nowe lub w trakcie pakowania).
+# To jednocześnie etapy "do spakowania" - patrz requires_packing().
 ACTIVE_FULFILLMENT_STATUSES = frozenset({FULFILLMENT_NEW, FULFILLMENT_PROCESSING})
+PACKING_FULFILLMENT_STATUSES = ACTIVE_FULFILLMENT_STATUSES
+
+# Etapy "czeka na nadanie": do spakowania plus spakowane, czekające na
+# kuriera. Każdy inny etap (wysłane, odebrane, do odbioru osobistego,
+# wstrzymane, anulowane, zwrócone) nie jest "do wysyłki".
+AWAITING_SHIPMENT_FULFILLMENT_STATUSES = frozenset(
+    {FULFILLMENT_NEW, FULFILLMENT_PROCESSING, FULFILLMENT_READY_FOR_SHIPMENT}
+)
 
 # Statusy, w których zamówienie wciąż może się zmienić na Allegro i których
 # nie wolno zostawić "zamrożonych" w bazie, gdy zamówienie wypadnie poza
@@ -50,12 +59,64 @@ ACTIVE_FULFILLMENT_STATUSES = frozenset({FULFILLMENT_NEW, FULFILLMENT_PROCESSING
 # w jednym z nich - albo z nieznanym etapem (NULL) - jest odświeżane
 # pojedynczo w każdym cyklu, dopóki Allegro nie poda etapu końcowego
 # (SENT, PICKED_UP, CANCELLED, RETURNED...).
-REFRESHABLE_FULFILLMENT_STATUSES = frozenset(
-    {FULFILLMENT_NEW, FULFILLMENT_PROCESSING, FULFILLMENT_READY_FOR_SHIPMENT}
-)
+REFRESHABLE_FULFILLMENT_STATUSES = AWAITING_SHIPMENT_FULFILLMENT_STATUSES
 
 # Status wyzwalający SMS "rozpoczęto pakowanie".
 PACKING_STARTED_FULFILLMENT_STATUS = FULFILLMENT_PROCESSING
+
+
+def _normalized(value: str | None) -> str | None:
+    return value.upper() if value else None
+
+
+def is_cancelled_order(status: str | None, fulfillment_status: str | None) -> bool:
+    """Anulowane - po statusie płatności ALBO po etapie realizacji."""
+    return (
+        _normalized(status) == FULFILLMENT_CANCELLED
+        or _normalized(fulfillment_status) == FULFILLMENT_CANCELLED
+    )
+
+
+def requires_packing(
+    status: str | None, fulfillment_status: str | None, tracking_number: str | None
+) -> bool:
+    """
+    JEDNA reguła "zamówienie czeka na spakowanie" dla całego ORDLY.
+
+    Z niej liczą: licznik "X zamówień czeka na spakowanie", plakietka
+    push, poranny raport 9:00, lista "Do spakowania" (desktop i telefon
+    dostają gotową flagę `requires_packing` z API) oraz bot (czat po
+    czyszczeniu 02:00; przypomnienie 20:00 to jej podzbiór - tylko NEW).
+    Zapytania SQL w SqliteOrderRepository są jej lustrem i test pilnuje,
+    żeby się nie rozjechały.
+
+    Czeka na spakowanie = nieanulowane, bez numeru przesyłki i z etapem
+    NEW albo PROCESSING. Numer przesyłki wygrywa z etapem: Allegro potrafi
+    zostawić NEW po nadaniu, gdy sprzedawca nie ma automatycznej zmiany
+    statusu.
+
+    Etap nieznany (NULL) NIE czeka na spakowanie. NULL mają rekordy,
+    których Allegro nigdy nie potwierdziło (sprzed śledzenia etapów);
+    synchronizacja dopytuje o nie w każdym cyklu i uzupełnia etap, a do
+    tego czasu nie mogą nabijać licznika - dokładnie tak powstało
+    przypomnienie o zamówieniu sprzed 170 dni.
+    """
+    if is_cancelled_order(status, fulfillment_status) or tracking_number:
+        return False
+    return _normalized(fulfillment_status) in PACKING_FULFILLMENT_STATUSES
+
+
+def awaits_shipment(
+    status: str | None, fulfillment_status: str | None, tracking_number: str | None
+) -> bool:
+    """
+    Zamówienie czeka na nadanie (kafel "Do wysyłki", kandydaci
+    check_waybills_job): jak requires_packing(), plus spakowane
+    (READY_FOR_SHIPMENT), które czekają już tylko na kuriera.
+    """
+    if is_cancelled_order(status, fulfillment_status) or tracking_number:
+        return False
+    return _normalized(fulfillment_status) in AWAITING_SHIPMENT_FULFILLMENT_STATUSES
 
 
 def is_shipped(fulfillment_status: str | None) -> bool:

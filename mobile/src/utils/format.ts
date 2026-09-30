@@ -122,11 +122,17 @@ const FULFILLMENT_LABELS: Record<string, string> = {
   PICKED_UP: "Odebrane",
   SUSPENDED: "Wstrzymane",
   CANCELLED: "Anulowane",
+  RETURNED: "Zwrócone",
 };
 
+/**
+ * Etap nieznany (NULL) to rekord, którego Allegro jeszcze nie potwierdziło -
+ * nie „Nowe”. Inaczej telefon pokazywałby jako nowe zamówienie, które nie
+ * liczy się do „Do spakowania” (1:1 z desktopem).
+ */
 export function fulfillmentLabel(status: string | null): string {
   if (!status) {
-    return "Nowe";
+    return "Brak danych";
   }
   return FULFILLMENT_LABELS[status] ?? status;
 }
@@ -136,6 +142,8 @@ interface OrderStatusFields {
   status: string;
   fulfillment_status: string | null;
   tracking_number: string | null;
+  /** Gotowy wynik reguły backendu (`requires_packing` z GET /orders). */
+  requires_packing?: boolean;
 }
 
 /**
@@ -175,12 +183,16 @@ export function displayFulfillmentLabel(order: OrderStatusFields): string {
  *   Wcześniej takie zamówienie wisiało w liczniku na zawsze.
  */
 export function isPendingFulfillment(order: OrderStatusFields): boolean {
+  // Źródło prawdy: backend (`requires_packing` z GET /orders) - ta sama
+  // reguła co bot, plakietka i poranny raport. Niżej zapas dla starszego
+  // Pi bez tego pola: etap nieznany (NULL) NIE czeka na spakowanie.
+  if (typeof order.requires_packing === "boolean") return order.requires_packing;
   if (order.status === "CANCELLED" || order.fulfillment_status === "CANCELLED") {
     return false;
   }
   if (isShippedForDisplay(order)) return false;
   const status = order.fulfillment_status;
-  return !status || status === "NEW" || status === "PROCESSING";
+  return status === "NEW" || status === "PROCESSING";
 }
 
 /**
