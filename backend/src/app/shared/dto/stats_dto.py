@@ -8,6 +8,7 @@ from typing import TYPE_CHECKING
 if TYPE_CHECKING:
     from app.domain.entities.order import Order
     from app.domain.entities.order_return import OrderReturn
+    from app.domain.returns import ReturnStatusChange
 
 
 @dataclass(frozen=True, slots=True)
@@ -39,6 +40,7 @@ class SyncResult:
     cancelled_orders: tuple[Order, ...] = field(default=())
     new_returns: tuple[OrderReturn, ...] = field(default=())
     packing_started_orders: tuple[Order, ...] = field(default=())
+    return_status_changes: tuple[ReturnStatusChange, ...] = field(default=())
 
 
 @dataclass(frozen=True, slots=True)

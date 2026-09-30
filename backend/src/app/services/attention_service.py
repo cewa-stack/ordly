@@ -11,7 +11,8 @@ aplikacje:
 - zamówienia: 100 ostatnich (tyle pobiera `GET /orders?limit=100`
   i desktop, i telefon), reguła 1:1 z `isPendingOrder` na desktopie
   i `isPendingFulfillment` na telefonie;
-- zwroty: 50 ostatnich (domyślny limit `GET /returns`), bez zamkniętych;
+- zwroty: 50 ostatnich (domyślny limit `GET /returns`), tylko wymagające
+  działania - reguła `return_requires_action` (app/domain/returns.py);
 - dyskusje: z API Allegro (nie ma ich w bazie), tylko z aktywnym czatem.
 
 Dotąd każde powiadomienie ustawiało plakietkę po swojemu: nowe zamówienie
@@ -27,8 +28,10 @@ from datetime import datetime
 from loguru import logger
 
 from app.domain.entities.order import Order
+from app.domain.fulfillment import requires_packing
 from app.domain.interfaces.order_repository import OrderRepository
 from app.domain.interfaces.return_repository import ReturnRepository
+from app.domain.returns import return_requires_action
 from app.services.issues_service import IssuesService
 
 #: Tyle zamówień pobierają aplikacje (`GET /orders?limit=100`).
@@ -36,30 +39,14 @@ ORDERS_WINDOW = 100
 #: Domyślny limit `GET /returns` - tyle zwrotów widzą aplikacje.
 RETURNS_WINDOW = 50
 
-#: Zwroty, które nie wymagają już niczego od sprzedawcy - te same, które
-#: aplikacje pokazują wygaszone (desktop ShellLayout, mobile StartScreen).
-CLOSED_RETURN_STATUSES = frozenset({"COMMISSION_REFUNDED", "CANCELLED", "REJECTED"})
-
-_SHIPPED = frozenset({"SENT", "PICKED_UP"})
-_WAITING_FOR_PACKING = frozenset({"NEW", "PROCESSING"})
-
-
 def is_pending_packing(order: Order) -> bool:
     """
-    Zamówienie czeka na spakowanie - 1:1 z `isPendingOrder` (desktop).
-
-    Anulowane odpada, nawet gdy Allegro zostawiło mu etap NEW. Wysłane
-    odpada też wtedy, gdy ORDLY samo wykryło numer przesyłki, zanim status
-    zmienił się na Allegro. Spakowane (READY_FOR_SHIPMENT) czeka już tylko
-    na kuriera, więc do "do spakowania" się nie liczy.
+    Zamówienie czeka na spakowanie - wspólna reguła domenowa
+    `requires_packing` (app/domain/fulfillment.py). Aplikacje dostają jej
+    wynik gotowy w polu `requires_packing` z `GET /orders`, więc nie
+    liczą niczego po swojemu.
     """
-    status = (order.status or "").upper()
-    fulfillment = (order.fulfillment_status or "").upper() or None
-    if status == "CANCELLED" or fulfillment == "CANCELLED":
-        return False
-    if (fulfillment in _SHIPPED) or order.tracking_number:
-        return False
-    return fulfillment is None or fulfillment in _WAITING_FOR_PACKING
+    return requires_packing(order.status, order.fulfillment_status, order.tracking_number)
 
 
 @dataclass(frozen=True, slots=True)
@@ -102,7 +89,9 @@ class AttentionService:
         pending = [order for order in orders if is_pending_packing(order)]
 
         returns = await self._returns.get_recent(limit=RETURNS_WINDOW)
-        open_returns = sum(1 for item in returns if item.status not in CLOSED_RETURN_STATUSES)
+        open_returns = sum(
+            1 for item in returns if return_requires_action(item.status, item.order_status)
+        )
 
         # Dyskusje żyją tylko w API Allegro. Awaria nie może zablokować
         # powiadomienia - brak liczby oznacza "plakietka bez zmian".

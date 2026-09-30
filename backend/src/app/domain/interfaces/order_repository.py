@@ -55,9 +55,10 @@ class OrderRepository(ABC):
         Zwraca zamówienia utworzone od podanej daty, które nie zostały
         jeszcze wysłane.
 
-        Zamówienie uznaje się za wysłane, gdy jego status realizacji to
-        SENT/PICKED_UP lub gdy ma zapisany numer przewozowy. Zamówienia
-        anulowane są pomijane - nie wymagają wysyłki.
+        Reguła `awaits_shipment` z app/domain/fulfillment.py: etap NEW,
+        PROCESSING albo READY_FOR_SHIPMENT, bez numeru przesyłki,
+        nieanulowane. Zwrócone, wstrzymane, do odbioru osobistego i bez
+        znanego etapu (NULL) nie są "do wysyłki".
         """
         raise NotImplementedError
 
@@ -79,6 +80,9 @@ class OrderRepository(ABC):
         zaktualizuje. Traktowanie ich jak NEW sprawiało, że przypomnienie
         20:00 przychodziło codziennie o zamówieniu sprzed miesięcy.
 
+        Zamówienie z wykrytym numerem przesyłki też odpada - to podzbiór
+        reguły `requires_packing` (app/domain/fulfillment.py).
+
         Używane przez przypomnienie 20:00.
         """
         raise NotImplementedError
@@ -89,9 +93,10 @@ class OrderRepository(ABC):
         Zwraca aktywne zamówienia (nowe lub w trakcie pakowania),
         posortowane od najnowszego.
 
-        Pomija zamówienia wysłane, anulowane i zwrócone. Używane przez
-        nocne czyszczenie czatu (02:00) do ponownej publikacji wyłącznie
-        aktualnych zamówień.
+        Dokładnie reguła `requires_packing` (app/domain/fulfillment.py):
+        pomija wysłane, anulowane, zwrócone i z numerem przesyłki. Używane
+        przez nocne czyszczenie czatu (02:00) do ponownej publikacji
+        wyłącznie aktualnych zamówień.
         """
         raise NotImplementedError
 

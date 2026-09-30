@@ -18,27 +18,9 @@ import {
   MiniButton,
   Pill,
   SkeletonRows,
-  type PillTone,
 } from "../components/ui";
 import { formatAge, formatDateTime } from "../lib/format";
-
-/** Statusy zwrotow Allegro - tlumaczone, nie surowe. */
-const STATUS_LABEL: Record<string, string> = {
-  CREATED: "Zgłoszony",
-  COMMISSION_REFUND_CLAIMED: "Prowizja do zwrotu",
-  COMMISSION_REFUNDED: "Prowizja zwrócona",
-  CANCELLED: "Anulowany",
-  REJECTED: "Odrzucony",
-};
-
-/** Tony wg sekcji 7 - zwrot zamkniety nie ma po co swiecic. */
-const STATUS_TONE: Record<string, PillTone> = {
-  CREATED: "hot",
-  COMMISSION_REFUND_CLAIMED: "go",
-  COMMISSION_REFUNDED: "mute",
-  CANCELLED: "mute",
-  REJECTED: "mute",
-};
+import { returnStatusLabel, returnStatusTone } from "../lib/returns";
 
 const ALLEGRO_RETURNS_URL = "https://allegro.pl/moje-allegro/sprzedaz/zwroty";
 
@@ -90,9 +72,7 @@ export function ReturnsScreen() {
               {formatDateTime(item.return_date)}
             </p>
           </div>
-          <Pill tone={STATUS_TONE[item.status] ?? "warn"}>
-            {STATUS_LABEL[item.status] ?? item.status}
-          </Pill>
+          <Pill tone={returnStatusTone(item)}>{returnStatusLabel(item)}</Pill>
           <MiniButton
             icon={<ExternalIcon size={13} />}
             onClick={() => window.open(ALLEGRO_RETURNS_URL, "_blank", "noopener,noreferrer")}

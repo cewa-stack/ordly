@@ -20,6 +20,7 @@ from app.core.event_bus.events import (
     OrderCreated,
     OrderPackingStarted,
     OrderReturnCreated,
+    ReturnStatusChanged,
     SyncFinished,
     SyncStarted,
 )
@@ -135,6 +136,30 @@ def register_event_subscriptions(container: Container) -> None:
                     "order_external_id": order_return.order_external_id,
                     "status": order_return.status,
                     "notification_sent": notification_sent,
+                },
+            )
+
+    async def handle_return_status_changed(event: ReturnStatusChanged) -> None:
+        """
+        Zapisuje zmianę statusu zwrotu w audycie - historia "kiedy i skąd
+        zwrot został zamknięty" (widoczna w logach aplikacji, /api/v1/logs).
+        Bez powiadomienia: zamknięcie zwrotu niczego od sprzedawcy nie wymaga.
+        """
+        change = event.change
+        async with container.session_scope() as session:
+            event_repository = SqliteEventRepository(session)
+            await event_repository.record(
+                event_type="ReturnStatusChanged",
+                level="INFO",
+                payload={
+                    "return_external_id": change.external_id,
+                    "order_external_id": change.order_external_id,
+                    "marketplace": change.marketplace,
+                    "previous_status": change.previous_status,
+                    "new_status": change.new_status,
+                    "closed": change.closes_return,
+                    "source": change.source,
+                    "changed_at": change.changed_at.isoformat(),
                 },
             )
 
@@ -336,6 +361,7 @@ def register_event_subscriptions(container: Container) -> None:
     container.event_bus.subscribe(OrderCancelled, handle_order_cancelled)
     container.event_bus.subscribe(OrderPackingStarted, handle_order_packing_started)
     container.event_bus.subscribe(OrderReturnCreated, handle_order_return_created)
+    container.event_bus.subscribe(ReturnStatusChanged, handle_return_status_changed)
     container.event_bus.subscribe(NotificationSent, handle_notification_sent)
     container.event_bus.subscribe(SyncStarted, handle_sync_started)
     container.event_bus.subscribe(SyncFinished, handle_sync_finished)

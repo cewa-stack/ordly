@@ -22,6 +22,7 @@ import { useSync } from "../lib/sync";
 import { useOrdlakState } from "../lib/ordlakState";
 import { formatLongDate, formatPlural } from "../lib/format";
 import { isPendingOrder } from "../lib/fulfillment";
+import { isOpenReturn } from "../lib/returns";
 import { StartScreen } from "./StartScreen";
 import { ZamowieniaScreen } from "./ZamowieniaScreen";
 import { DiscussionsScreen } from "./DiscussionsScreen";
@@ -49,12 +50,6 @@ const GOTO_KEYS: Record<string, ViewId> = {
   k: "kalendarz",
   u: "ustawienia",
 };
-
-/**
- * Statusy zwrotow, ktore nie wymagaja juz niczego od sprzedawcy - te same,
- * ktore ekran Zwroty pokazuje wygaszone (ton "mute").
- */
-const CLOSED_RETURN_STATUSES = new Set(["COMMISSION_REFUNDED", "CANCELLED", "REJECTED"]);
 
 function hostnameOf(baseUrl: string): string {
   try {
@@ -130,9 +125,7 @@ export function ShellLayout() {
   const pendingOrders = (ordersQuery.data ?? []).filter(isPendingOrder);
   // Licznik zwrotow to te, ktore jeszcze czekaja na ruch - nie wszystkie
   // pobrane (do 50), bo razem z zamknietymi wisial na stale.
-  const openReturns = (returnsQuery.data ?? []).filter(
-    (item) => !CLOSED_RETURN_STATUSES.has(item.status)
-  );
+  const openReturns = (returnsQuery.data ?? []).filter(isOpenReturn);
 
   const counts: NavCounts = {
     zamowienia: pendingOrders.length,

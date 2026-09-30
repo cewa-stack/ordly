@@ -35,3 +35,24 @@ class ReturnRepository(ABC):
     async def get_recent(self, limit: int = 50, offset: int = 0) -> list[ReturnRecord]:
         """Zwraca ostatnie zwroty do wyświetlenia, najnowsze pierwsze."""
         raise NotImplementedError
+
+    @abstractmethod
+    async def get_status(self, marketplace: str, external_id: str) -> str | None:
+        """Zwraca zapisany status zwrotu albo None, gdy zwrotu nie ma."""
+        raise NotImplementedError
+
+    @abstractmethod
+    async def update_status(self, marketplace: str, external_id: str, status: str) -> None:
+        """Utrwala nowy status zwrotu wykryty podczas synchronizacji."""
+        raise NotImplementedError
+
+    @abstractmethod
+    async def get_open(self, marketplace: str, limit: int) -> list[ReturnRecord]:
+        """
+        Zwraca zwroty danego marketplace z niezamkniętym statusem
+        (poza CLOSED_RETURN_STATUSES), najnowsze pierwsze.
+
+        Służy synchronizacji do dopytania o zwroty, których nie było
+        w pobranej liście - inaczej ich status zamarzałby w bazie.
+        """
+        raise NotImplementedError

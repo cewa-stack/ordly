@@ -54,8 +54,9 @@ function filterOf(order: Order): Exclude<StatusFilter, "Wszystkie"> | null {
   if (isShippedForDisplay(order)) {
     return "Wysłane";
   }
+  // Etap nieznany (NULL) nie jest "Nowe" - Allegro go jeszcze nie
+  // potwierdziło i nie liczy się do "Do spakowania" (reguła backendu).
   switch (order.fulfillment_status) {
-    case null:
     case "NEW":
       return "Nowe";
     case "PROCESSING":

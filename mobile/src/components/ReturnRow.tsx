@@ -30,7 +30,7 @@ export function ReturnRow({ item }: ReturnRowProps) {
         </Text>
         <View style={styles.statusPill}>
           <Text style={styles.statusText} numberOfLines={1}>
-            {returnStatusLabel(item.status)}
+            {returnStatusLabel(item.status, item.status_label)}
           </Text>
         </View>
       </View>
