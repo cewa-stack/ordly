@@ -33,6 +33,12 @@ class FakeMarketplacePlugin(MarketplacePlugin):
         self.should_raise_issues_api_error: bool = False
         self.should_raise_tracking_api_error: bool = False
         self.orders_without_waybill: set[str] = set()
+        # Zamówienia dostępne tylko przez GET pojedynczego checkout-formu -
+        # czyli takie, które wypadły już z listy `get_orders` (okno 50
+        # najnowszych), a Allegro nadal je zna.
+        self.single_orders: dict[str, Order] = {}
+        self.get_order_errors: dict[str, AllegroApiError] = {}
+        self.get_order_calls: list[str] = []
         self.authenticate_called = False
         self.refresh_token_called = False
 
@@ -77,6 +83,11 @@ class FakeMarketplacePlugin(MarketplacePlugin):
         self.fulfillment_calls.append((external_id, status))
 
     async def get_order(self, external_id: str) -> Order:
+        self.get_order_calls.append(external_id)
+        if external_id in self.get_order_errors:
+            raise self.get_order_errors[external_id]
+        if external_id in self.single_orders:
+            return self.single_orders[external_id]
         order = next((o for o in self.orders_to_return if o.external_id == external_id), None)
         if order is None:
             raise AllegroApiError(404, "Nie znaleziono (fake)")

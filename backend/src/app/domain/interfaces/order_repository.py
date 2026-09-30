@@ -96,6 +96,22 @@ class OrderRepository(ABC):
         raise NotImplementedError
 
     @abstractmethod
+    async def get_open_for_refresh(self, marketplace: str, limit: int) -> list[Order]:
+        """
+        Zwraca zamówienia danego marketplace, których stan lokalny może być
+        nieaktualny i trzeba go potwierdzić u źródła.
+
+        Kandydat = nieanulowane, bez zapisanego numeru przesyłki, z etapem
+        realizacji NULL albo z `REFRESHABLE_FULFILLMENT_STATUSES`.
+        Synchronizacja pobiera z marketplace tylko najnowsze zamówienia -
+        te starsze bez tej metody zostawały na zawsze z etapem NEW
+        i wisiały w "do spakowania", choć na Allegro dawno były obsłużone.
+
+        Posortowane od najnowszego.
+        """
+        raise NotImplementedError
+
+    @abstractmethod
     async def search(self, query: str) -> list[Order]:
         """Wyszukuje zamówienia po numerze, kupującym lub nazwie produktu."""
         raise NotImplementedError

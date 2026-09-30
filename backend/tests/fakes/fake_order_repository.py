@@ -9,6 +9,7 @@ from app.domain.entities.order import Order
 from app.domain.fulfillment import (
     ACTIVE_FULFILLMENT_STATUSES,
     FULFILLMENT_NEW,
+    REFRESHABLE_FULFILLMENT_STATUSES,
     SHIPPED_FULFILLMENT_STATUSES,
 )
 from app.domain.interfaces.order_repository import OrderRepository
@@ -73,6 +74,20 @@ class FakeOrderRepository(OrderRepository):
             and o.fulfillment_status.upper() in ACTIVE_FULFILLMENT_STATUSES
         ]
         return sorted(active, key=lambda o: o.order_date, reverse=True)[:limit]
+
+    async def get_open_for_refresh(self, marketplace: str, limit: int) -> list[Order]:
+        candidates = [
+            o
+            for o in self._orders
+            if o.marketplace == marketplace
+            and o.status.upper() != "CANCELLED"
+            and o.tracking_number is None
+            and (
+                o.fulfillment_status is None
+                or o.fulfillment_status.upper() in REFRESHABLE_FULFILLMENT_STATUSES
+            )
+        ]
+        return sorted(candidates, key=lambda o: o.order_date, reverse=True)[:limit]
 
     async def search(self, query: str) -> list[Order]:
         query_lower = query.lower()

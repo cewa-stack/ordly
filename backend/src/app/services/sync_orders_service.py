@@ -47,6 +47,16 @@ from app.utils.time import utc_now
 
 _CANCELLED_STATUS = "CANCELLED"
 
+# Ile zamówień spoza okna listy (`get_orders` zwraca tylko najnowsze)
+# odświeżamy pojedynczo w jednym cyklu. W zdrowym sklepie wszystkie
+# otwarte zamówienia mieszczą się w oknie i ta pętla nie robi ani jednego
+# zapytania - limit chroni tylko przed zalaniem Allegro, gdyby w bazie
+# zalegało dużo starych, nigdy niepotwierdzonych zamówień. Kandydatów
+# pobieramy z zapasem, bo część z nich jest w oknie i odpada.
+_MAX_OUT_OF_WINDOW_REFRESHES = 25
+_REFRESH_CANDIDATES_LIMIT = 200
+_HTTP_NOT_FOUND = 404
+
 
 @dataclass(frozen=True, slots=True)
 class _ExistingOrderChange:
@@ -131,6 +141,13 @@ class SyncOrdersService:
             new_orders.append(order)
             logger.info("Zapisano nowe zamówienie {}", order.external_id)
 
+        fetched_ids = {order.external_id for order in orders}
+        for refreshed, change in await self._refresh_orders_outside_window(fetched_ids):
+            if change.cancelled:
+                cancelled_orders.append(refreshed)
+            if change.packing_started:
+                packing_started_orders.append(refreshed)
+
         new_returns = await self._sync_customer_returns()
 
         return SyncResult(
@@ -190,6 +207,74 @@ class SyncOrdersService:
             )
 
         return _ExistingOrderChange(cancelled=cancelled, packing_started=packing_started)
+
+    async def _refresh_orders_outside_window(
+        self, fetched_ids: set[str]
+    ) -> list[tuple[Order, _ExistingOrderChange]]:
+        """
+        Potwierdza u źródła stan otwartych zamówień, których nie było
+        w pobranej liście.
+
+        `get_orders` zwraca tylko najnowsze checkout-formy. Zamówienie,
+        które z nich wypadło, zostawało w bazie z ostatnim widzianym etapem
+        (NEW albo NULL) na zawsze - aplikacja liczyła je do "czeka na
+        spakowanie" i przypominała o nim miesiącami, choć na Allegro było
+        dawno obsłużone. Tu każde takie zamówienie jest pobierane
+        pojedynczo i przechodzi przez tę samą ścieżkę porównania co
+        zamówienia z listy.
+
+        Błąd Allegro dla jednego zamówienia nie zmienia niczego w bazie
+        (dane lokalne zostają). 404 = Allegro nie udostępnia już tego
+        zamówienia - pomijamy je; każdy inny błąd (sieć, 5xx, limit
+        zapytań) przerywa pętlę do następnego cyklu, żeby nie dobijać
+        niedostępnego API.
+
+        Zdarzenia (anulowanie, rozpoczęcie pakowania) wychodzą tylko dla
+        zamówień, których etap był znany (nie NULL) - korekta starego
+        rekordu bez etapu to nadrabianie historii, a nie zmiana "na żywo",
+        i nie może wysłać klientowi SMS-a o pakowaniu zamówienia sprzed
+        miesięcy.
+        """
+        candidates = await self._order_repository.get_open_for_refresh(
+            self._plugin.marketplace_code, _REFRESH_CANDIDATES_LIMIT
+        )
+        stale = [order for order in candidates if order.external_id not in fetched_ids]
+        if len(stale) > _MAX_OUT_OF_WINDOW_REFRESHES:
+            # Rotacja co minutę: gdy kandydatów jest więcej niż limit,
+            # każdy cykl zaczyna od innego miejsca, więc żadne zamówienie
+            # nie czeka w nieskończoność za tymi samymi 25.
+            start = (
+                int(utc_now().timestamp()) // 60 * _MAX_OUT_OF_WINDOW_REFRESHES
+            ) % len(stale)
+            stale = stale[start:] + stale[:start]
+            logger.info(
+                "Zamówień do potwierdzenia spoza okna: {} - w tym cyklu {}",
+                len(stale),
+                _MAX_OUT_OF_WINDOW_REFRESHES,
+            )
+
+        refreshed: list[tuple[Order, _ExistingOrderChange]] = []
+        for stored in stale[:_MAX_OUT_OF_WINDOW_REFRESHES]:
+            try:
+                fresh = await self._plugin.get_order(stored.external_id)
+            except AllegroApiError as exc:
+                if exc.status_code == _HTTP_NOT_FOUND:
+                    logger.debug(
+                        "Zamówienie {} niedostępne w Allegro (404) - zostaje bez zmian",
+                        stored.external_id,
+                    )
+                    continue
+                logger.warning(
+                    "Odświeżanie zamówień spoza okna przerwane - Allegro: {}", exc
+                )
+                break
+
+            change = await self._sync_existing_order_status(fresh)
+            if stored.fulfillment_status is None:
+                change = _ExistingOrderChange()
+            refreshed.append((fresh, change))
+
+        return refreshed
 
     async def _sync_customer_returns(self) -> list[OrderReturn]:
         """

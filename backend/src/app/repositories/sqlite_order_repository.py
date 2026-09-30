@@ -19,6 +19,7 @@ from app.domain.exceptions.domain_exceptions import DuplicateOrderError
 from app.domain.fulfillment import (
     ACTIVE_FULFILLMENT_STATUSES,
     FULFILLMENT_NEW,
+    REFRESHABLE_FULFILLMENT_STATUSES,
     SHIPPED_FULFILLMENT_STATUSES,
 )
 from app.domain.interfaces.order_repository import OrderRepository
@@ -180,6 +181,29 @@ class SqliteOrderRepository(OrderRepository):
                 func.upper(OrderModel.fulfillment_status).in_(
                     list(ACTIVE_FULFILLMENT_STATUSES)
                 ),
+            )
+            .order_by(OrderModel.order_date.desc())
+            .limit(limit)
+        )
+        result = await self._session.execute(stmt)
+        return [self._to_domain(m) for m in result.scalars().all()]
+
+    async def get_open_for_refresh(self, marketplace: str, limit: int) -> list[Order]:
+        """Zamówienia do potwierdzenia u źródła - patrz OrderRepository."""
+        stmt = (
+            select(OrderModel)
+            .options(selectinload(OrderModel.products), selectinload(OrderModel.shipment))
+            .outerjoin(ShipmentModel, ShipmentModel.order_id == OrderModel.id)
+            .where(
+                OrderModel.marketplace == marketplace,
+                func.upper(OrderModel.status) != _CANCELLED_STATUS,
+                or_(
+                    OrderModel.fulfillment_status.is_(None),
+                    func.upper(OrderModel.fulfillment_status).in_(
+                        list(REFRESHABLE_FULFILLMENT_STATUSES)
+                    ),
+                ),
+                ShipmentModel.tracking_number.is_(None),
             )
             .order_by(OrderModel.order_date.desc())
             .limit(limit)

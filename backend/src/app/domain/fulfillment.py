@@ -22,6 +22,8 @@ FULFILLMENT_READY_FOR_PICKUP = "READY_FOR_PICKUP"
 FULFILLMENT_SENT = "SENT"
 FULFILLMENT_PICKED_UP = "PICKED_UP"
 FULFILLMENT_SUSPENDED = "SUSPENDED"
+FULFILLMENT_CANCELLED = "CANCELLED"
+FULFILLMENT_RETURNED = "RETURNED"
 
 # Statusy oznaczające, że zamówienie zostało już wysłane / odebrane -
 # takie zamówienie nie wymaga już pakowania ani nadania.
@@ -30,6 +32,16 @@ SHIPPED_FULFILLMENT_STATUSES = frozenset({FULFILLMENT_SENT, FULFILLMENT_PICKED_U
 # Statusy, w których zamówienie jest wciąż "w toku" i powinno pozostać
 # widoczne na czacie po nocnym czyszczeniu (nowe lub w trakcie pakowania).
 ACTIVE_FULFILLMENT_STATUSES = frozenset({FULFILLMENT_NEW, FULFILLMENT_PROCESSING})
+
+# Statusy, w których zamówienie wciąż może się zmienić na Allegro i których
+# nie wolno zostawić "zamrożonych" w bazie, gdy zamówienie wypadnie poza
+# okno synchronizacji (50 najnowszych checkout-formów). Zamówienie
+# w jednym z nich - albo z nieznanym etapem (NULL) - jest odświeżane
+# pojedynczo w każdym cyklu, dopóki Allegro nie poda etapu końcowego
+# (SENT, PICKED_UP, CANCELLED, RETURNED...).
+REFRESHABLE_FULFILLMENT_STATUSES = frozenset(
+    {FULFILLMENT_NEW, FULFILLMENT_PROCESSING, FULFILLMENT_READY_FOR_SHIPMENT}
+)
 
 # Status wyzwalający SMS "rozpoczęto pakowanie".
 PACKING_STARTED_FULFILLMENT_STATUS = FULFILLMENT_PROCESSING
