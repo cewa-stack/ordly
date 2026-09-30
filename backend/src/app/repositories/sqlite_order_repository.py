@@ -156,9 +156,13 @@ class SqliteOrderRepository(OrderRepository):
         stmt = (
             select(OrderModel)
             .options(selectinload(OrderModel.products), selectinload(OrderModel.shipment))
+            .outerjoin(ShipmentModel, ShipmentModel.order_id == OrderModel.id)
             .where(
                 func.upper(OrderModel.status) != _CANCELLED_STATUS,
                 func.upper(OrderModel.fulfillment_status) == FULFILLMENT_NEW,
+                # Wykryty numer przesyłki = paczka nadana, nawet gdy
+                # Allegro zostawiło etap NEW - tak samo jak w aplikacjach.
+                ShipmentModel.tracking_number.is_(None),
             )
             .order_by(OrderModel.order_date.desc())
         )
@@ -176,11 +180,13 @@ class SqliteOrderRepository(OrderRepository):
         stmt = (
             select(OrderModel)
             .options(selectinload(OrderModel.products), selectinload(OrderModel.shipment))
+            .outerjoin(ShipmentModel, ShipmentModel.order_id == OrderModel.id)
             .where(
                 func.upper(OrderModel.status) != _CANCELLED_STATUS,
                 func.upper(OrderModel.fulfillment_status).in_(
                     list(ACTIVE_FULFILLMENT_STATUSES)
                 ),
+                ShipmentModel.tracking_number.is_(None),
             )
             .order_by(OrderModel.order_date.desc())
             .limit(limit)

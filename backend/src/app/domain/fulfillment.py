@@ -25,6 +25,17 @@ FULFILLMENT_SUSPENDED = "SUSPENDED"
 FULFILLMENT_CANCELLED = "CANCELLED"
 FULFILLMENT_RETURNED = "RETURNED"
 
+# Status płatności wstawiany przez mapper, gdy odpowiedź marketplace nie
+# zawiera pola `status` (niepełna odpowiedź). Nigdy nie nadpisuje
+# statusu zapisanego w bazie.
+UNKNOWN_ORDER_STATUS = "UNKNOWN"
+
+# `fulfillment.shipmentSummary.lineItemsSent` - ile pozycji zamówienia ma
+# już numer przesyłki. SOME/ALL = Allegro zna numer, nawet jeśli etap
+# realizacji nadal jest NEW/PROCESSING (sprzedawca nie ma włączonej
+# automatycznej zmiany statusu po dodaniu numeru).
+LINE_ITEMS_SENT_WITH_WAYBILL = frozenset({"SOME", "ALL"})
+
 # Statusy oznaczające, że zamówienie zostało już wysłane / odebrane -
 # takie zamówienie nie wymaga już pakowania ani nadania.
 SHIPPED_FULFILLMENT_STATUSES = frozenset({FULFILLMENT_SENT, FULFILLMENT_PICKED_UP})

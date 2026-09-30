@@ -18,6 +18,7 @@ from app.domain.entities.order import Order
 from app.domain.entities.order_return import OrderReturn
 from app.domain.entities.product import Product
 from app.domain.entities.shipment import Shipment
+from app.domain.fulfillment import UNKNOWN_ORDER_STATUS
 from app.utils.time import utc_now
 
 
@@ -56,6 +57,7 @@ def map_checkout_form_to_order(raw: dict[str, Any]) -> Order:
 
     fulfillment_raw = raw.get("fulfillment") or {}
     fulfillment_status = fulfillment_raw.get("status")
+    line_items_sent = (fulfillment_raw.get("shipmentSummary") or {}).get("lineItemsSent")
 
     return Order(
         external_id=raw["id"],
@@ -64,9 +66,10 @@ def map_checkout_form_to_order(raw: dict[str, Any]) -> Order:
         products=products,
         total_amount=Decimal(str(total_raw.get("amount", "0.00"))),
         currency=total_raw.get("currency", "PLN"),
-        status=raw.get("status", "UNKNOWN"),
+        status=raw.get("status") or UNKNOWN_ORDER_STATUS,
         order_date=_parse_datetime(raw.get("updatedAt") or raw.get("boughtAt")),
         fulfillment_status=fulfillment_status,
+        line_items_sent=line_items_sent,
     )
 
 

@@ -165,8 +165,11 @@ class SchedulerSettings(BaseSettings):
     sync_orders_interval_seconds: int = Field(
         default=60, alias="SYNC_ORDERS_INTERVAL_SECONDS", ge=10
     )
+    # Co minutę, jak synchronizacja zamówień: numer przypisany
+    # automatycznie (etykieta, integracja przewoźnika) ma zdjąć zamówienie
+    # z "do spakowania" od razu, a nie po 5 minutach.
     check_waybills_interval_seconds: int = Field(
-        default=300, alias="CHECK_WAYBILLS_INTERVAL_SECONDS", ge=60
+        default=60, alias="CHECK_WAYBILLS_INTERVAL_SECONDS", ge=60
     )
 
 

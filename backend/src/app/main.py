@@ -218,7 +218,7 @@ async def _run_application() -> None:
         )
 
     async def scheduled_check_waybills_job() -> None:
-        """Wrapper sprawdzania nowych numerów przesyłek (co 5 min)."""
+        """Wrapper sprawdzania nowych numerów przesyłek (co minutę)."""
         await run_check_waybills_job(
             session_scope_factory=container.session_scope,
             build_waybill_check_service=container.waybill_check_service,

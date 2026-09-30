@@ -68,6 +68,15 @@ class TrackingService:
                 return fallback
             raise MarketplaceUnavailableError(str(exc)) from exc
 
+        if not shipment.tracking_number:
+            # Pusta lista przesyłek po tym, jak numer był już znany, to
+            # niepełna odpowiedź Allegro, a nie "paczka zniknęła" - nie
+            # wolno nią nadpisać zapisanego numeru. Inaczej zamówienie
+            # wracało do "czeka na spakowanie".
+            known = await self._shipment_repository.get_last_known(order_external_id)
+            if known is not None and known.tracking_number:
+                return known
+
         await self._shipment_repository.save_check_result(order_external_id, shipment)
 
         if shipment.status == _NOT_YET_SHIPPED_STATUS:

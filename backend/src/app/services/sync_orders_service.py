@@ -37,10 +37,15 @@ from app.domain.exceptions.domain_exceptions import (
     MarketplaceUnavailableError,
     OrderNotFoundError,
 )
-from app.domain.fulfillment import is_packing_started
+from app.domain.fulfillment import (
+    LINE_ITEMS_SENT_WITH_WAYBILL,
+    UNKNOWN_ORDER_STATUS,
+    is_packing_started,
+)
 from app.domain.interfaces.marketplace_plugin import MarketplacePlugin
 from app.domain.interfaces.order_repository import OrderRepository
 from app.domain.interfaces.return_repository import ReturnRepository
+from app.domain.interfaces.shipment_repository import ShipmentRepository
 from app.infrastructure.plugins.allegro.exceptions import AllegroApiError
 from app.shared.dto.stats_dto import SyncResult
 from app.utils.time import utc_now
@@ -75,6 +80,7 @@ class SyncOrdersService:
         order_repository: OrderRepository,
         event_bus: EventBus,
         return_repository: ReturnRepository | None = None,
+        shipment_repository: ShipmentRepository | None = None,
     ) -> None:
         """
         Args:
@@ -83,11 +89,16 @@ class SyncOrdersService:
             event_bus: Magistrala zdarzeń do publikacji OrderCreated itd.
             return_repository: Repozytorium zwrotów klientów. Gdy None,
                 synchronizacja zwrotów jest pomijana.
+            shipment_repository: Repozytorium numerów przesyłek. Gdy None,
+                numer zgłoszony przez Allegro w checkout-formie
+                (`lineItemsSent`) nie jest dociągany w tym cyklu - zrobi to
+                dopiero check_waybills_job.
         """
         self._plugin = plugin
         self._order_repository = order_repository
         self._event_bus = event_bus
         self._return_repository = return_repository
+        self._shipment_repository = shipment_repository
 
     async def sync_new_orders(self) -> SyncResult:
         """
@@ -127,6 +138,7 @@ class SyncOrdersService:
                     cancelled_orders.append(order)
                 if change.packing_started:
                     packing_started_orders.append(order)
+                await self._capture_reported_waybill(order)
                 continue
 
             try:
@@ -140,6 +152,7 @@ class SyncOrdersService:
 
             new_orders.append(order)
             logger.info("Zapisano nowe zamówienie {}", order.external_id)
+            await self._capture_reported_waybill(order)
 
         fetched_ids = {order.external_id for order in orders}
         for refreshed, change in await self._refresh_orders_outside_window(fetched_ids):
@@ -175,8 +188,12 @@ class SyncOrdersService:
         if stored is None:
             return _ExistingOrderChange()
 
+        # Niepełna odpowiedź marketplace (brak `status` albo brak
+        # `fulfillment.status`) nie jest informacją o zmianie - nie może
+        # nadpisać poprawnie zapisanego stanu pustą wartością. Bez tego
+        # jedna ucięta odpowiedź cofała zamówienie SENT do "Nowe".
         cancelled = False
-        if stored.status != order.status:
+        if order.status != UNKNOWN_ORDER_STATUS and stored.status != order.status:
             await self._order_repository.update_status(
                 order.marketplace, order.external_id, order.status
             )
@@ -192,7 +209,10 @@ class SyncOrdersService:
             )
 
         packing_started = False
-        if stored.fulfillment_status != order.fulfillment_status:
+        if (
+            order.fulfillment_status is not None
+            and stored.fulfillment_status != order.fulfillment_status
+        ):
             await self._order_repository.update_fulfillment_status(
                 order.marketplace, order.external_id, order.fulfillment_status
             )
@@ -207,6 +227,52 @@ class SyncOrdersService:
             )
 
         return _ExistingOrderChange(cancelled=cancelled, packing_started=packing_started)
+
+    async def _capture_reported_waybill(self, order: Order) -> None:
+        """
+        Dociąga numer przesyłki, gdy checkout-form mówi, że Allegro go zna.
+
+        Numer przypisany automatycznie (np. po wygenerowaniu etykiety albo
+        przez zewnętrzną integrację przewoźnika) nie zmienia etapu
+        realizacji, jeśli sprzedawca nie ma włączonej automatycznej zmiany
+        statusu - zamówienie wisiało wtedy jako "Nowe" do czasu osobnego
+        joba co 5 minut. `lineItemsSent` = SOME/ALL przychodzi w tej samej
+        liście, którą synchronizacja i tak pobiera co minutę, więc numer
+        jest zapisywany w tym samym cyklu.
+
+        Wywołuje API tylko raz na zamówienie: gdy numer jest już w bazie,
+        nic się nie dzieje. Błąd Allegro niczego nie nadpisuje - numer
+        dociągnie kolejny cykl albo check_waybills_job.
+        """
+        if self._shipment_repository is None:
+            return
+        if (order.line_items_sent or "").upper() not in LINE_ITEMS_SENT_WITH_WAYBILL:
+            return
+
+        known = await self._shipment_repository.get_last_known(order.external_id)
+        if known is not None and known.tracking_number:
+            return
+
+        try:
+            shipments = await self._plugin.get_all_trackings(order.external_id)
+        except AllegroApiError as exc:
+            logger.warning(
+                "Allegro zgłosiło numer przesyłki dla {}, ale nie udało się go pobrać: {}",
+                order.external_id,
+                exc,
+            )
+            return
+
+        with_waybill = next((s for s in shipments if s.tracking_number), None)
+        if with_waybill is None:
+            return
+
+        await self._shipment_repository.save_check_result(order.external_id, with_waybill)
+        logger.info(
+            "Synchronizacja wykryła numer przesyłki dla {}: {}",
+            order.external_id,
+            with_waybill.tracking_number,
+        )
 
     async def _refresh_orders_outside_window(
         self, fetched_ids: set[str]
@@ -273,6 +339,7 @@ class SyncOrdersService:
             if stored.fulfillment_status is None:
                 change = _ExistingOrderChange()
             refreshed.append((fresh, change))
+            await self._capture_reported_waybill(fresh)
 
         return refreshed
 

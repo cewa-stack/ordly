@@ -181,9 +181,10 @@ class AllegroPlugin(MarketplacePlugin):
         Pobiera aktualny status pierwszej przesyłki dla podanego zamówienia.
 
         Jeśli zamówienie ma więcej niż jedną przesyłkę, ta metoda zwraca
-        tylko pierwszą - użyj get_all_trackings(), aby pobrać wszystkie.
+        pierwszą z numerem listu przewozowego - użyj get_all_trackings(),
+        aby pobrać wszystkie.
         """
-        shipments = await self.get_all_trackings(external_id)
+        shipments = [s for s in await self.get_all_trackings(external_id) if s.tracking_number]
         if not shipments:
             return Shipment(
                 order_external_id=external_id,

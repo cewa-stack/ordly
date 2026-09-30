@@ -60,6 +60,7 @@ class FakeOrderRepository(OrderRepository):
             o
             for o in self._orders
             if o.status.upper() != "CANCELLED"
+            and o.tracking_number is None
             and o.fulfillment_status is not None
             and o.fulfillment_status.upper() == FULFILLMENT_NEW
         ]
@@ -70,6 +71,7 @@ class FakeOrderRepository(OrderRepository):
             o
             for o in self._orders
             if o.status.upper() != "CANCELLED"
+            and o.tracking_number is None
             and o.fulfillment_status is not None
             and o.fulfillment_status.upper() in ACTIVE_FULFILLMENT_STATUSES
         ]

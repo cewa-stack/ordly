@@ -30,6 +30,12 @@ class Order:
     /tracking albo automatyczny job check_waybills_job), NIE z
     checkout-formu Allegro - `fulfillment_status` z niego nie korzysta
     i pozostaje sterowany wyłącznie przez Allegro.
+
+    `line_items_sent` to `fulfillment.shipmentSummary.lineItemsSent`
+    z checkout-formu (NONE / SOME / ALL) - "ile pozycji ma już numer
+    przesyłki". Nie jest zapisywane w bazie: służy synchronizacji jako
+    sygnał, że Allegro przypisało numer (np. automatycznie po wygenerowaniu
+    etykiety) i trzeba go dociągnąć od razu, a nie czekać na osobny job.
     """
 
     external_id: str
@@ -42,6 +48,7 @@ class Order:
     order_date: datetime
     fulfillment_status: str | None = None
     tracking_number: str | None = None
+    line_items_sent: str | None = None
     products_summary: str = field(init=False)
 
     def __post_init__(self) -> None:

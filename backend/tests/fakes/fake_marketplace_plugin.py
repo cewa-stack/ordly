@@ -39,6 +39,7 @@ class FakeMarketplacePlugin(MarketplacePlugin):
         self.single_orders: dict[str, Order] = {}
         self.get_order_errors: dict[str, AllegroApiError] = {}
         self.get_order_calls: list[str] = []
+        self.tracking_calls: list[str] = []
         self.authenticate_called = False
         self.refresh_token_called = False
 
@@ -94,6 +95,7 @@ class FakeMarketplacePlugin(MarketplacePlugin):
         return order
 
     async def get_tracking(self, external_id: str) -> Shipment:
+        self.tracking_calls.append(external_id)
         if self.should_raise_tracking_api_error:
             raise AllegroApiError(503, "Serwis testowy: symulowana niedostępność przesyłek")
         if external_id in self.orders_without_waybill:

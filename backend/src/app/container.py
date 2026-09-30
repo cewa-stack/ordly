@@ -124,7 +124,13 @@ class Container:
         order_repository = SqliteOrderRepository(session)
         return_repository = SqliteReturnRepository(session)
         plugin = self.build_plugin(session)
-        return SyncOrdersService(plugin, order_repository, self.event_bus, return_repository)
+        return SyncOrdersService(
+            plugin,
+            order_repository,
+            self.event_bus,
+            return_repository,
+            shipment_repository=SqliteShipmentRepository(session),
+        )
 
     def sync_orders_service(self, session: AsyncSession) -> SyncOrdersService:
         """Alias semantyczny używany przez komendę /sync i scheduler."""
