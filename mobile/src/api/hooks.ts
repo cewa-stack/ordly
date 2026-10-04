@@ -13,6 +13,7 @@ import {
 
 import { api } from "./client";
 import type {
+  CustomerCase,
   CatalogSync,
   Dashboard,
   EventLog,
@@ -200,6 +201,14 @@ export function useReturns() {
   return useQuery({
     queryKey: ["returns"],
     queryFn: () => api.get<ReturnItem[]>("/api/v1/returns"),
+  });
+}
+
+/** Rejestr anulowań i zwrotów pieniędzy - tylko odczyt. */
+export function useCustomerCases() {
+  return useQuery({
+    queryKey: ["customer-cases"],
+    queryFn: () => api.get<CustomerCase[]>("/api/v1/customer-cases"),
   });
 }
 

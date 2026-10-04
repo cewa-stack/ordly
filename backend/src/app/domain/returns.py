@@ -156,6 +156,47 @@ def is_reopening(previous_status: str, new_status: str) -> bool:
     return is_closed_return_status(previous_status) and not is_closed_return_status(new_status)
 
 
+#: Status obsługi zwrotu na ekranie Zwroty (pozycja z Notion "Podział
+#: zwrotów i anulowanych zamówień na osobne podzakładki oraz statusy
+#: obsługi", decyzja D6-a: dla zwrotów liczony automatycznie z Allegro).
+#: Wartości i nazwy te same co w rejestrze anulowań (customer_cases).
+RETURN_HANDLING_REPORTED = "REPORTED"
+RETURN_HANDLING_IN_PROGRESS = "IN_PROGRESS"
+RETURN_HANDLING_DONE = "DONE"
+
+RETURN_HANDLING_LABELS: dict[str, str] = {
+    RETURN_HANDLING_REPORTED: "Zgłoszony",
+    RETURN_HANDLING_IN_PROGRESS: "W trakcie realizacji",
+    RETURN_HANDLING_DONE: "Zakończony",
+}
+
+_RETURN_IN_PROGRESS_STATUSES = frozenset(
+    {
+        RETURN_DISPATCHED,
+        RETURN_IN_TRANSIT,
+        RETURN_DELIVERED,
+        RETURN_WAREHOUSE_DELIVERED,
+        RETURN_WAREHOUSE_VERIFICATION,
+    }
+)
+
+
+def return_handling_status(status: str | None, order_status: str | None = None) -> str:
+    """
+    Zgłoszony / W trakcie realizacji / Zakończony - z tej samej reguły co
+    "wymaga działania", żeby podzakładki zgadzały się z licznikiem:
+
+    - zamknięty albo zamówienie anulowane (nie wymaga działania) -> Zakończony;
+    - nadany, w drodze, dostarczony, w magazynie Allegro -> W trakcie realizacji;
+    - zgłoszony i każdy nieznany status -> Zgłoszony (lepiej raz za dużo).
+    """
+    if not return_requires_action(status, order_status):
+        return RETURN_HANDLING_DONE
+    if (status or "").upper() in _RETURN_IN_PROGRESS_STATUSES:
+        return RETURN_HANDLING_IN_PROGRESS
+    return RETURN_HANDLING_REPORTED
+
+
 def return_status_label(status: str) -> str:
     """Nazwa statusu dla człowieka; nieznany status zostaje surowy."""
     return RETURN_STATUS_LABELS.get((status or "").upper(), status)

@@ -165,19 +165,33 @@ function CaseRow({ item }: { item: CustomerCase }) {
   );
 }
 
+/** Wybor rodzaju spraw w filtrze ("Anulowania", "Zwroty pieniedzy"...). */
+export interface CaseKindChoice {
+  label: string;
+  kinds: CaseKind[];
+}
+
 interface CustomerCasesPanelProps {
-  /** Rodzaje spraw do pokazania (puste = wszystkie). */
+  /** Rodzaje spraw do pokazania (puste = wszystkie). Pomijane, gdy jest `kindChoices`. */
   kinds?: CaseKind[];
+  /** Filtr rodzaju do wyboru przez uzytkownika (sterowany przez rodzica). */
+  kindChoices?: CaseKindChoice[];
+  kindIndex?: number;
+  onKindIndexChange?: (index: number) => void;
   /** Status obslugi z podzakladki rodzica (puste = wszystkie). */
   handlingStatus?: CaseHandling;
   emptyTitle?: string;
 }
 
 export function CustomerCasesPanel({
-  kinds,
+  kinds: fixedKinds,
+  kindChoices,
+  kindIndex = 0,
+  onKindIndexChange,
   handlingStatus,
   emptyTitle = "Brak spraw",
 }: CustomerCasesPanelProps) {
+  const kinds = kindChoices ? kindChoices[kindIndex]?.kinds : fixedKinds;
   const [reason, setReason] = React.useState<ReasonFilter>("");
   const [source, setSource] = React.useState<"" | CaseSource>("");
   const [dateFrom, setDateFrom] = React.useState("");
@@ -208,6 +222,20 @@ export function CustomerCasesPanel({
   return (
     <div className="flex flex-col gap-3">
       <div className="flex flex-wrap items-center gap-2">
+        {kindChoices && (
+          <select
+            aria-label="Rodzaj sprawy"
+            className={SELECT_CLASS}
+            value={kindIndex}
+            onChange={(event) => onKindIndexChange?.(Number(event.target.value))}
+          >
+            {kindChoices.map((choice, index) => (
+              <option key={choice.label} value={index}>
+                {choice.label}
+              </option>
+            ))}
+          </select>
+        )}
         <Chip active={reason === ""} onClick={() => setReason("")}>
           Każdy powód
         </Chip>

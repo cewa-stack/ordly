@@ -38,7 +38,12 @@ from app.domain.order_status import (
     is_manual_in_force,
     order_requires_packing,
 )
-from app.domain.returns import return_requires_action, return_status_label
+from app.domain.returns import (
+    RETURN_HANDLING_LABELS,
+    return_handling_status,
+    return_requires_action,
+    return_status_label,
+)
 from app.infrastructure.mail.mime import MailBodies, html_to_plain_text
 from app.repositories.sqlite_event_repository import EventRecord
 from app.services.dashboard_service import DashboardSummary
@@ -281,6 +286,10 @@ class ReturnOut(BaseModel):
     #: Wynik wspólnej reguły `return_requires_action` - z tej flagi aplikacje
     #: liczą "Zwroty do obsługi", zamiast trzymać własną listę statusów.
     requires_action: bool
+    #: Podzakładka: REPORTED / IN_PROGRESS / DONE (app/domain/returns.py).
+    handling_status: str = "REPORTED"
+    #: "Zgłoszony" / "W trakcie realizacji" / "Zakończony".
+    handling_label: str = "Zgłoszony"
 
 
 def return_out(record: ReturnRecord) -> ReturnOut:
@@ -295,6 +304,10 @@ def return_out(record: ReturnRecord) -> ReturnOut:
         return_date=record.return_date,
         status_label=return_status_label(record.status),
         requires_action=return_requires_action(record.status, record.order_status),
+        handling_status=return_handling_status(record.status, record.order_status),
+        handling_label=RETURN_HANDLING_LABELS[
+            return_handling_status(record.status, record.order_status)
+        ],
     )
 
 

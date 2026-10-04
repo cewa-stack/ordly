@@ -123,6 +123,9 @@ export interface ReturnItem {
   status_label?: string;
   /** Wynik wspólnej reguły backendu `return_requires_action`. */
   requires_action?: boolean;
+  /** Podzakladka: Zgloszony / W trakcie realizacji / Zakonczony (z Allegro). */
+  handling_status?: CaseHandling;
+  handling_label?: string;
 }
 
 /** Rodzaj sprawy w rejestrze anulowan i zwrotow pieniedzy. */

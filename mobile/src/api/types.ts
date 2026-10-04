@@ -144,6 +144,35 @@ export interface ReturnItem {
   status_label?: string;
   /** Wynik wspólnej reguły backendu `return_requires_action`. */
   requires_action?: boolean;
+  /** Podzakładka: Zgłoszony / W trakcie realizacji / Zakończony (z Allegro). */
+  handling_status?: CaseHandling;
+  handling_label?: string;
+}
+
+/** Zgłoszony / W trakcie realizacji / Zakończony. */
+export type CaseHandling = "REPORTED" | "IN_PROGRESS" | "DONE";
+
+/**
+ * Rekord rejestru anulowań i zwrotów (`GET /api/v1/customer-cases`).
+ * `null` = "nieuzupełnione". Bez danych kontaktowych.
+ */
+export interface CustomerCase {
+  id: number;
+  marketplace: string;
+  order_external_id: string;
+  allegro_order_id: string | null;
+  kind: "CANCELLATION" | "REFUND" | "BOTH";
+  kind_label: string;
+  buyer_login: string | null;
+  order_date: string | null;
+  cancelled_at: string | null;
+  refunded_at: string | null;
+  reason: string | null;
+  reason_label: string;
+  handling_status: CaseHandling;
+  handling_label: string;
+  source: string;
+  source_label: string;
 }
 
 export type IssueType = "DISPUTE" | "CLAIM";
