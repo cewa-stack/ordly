@@ -125,6 +125,67 @@ export interface ReturnItem {
   requires_action?: boolean;
 }
 
+/** Rodzaj sprawy w rejestrze anulowan i zwrotow pieniedzy. */
+export type CaseKind = "CANCELLATION" | "REFUND" | "BOTH";
+export type CaseReason = "OUT_OF_STOCK" | "PAYMENT_PROBLEM" | "BUYER_RESIGNED" | "OTHER";
+/** Zgloszony / W trakcie realizacji / Zakonczony. */
+export type CaseHandling = "REPORTED" | "IN_PROGRESS" | "DONE";
+export type CaseSource = "ALLEGRO_ORDER" | "ALLEGRO_RETURN" | "APP_STATUS" | "MIGRATION";
+
+/**
+ * Rekord `GET /api/v1/customer-cases` - jeden na zamowienie. `null` =
+ * "nieuzupelnione". Bez telefonu, e-maila i imienia i nazwiska.
+ */
+export interface CustomerCase {
+  id: number;
+  marketplace: string;
+  order_external_id: string;
+  allegro_order_id: string | null;
+  kind: CaseKind;
+  kind_label: string;
+  buyer_login: string | null;
+  order_date: string | null;
+  cancelled_at: string | null;
+  refunded_at: string | null;
+  reason: CaseReason | null;
+  reason_label: string;
+  reason_detail: string | null;
+  handling_status: CaseHandling;
+  handling_label: string;
+  source: CaseSource;
+  source_label: string;
+  created_at: string;
+  updated_at: string;
+}
+
+/** Filtry listy rekordow - wszystkie opcjonalne. */
+export interface CaseQuery {
+  kind?: CaseKind[];
+  handling_status?: CaseHandling;
+  /** `MISSING` = powod nieuzupelniony. */
+  reason?: CaseReason | "MISSING";
+  source?: CaseSource;
+  /** ISO, wlacznie. */
+  date_from?: string;
+  /** ISO, wylacznie. */
+  date_to?: string;
+}
+
+/** Zmiana recznie: pominiete pole = bez zmian, `reason: null` = nieuzupelnione. */
+export interface CaseUpdate {
+  reason?: CaseReason | null;
+  handling_status?: CaseHandling;
+}
+
+export interface CaseReasonChange {
+  previous_reason: CaseReason | null;
+  previous_label: string;
+  new_reason: CaseReason | null;
+  new_label: string;
+  source: string;
+  changed_at: string;
+}
+
 export interface Issue {
   external_id: string;
   marketplace: string;

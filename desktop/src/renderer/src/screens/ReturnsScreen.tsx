@@ -21,6 +21,7 @@ import {
 } from "../components/ui";
 import { formatAge, formatDateTime } from "../lib/format";
 import { returnStatusLabel, returnStatusTone } from "../lib/returns";
+import { CustomerCasesPanel } from "../components/CustomerCasesPanel";
 
 const ALLEGRO_RETURNS_URL = "https://allegro.pl/moje-allegro/sprzedaz/zwroty";
 
@@ -88,6 +89,17 @@ export function ReturnsScreen() {
           pokazuje stan i pilnuje, żeby żaden zwrot Ci nie umknął.
         </p>
       )}
+
+      <section className="flex flex-col gap-3 border-t border-line pt-4">
+        <div>
+          <h3 className="o-display text-[15px] tracking-[-.01em]">Anulowania i zwroty pieniędzy</h3>
+          <p className="text-[11.5px] text-text-3">
+            Jeden rekord na zamówienie - zapisywany automatycznie po anulowaniu albo zwrocie
+            pieniędzy. Bez telefonu i e-maila: kontakt przez Allegro, po numerze zamówienia.
+          </p>
+        </div>
+        <CustomerCasesPanel />
+      </section>
     </div>
   );
 }

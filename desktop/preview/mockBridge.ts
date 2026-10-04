@@ -12,6 +12,9 @@
 import type { OrdlyBridge } from "../src/renderer/src/types/ordly-bridge";
 import type {
   AppStatus,
+  CaseQuery,
+  CaseUpdate,
+  CustomerCase,
   Order,
   OrderStatusChange,
   Wholesaler,
@@ -26,6 +29,112 @@ function hoursAgo(hours: number): string {
 }
 
 const MOCK_HISTORY: OrderStatusChange[] = [];
+
+const REASON_LABEL: Record<string, string> = {
+  OUT_OF_STOCK: "Brak towaru",
+  PAYMENT_PROBLEM: "Problem z płatnością",
+  BUYER_RESIGNED: "Rezygnacja klienta",
+  OTHER: "Inna",
+};
+const HANDLING_LABEL: Record<string, string> = {
+  REPORTED: "Zgłoszony",
+  IN_PROGRESS: "W trakcie realizacji",
+  DONE: "Zakończony",
+};
+
+/** Zmyslone rekordy rejestru anulowan i zwrotow - tylko do podgladu. */
+let MOCK_CASES: CustomerCase[] = [
+  {
+    id: 1,
+    marketplace: "allegro",
+    order_external_id: "c3a5f770-0000-4000-8000-000000000001",
+    allegro_order_id: "c3a5f770-0000-4000-8000-000000000001",
+    kind: "CANCELLATION",
+    kind_label: "Anulowanie zamówienia",
+    buyer_login: "kasia_test",
+    order_date: hoursAgo(50),
+    cancelled_at: hoursAgo(30),
+    refunded_at: null,
+    reason: "OUT_OF_STOCK",
+    reason_label: "Brak towaru",
+    reason_detail: null,
+    handling_status: "REPORTED",
+    handling_label: "Zgłoszony",
+    source: "ALLEGRO_ORDER",
+    source_label: "Allegro - anulowanie zamówienia",
+    created_at: hoursAgo(30),
+    updated_at: hoursAgo(30),
+  },
+  {
+    id: 2,
+    marketplace: "allegro",
+    order_external_id: "d4b6e881-0000-4000-8000-000000000002",
+    allegro_order_id: "d4b6e881-0000-4000-8000-000000000002",
+    kind: "BOTH",
+    kind_label: "Anulowanie i zwrot pieniędzy",
+    buyer_login: null,
+    order_date: hoursAgo(120),
+    cancelled_at: hoursAgo(100),
+    refunded_at: hoursAgo(90),
+    reason: null,
+    reason_label: "nieuzupełnione",
+    reason_detail: null,
+    handling_status: "IN_PROGRESS",
+    handling_label: "W trakcie realizacji",
+    source: "APP_STATUS",
+    source_label: "Status w aplikacji",
+    created_at: hoursAgo(100),
+    updated_at: hoursAgo(90),
+  },
+  {
+    id: 3,
+    marketplace: "allegro",
+    order_external_id: "e5c71992-0000-4000-8000-000000000003",
+    allegro_order_id: "e5c71992-0000-4000-8000-000000000003",
+    kind: "REFUND",
+    kind_label: "Zwrot pieniędzy",
+    buyer_login: "tomek_test",
+    order_date: hoursAgo(300),
+    cancelled_at: null,
+    refunded_at: hoursAgo(200),
+    reason: "BUYER_RESIGNED",
+    reason_label: "Rezygnacja klienta",
+    reason_detail: "DONT_LIKE_IT",
+    handling_status: "DONE",
+    handling_label: "Zakończony",
+    source: "ALLEGRO_RETURN",
+    source_label: "Allegro - zwrot klienta",
+    created_at: hoursAgo(200),
+    updated_at: hoursAgo(200),
+  },
+];
+
+function filterMockCases(query: CaseQuery = {}): CustomerCase[] {
+  return MOCK_CASES.filter(
+    (item) =>
+      (!query.kind || query.kind.includes(item.kind)) &&
+      (!query.handling_status || item.handling_status === query.handling_status) &&
+      (!query.source || item.source === query.source) &&
+      (!query.reason ||
+        (query.reason === "MISSING" ? item.reason === null : item.reason === query.reason))
+  ).map((item) => ({ ...item }));
+}
+
+function updateMockCase(id: number, update: CaseUpdate): CustomerCase {
+  MOCK_CASES = MOCK_CASES.map((item) => {
+    if (item.id !== id) return item;
+    const reason = "reason" in update ? (update.reason ?? null) : item.reason;
+    const handling = update.handling_status ?? item.handling_status;
+    return {
+      ...item,
+      reason,
+      reason_label: reason ? REASON_LABEL[reason] : "nieuzupełnione",
+      handling_status: handling,
+      handling_label: HANDLING_LABEL[handling],
+    };
+  });
+  return MOCK_CASES.find((item) => item.id === id) ?? MOCK_CASES[0];
+}
 
 const ORDERS: Order[] = [
   {
@@ -344,6 +453,11 @@ export function installMockBridge(): void {
           cancelled_orders_count: 0,
           new_returns_count: 0,
         }),
+    },
+    cases: {
+      list: (query?: CaseQuery) => ok(filterMockCases(query)),
+      update: (id: number, update: CaseUpdate) => ok(updateMockCase(id, update)),
+      reasonHistory: () => ok([]),
     },
     returns: {
       list: () =>

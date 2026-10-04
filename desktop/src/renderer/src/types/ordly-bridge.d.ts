@@ -1,4 +1,8 @@
 import type {
+  CaseQuery,
+  CaseReasonChange,
+  CaseUpdate,
+  CustomerCase,
   AppStatus,
   BridgeResult,
   CatalogSyncResult,
@@ -71,6 +75,12 @@ export interface OrdlyBridge {
   };
   returns: {
     list: () => Promise<BridgeResult<ReturnItem[]>>;
+  };
+  /** Rejestr anulowan i zwrotow pieniedzy. */
+  cases: {
+    list: (query?: CaseQuery) => Promise<BridgeResult<CustomerCase[]>>;
+    update: (id: number, update: CaseUpdate) => Promise<BridgeResult<CustomerCase>>;
+    reasonHistory: (id: number) => Promise<BridgeResult<CaseReasonChange[]>>;
   };
   issues: {
     list: () => Promise<BridgeResult<Issue[]>>;

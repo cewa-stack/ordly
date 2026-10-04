@@ -38,6 +38,11 @@ const ordly = {
   returns: {
     list: () => ipcRenderer.invoke("ordly:returns:list"),
   },
+  cases: {
+    list: (query?: Record<string, unknown>) => ipcRenderer.invoke("ordly:cases:list", query ?? {}),
+    update: (id: number, update: unknown) => ipcRenderer.invoke("ordly:cases:update", id, update),
+    reasonHistory: (id: number) => ipcRenderer.invoke("ordly:cases:reasonHistory", id),
+  },
   issues: {
     list: () => ipcRenderer.invoke("ordly:issues:list"),
     messages: (issueId: string) => ipcRenderer.invoke("ordly:issues:messages", issueId),
