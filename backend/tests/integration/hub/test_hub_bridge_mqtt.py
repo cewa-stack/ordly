@@ -1,0 +1,174 @@
+"""
+Most MQTT na prawdziwym protokole: aiomqtt (ORDLY) i drugi klient
+udający Hub rozmawiają po TCP z brokerem MQTT 3.1.1 (`MiniMqttBroker`).
+
+Sprawdza to, czego nie pokaże zapisujący publisher: logowanie hasłem,
+LWT i retained `ordly/backend/status`, odbiór retained statusu Huba
+zaraz po połączeniu (to on wyzwala snapshot po restarcie ORDLY),
+potwierdzenie OK z Huba aż do bazy i odporność na śmieci w wiadomości.
+
+aiomqtt potrzebuje pętli z `add_reader` - na Windows (środowisko
+deweloperskie) domyślna pętla Proactor jej nie ma, dlatego scenariusze
+uruchamiamy na SelectorEventLoop. Na Raspberry Pi to domyślna pętla.
+"""
+
+from __future__ import annotations
+
+import asyncio
+import json
+from collections.abc import Awaitable, Callable
+from pathlib import Path
+from typing import Any
+
+import aiomqtt
+from pydantic import SecretStr
+
+from app.core.config import HubMqttSettings
+from app.domain.entities.order import Order
+from app.infrastructure.mqtt.hub_bridge import TOPIC_BACKEND_STATUS, MqttHubBridge
+from app.repositories.sqlite_hub_event_repository import SqliteHubEventRepository
+from app.services.hub_events_service import (
+    TOPIC_EVENT_NEW,
+    TOPIC_EVENT_SNAPSHOT,
+    TOPIC_HUB_ACK,
+    TOPIC_HUB_STATUS,
+    HubEventsService,
+)
+from tests.fakes.mini_mqtt_broker import MiniMqttBroker
+from tests.integration.hub.conftest import make_database
+
+USERS = {"ordly": "haslo-ordly", "hub": "haslo-hub"}
+
+
+def _run(scenario: Callable[[], Awaitable[None]]) -> None:
+    asyncio.run(scenario(), loop_factory=asyncio.SelectorEventLoop)
+
+
+def _settings(port: int, password: str = "haslo-ordly") -> HubMqttSettings:
+    return HubMqttSettings(
+        MQTT_HOST="127.0.0.1",
+        MQTT_PORT=port,
+        MQTT_USER="ordly",
+        MQTT_PASSWORD=SecretStr(password),
+    )
+
+
+async def _eventually(check: Callable[[], Awaitable[bool]]) -> None:
+    """Sprawdza warunek co 50 ms, najwyżej przez 5 s."""
+    for _ in range(100):
+        if await check():
+            return
+        await asyncio.sleep(0.05)
+    raise AssertionError("warunek nie spełnił się w 5 s")
+
+
+def test_hub_po_polaczeniu_dostaje_snapshot_a_ok_trafia_do_bazy(
+    tmp_path: Path, sample_order: Order
+) -> None:
+    async def scenario() -> None:
+        engine, session_scope = await make_database(tmp_path / "hub.db")
+        async with MiniMqttBroker(USERS) as broker:
+            bridge = MqttHubBridge(_settings(broker.port))
+            hub_service = HubEventsService(
+                session_scope_factory=session_scope, publisher=bridge
+            )
+            bridge.subscribe(TOPIC_HUB_ACK, hub_service.handle_ack)
+            bridge.subscribe(TOPIC_HUB_STATUS, hub_service.handle_hub_status)
+            stop = asyncio.Event()
+
+            # Zamówienie przyszło, zanim Hub i ORDLY w ogóle się połączyły.
+            await hub_service.on_order_created(sample_order)
+
+            # Hub był online wcześniej: jego status jest retained u brokera.
+            async with aiomqtt.Client(
+                "127.0.0.1",
+                broker.port,
+                username="hub",
+                password="haslo-hub",
+                identifier="hub",
+            ) as hub:
+                await hub.subscribe("ordly/#")
+                await hub.publish(
+                    TOPIC_HUB_STATUS,
+                    '{"online":true,"fw_version":"0.4.0"}',
+                    qos=1,
+                    retain=True,
+                )
+
+                task = asyncio.create_task(bridge.run(stop))
+                assert await bridge.wait_connected(5)
+
+                received: dict[str, Any] = {}
+
+                async def _read() -> None:
+                    async for message in hub.messages:
+                        if str(message.topic) == TOPIC_EVENT_SNAPSHOT:
+                            received.update(json.loads(message.payload))
+                            return
+
+                await asyncio.wait_for(_read(), 5)
+                assert received["total"] == 1
+                assert received["events"][0]["id"] == "evt_1"
+                assert broker.retained(TOPIC_BACKEND_STATUS) == b'{"online":true}'
+
+                # Śmieci nie zrywają połączenia, a OK z Huba trafia do bazy.
+                await hub.publish(TOPIC_HUB_ACK, b"\xff nie-json", qos=1)
+                await hub.publish(TOPIC_HUB_ACK, '{"event_id":"evt_1"}', qos=1)
+
+                async def _acked() -> bool:
+                    async with session_scope() as session:
+                        return await SqliteHubEventRepository(session).count_active() == 0
+
+                await _eventually(_acked)
+                assert bridge.connected
+
+            stop.set()
+            await asyncio.wait_for(task, 5)
+            assert broker.retained(TOPIC_BACKEND_STATUS) == b'{"online":false}'
+        await engine.dispose()
+
+    _run(scenario)
+
+
+def test_nowe_zdarzenie_idzie_na_ordly_events_new_jako_utf8(
+    tmp_path: Path, sample_order: Order
+) -> None:
+    async def scenario() -> None:
+        engine, session_scope = await make_database(tmp_path / "hub.db")
+        async with MiniMqttBroker(USERS) as broker:
+            bridge = MqttHubBridge(_settings(broker.port))
+            hub_service = HubEventsService(
+                session_scope_factory=session_scope, publisher=bridge
+            )
+            stop = asyncio.Event()
+            task = asyncio.create_task(bridge.run(stop))
+            assert await bridge.wait_connected(5)
+
+            await hub_service.on_order_created(sample_order)
+
+            [raw] = await broker.wait_for(TOPIC_EVENT_NEW)
+            message = json.loads(raw.decode("utf-8"))
+            assert message["id"] == "evt_1"
+            assert message["data"]["summary"] == "Kubek ceramiczny x2"
+
+            stop.set()
+            await asyncio.wait_for(task, 5)
+        await engine.dispose()
+
+    _run(scenario)
+
+
+def test_zle_haslo_nie_wywraca_ordly() -> None:
+    async def scenario() -> None:
+        async with MiniMqttBroker(USERS) as broker:
+            bridge = MqttHubBridge(_settings(broker.port, password="zle"))
+            stop = asyncio.Event()
+            task = asyncio.create_task(bridge.run(stop))
+
+            assert not await bridge.wait_connected(1)
+            assert await bridge.publish("ordly/test", {"x": 1}) is False
+
+            stop.set()
+            await asyncio.wait_for(task, 10)
+
+    _run(scenario)

@@ -22,6 +22,7 @@ from app.domain.interfaces.marketplace_plugin import MarketplacePlugin
 from app.domain.interfaces.notifier import Notifier
 from app.domain.interfaces.sms_provider import SmsProvider
 from app.infrastructure.composite_notifier import CompositeNotifier
+from app.infrastructure.mqtt.hub_bridge import MqttHubBridge
 from app.infrastructure.plugins.allegro.config import AllegroConfig
 from app.infrastructure.plugins.allegro.plugin import AllegroPlugin
 from app.infrastructure.sms.logging_sms_provider import LoggingSmsProvider
@@ -52,6 +53,7 @@ from app.services.backup_service import BackupService
 from app.services.dashboard_service import DashboardService
 from app.services.events_service import EventsService
 from app.services.health_service import HealthService, SyncStatus
+from app.services.hub_events_service import HubEventsService
 from app.services.issues_service import IssuesService
 from app.services.mail_service import MailService
 from app.services.mailbox_service import MailboxService
@@ -94,6 +96,20 @@ class Container:
         )
         self.event_bus = EventBus()
         self.sync_status = SyncStatus()
+        # Most do ORDLy Control Hub - tylko gdy w `.env` jest hasło MQTT.
+        # Jedna instancja na proces: trzyma jedno połączenie z brokerem.
+        self.hub_bridge: MqttHubBridge | None = (
+            MqttHubBridge(settings.hub_mqtt) if settings.hub_mqtt.enabled else None
+        )
+        self.hub_events: HubEventsService | None = (
+            HubEventsService(
+                session_scope_factory=self.session_scope,
+                publisher=self.hub_bridge,
+                last_sync_at=lambda: self.sync_status.last_sync_at,
+            )
+            if self.hub_bridge is not None
+            else None
+        )
 
     @asynccontextmanager
     async def session_scope(self) -> AsyncGenerator[AsyncSession]:

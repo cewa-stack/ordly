@@ -56,3 +56,13 @@ class SyncFailureTracker:
         """
         self._consecutive_failures.pop(channel, None)
         self._alerted.discard(channel)
+
+    @property
+    def alerted_channels(self) -> frozenset[str]:
+        """
+        Kanały, o których poszedł już alert i które jeszcze nie wróciły.
+
+        Czyta to most do ORDLy Control Hub: dopóki kanał tu jest, niebieska
+        dioda Huba miga szybko (problem z systemem).
+        """
+        return frozenset(self._alerted)
