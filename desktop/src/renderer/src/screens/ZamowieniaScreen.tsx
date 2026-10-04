@@ -55,20 +55,21 @@ import {
   waitingLabel,
 } from "../lib/format";
 import {
-  ORDER_FILTER_LABEL,
   displayFulfillmentLabel,
   isPendingOrder,
   isShippedForDisplay,
-  matchesOrderFilter,
-  type OrderFilter,
 } from "../lib/fulfillment";
 import {
   APP_STATUSES,
   APP_STATUS_LABEL,
+  ORDER_TABS,
+  ORDER_TAB_LABEL,
   appStatusLabel,
   appStatusOf,
   appStatusTone,
   isManualStatus,
+  matchesOrderTab,
+  type OrderTab,
 } from "../lib/appStatus";
 import { useNewIds } from "../lib/useNewIds";
 import type { AppStatus, MarketplaceOffer, Order } from "../types/api";
@@ -533,7 +534,7 @@ function OrderDetail({
 
 export function ZamowieniaScreen({ focusOrderId, onFocusHandled }: ZamowieniaScreenProps) {
   const { data, isLoading, isError, error, refetch } = useOrders();
-  const [filter, setFilter] = React.useState<OrderFilter>("all");
+  const [filter, setFilter] = React.useState<OrderTab>("all");
   const [sort, setSort] = React.useState<SortMode>("newest");
   const [selectedId, setSelectedId] = React.useState<string | null>(null);
   const [checked, setChecked] = React.useState<Set<string>>(new Set());
@@ -563,7 +564,7 @@ export function ZamowieniaScreen({ focusOrderId, onFocusHandled }: ZamowieniaScr
   }, [focusOrderId, onFocusHandled]);
 
   const visible = React.useMemo(() => {
-    const filtered = (data ?? []).filter((order) => matchesOrderFilter(order, filter));
+    const filtered = (data ?? []).filter((order) => matchesOrderTab(order, filter));
     return [...filtered].sort((a, b) =>
       sort === "amount"
         ? toAmount(b.total_amount) - toAmount(a.total_amount)
@@ -575,15 +576,14 @@ export function ZamowieniaScreen({ focusOrderId, onFocusHandled }: ZamowieniaScr
   // Nowe od ostatniego odswiezenia - raz migna akcentem.
   const freshOrders = useNewIds(data?.map((order) => order.external_id));
 
-  /** Licznik przy kazdym chipie - liczy to, co chip naprawde pokaze. */
+  /** Licznik przy kazdej podzakladce - liczy to, co zakladka naprawde pokaze. */
   const filterCounts = React.useMemo(() => {
     const all = data ?? [];
-    return {
-      all: all.length,
-      pack: all.filter((order) => matchesOrderFilter(order, "pack")).length,
-      ready: all.filter((order) => matchesOrderFilter(order, "ready")).length,
-      sent: all.filter((order) => matchesOrderFilter(order, "sent")).length,
-    } satisfies Record<OrderFilter, number>;
+    const counts = { all: 0, NEW: 0, IN_PROGRESS: 0, DONE: 0 } satisfies Record<OrderTab, number>;
+    for (const tab of ORDER_TABS) {
+      counts[tab] = all.filter((order) => matchesOrderTab(order, tab)).length;
+    }
+    return counts;
   }, [data]);
 
   const bulkMutation = useMutation({
@@ -738,16 +738,20 @@ export function ZamowieniaScreen({ focusOrderId, onFocusHandled }: ZamowieniaScr
     >
       {/* ------------------------------------------------ rzad filtrow */}
       <div className="flex shrink-0 flex-wrap items-center gap-2">
-        {(["all", "pack", "ready", "sent"] as const).map((option) => (
-          <Chip
-            key={option}
-            active={filter === option}
-            count={filterCounts[option]}
-            onClick={() => setFilter(option)}
-          >
-            {ORDER_FILTER_LABEL[option]}
-          </Chip>
-        ))}
+        <div role="tablist" aria-label="Podzakładki zamówień" className="flex flex-wrap gap-2">
+          {ORDER_TABS.map((option) => (
+            <Chip
+              key={option}
+              role="tab"
+              aria-selected={filter === option}
+              active={filter === option}
+              count={filterCounts[option]}
+              onClick={() => setFilter(option)}
+            >
+              {ORDER_TAB_LABEL[option]}
+            </Chip>
+          ))}
+        </div>
         <div className="ml-auto flex items-center gap-2">
           <button
             onClick={() => setSort((prev) => (prev === "newest" ? "amount" : "newest"))}
@@ -790,11 +794,11 @@ export function ZamowieniaScreen({ focusOrderId, onFocusHandled }: ZamowieniaScr
             {!isLoading && visible.length === 0 && (
               <EmptyState
                 prop={filter === "all" ? "box" : "magnifier"}
-                title={filter === "all" ? "Brak zamówień" : "Nic w tym filtrze"}
+                title={filter === "all" ? "Brak zamówień" : `Brak zamówień: ${ORDER_TAB_LABEL[filter]}`}
                 description={
                   filter === "all"
                     ? "Gdy tylko wpadnie nowe zamówienie, Ordlak je tu położy."
-                    : "Zmień filtr albo zsynchronizuj kanały, żeby zobaczyć więcej."
+                    : "Zmień zakładkę albo zsynchronizuj kanały, żeby zobaczyć więcej."
                 }
               />
             )}

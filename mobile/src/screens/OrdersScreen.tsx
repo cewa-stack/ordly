@@ -29,42 +29,32 @@ import { ReceiptIcon } from "@/icons";
 import { TabHeading } from "@/components/TabHeading";
 import { ListEndNote } from "@/components/ListEndNote";
 import { useSync } from "@/store/sync";
-import { fulfillmentLabel, isShippedForDisplay } from "@/utils/format";
+import { appStatusOf } from "@/utils/appStatus";
 import { useNewIds } from "@/utils/useNewIds";
-import type { Order } from "@/api/types";
+import type { AppStatus, Order } from "@/api/types";
 import type { RootStackParamList } from "@/navigation/types";
 
-const STATUS_FILTERS = ["Wszystkie", "Nowe", "Pakowanie", "Wysłane", "Anulowane"] as const;
+/**
+ * Podzakładki wg statusu realizacji (pozycja z Notion "Podział zamówień
+ * na podzakładki według statusu realizacji", decyzja D3-a) - te same co
+ * na desktopie: Nowe / W realizacji / Zrealizowane, liczone ze statusu
+ * aplikacyjnego (app_status z API, z ręczną zmianą włącznie). Anulowane
+ * zostają w "Wszystkie".
+ */
+const STATUS_FILTERS = ["Wszystkie", "Nowe", "W realizacji", "Zrealizowane"] as const;
 type StatusFilter = (typeof STATUS_FILTERS)[number];
 
-/**
- * Do którego filtra należy zamówienie.
- *
- * Wcześniej filtr porównywał SWOJĄ nazwę z etykietą statusu, a etykiety to
- * "Do spakowania", "Gotowe do wysyłki" i "Odebrane" - więc "Pakowanie"
- * było zawsze puste, a odebrane paczki wypadały z "Wysłanych".
- */
+const TAB_OF: Record<AppStatus, Exclude<StatusFilter, "Wszystkie"> | null> = {
+  NEW: "Nowe",
+  IN_PROGRESS: "W realizacji",
+  DONE: "Zrealizowane",
+  CANCELLED: null,
+};
+
+/** Do której podzakładki należy zamówienie (null = tylko "Wszystkie"). */
 function filterOf(order: Order): Exclude<StatusFilter, "Wszystkie"> | null {
-  if (order.status === "CANCELLED" || order.fulfillment_status === "CANCELLED") {
-    return "Anulowane";
-  }
-  // Wykryty numer przesyłki (check_waybills_job) przenosi zamówienie do
-  // "Wysłane" tak samo jak realny SENT/PICKED_UP z Allegro - patrz
-  // isShippedForDisplay.
-  if (isShippedForDisplay(order)) {
-    return "Wysłane";
-  }
-  // Etap nieznany (NULL) nie jest "Nowe" - Allegro go jeszcze nie
-  // potwierdziło i nie liczy się do "Do spakowania" (reguła backendu).
-  switch (order.fulfillment_status) {
-    case "NEW":
-      return "Nowe";
-    case "PROCESSING":
-    case "READY_FOR_SHIPMENT":
-      return "Pakowanie";
-    default:
-      return null;
-  }
+  const status = appStatusOf(order);
+  return status ? TAB_OF[status] : null;
 }
 
 export function OrdersScreen() {
@@ -90,9 +80,8 @@ export function OrdersScreen() {
     const map: Record<StatusFilter, number> = {
       Wszystkie: baseData?.length ?? 0,
       Nowe: 0,
-      Pakowanie: 0,
-      Wysłane: 0,
-      Anulowane: 0,
+      "W realizacji": 0,
+      Zrealizowane: 0,
     };
     for (const order of baseData ?? []) {
       const key = filterOf(order);

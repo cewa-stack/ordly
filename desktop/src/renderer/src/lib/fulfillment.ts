@@ -133,26 +133,3 @@ export function isPendingOrder(order: OrderStatusFields): boolean {
   const status = order.fulfillment_status;
   return status === "NEW" || status === "PROCESSING";
 }
-
-export type OrderFilter = "all" | "pack" | "ready" | "sent";
-
-export function matchesOrderFilter(order: OrderStatusFields, filter: OrderFilter): boolean {
-  const status = order.fulfillment_status;
-  switch (filter) {
-    case "pack":
-      return isPendingOrder(order);
-    case "ready":
-      return !isCancelledOrder(order) && status === "READY_FOR_SHIPMENT" && !order.tracking_number;
-    case "sent":
-      return isShippedForDisplay(order) || status === "READY_FOR_PICKUP";
-    default:
-      return true;
-  }
-}
-
-export const ORDER_FILTER_LABEL: Record<OrderFilter, string> = {
-  all: "Wszystkie",
-  pack: "Do spakowania",
-  ready: "Gotowe do wysyłki",
-  sent: "Wysłane",
-};

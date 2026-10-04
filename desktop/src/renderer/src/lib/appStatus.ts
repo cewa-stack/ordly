@@ -72,3 +72,25 @@ export function appStatusTone(order: StatusFields): PillTone {
 export function isManualStatus(order: Pick<Order, "app_status_manual">): boolean {
   return order.app_status_manual === true;
 }
+
+/**
+ * Podzakladki Zamowien (pozycja z Notion "Podzial zamowien na podzakladki
+ * wedlug statusu realizacji", decyzja D3-a): Wszystkie / Nowe /
+ * W realizacji / Zrealizowane. Zastapily filtry "Do spakowania",
+ * "Gotowe do wysylki" i "Wyslane", ktore pokrywaly sie z nowymi.
+ * Anulowane sa widoczne w "Wszystkie" (z szara pigulka).
+ */
+export type OrderTab = "all" | "NEW" | "IN_PROGRESS" | "DONE";
+
+export const ORDER_TABS: OrderTab[] = ["all", "NEW", "IN_PROGRESS", "DONE"];
+
+export const ORDER_TAB_LABEL: Record<OrderTab, string> = {
+  all: "Wszystkie",
+  NEW: "Nowe",
+  IN_PROGRESS: "W realizacji",
+  DONE: "Zrealizowane",
+};
+
+export function matchesOrderTab(order: StatusFields, tab: OrderTab): boolean {
+  return tab === "all" || appStatusOf(order) === tab;
+}
