@@ -77,6 +77,31 @@ export interface Order {
   products: OrderProduct[];
   /** Wynik wspolnej reguly backendu `requires_packing` - zrodlo prawdy dla "Do spakowania". */
   requires_packing?: boolean;
+  /**
+   * Status aplikacyjny widoczny dla uzytkownika (app/domain/order_status.py).
+   * `null` = Allegro nie potwierdzilo etapu; brak pola = starsze Pi.
+   */
+  app_status?: AppStatus | null;
+  /** "Nowe" / "W realizacji" / "Zrealizowane" / "Anulowane" / "Brak danych". */
+  app_status_label?: string;
+  /** True = status zmieniono recznie w aplikacji i nadal obowiazuje. */
+  app_status_manual?: boolean;
+  /** Kiedy zmieniono recznie (ISO z `Z`), `null` bez recznej zmiany. */
+  app_status_changed_at?: string | null;
+}
+
+/** Status aplikacyjny zamowienia - niezalezny od Allegro. */
+export type AppStatus = "NEW" | "IN_PROGRESS" | "DONE" | "CANCELLED";
+
+/** Wpis historii statusu aplikacyjnego. */
+export interface OrderStatusChange {
+  previous_status: AppStatus | null;
+  previous_label: string;
+  new_status: AppStatus | null;
+  new_label: string;
+  /** "manual" albo "restore_allegro". */
+  source: string;
+  changed_at: string;
 }
 
 export interface SyncResult {

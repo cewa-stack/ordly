@@ -35,7 +35,16 @@ export interface Order {
   products: OrderProduct[];
   /** Wynik wspólnej reguły backendu `requires_packing` - źródło prawdy dla „Do spakowania”. */
   requires_packing?: boolean;
+  /** Status aplikacyjny (app/domain/order_status.py); brak pola = starsze Pi. */
+  app_status?: AppStatus | null;
+  app_status_label?: string;
+  /** True = status zmieniono ręcznie w aplikacji i nadal obowiązuje. */
+  app_status_manual?: boolean;
+  app_status_changed_at?: string | null;
 }
+
+/** Status aplikacyjny zamówienia - niezależny od Allegro. */
+export type AppStatus = "NEW" | "IN_PROGRESS" | "DONE" | "CANCELLED";
 
 export interface Shipment {
   order_external_id: string;

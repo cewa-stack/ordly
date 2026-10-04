@@ -168,6 +168,7 @@ export const ORDER_TONE: Record<string, Tone> = {
   Odebrane: "mute",
   Anulowane: "mute",
   Wstrzymane: "hot",
+  Zrealizowane: "mute",
 };
 
 /**

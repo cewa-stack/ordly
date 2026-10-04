@@ -26,8 +26,8 @@ import type { Palette } from "@/theme/colors";
 import { useTheme, useThemedStyles } from "@/theme/theme";
 import { fonts, radii } from "@/theme/typography";
 import type { Order } from "@/api/types";
+import { appStatusLabel, isManualStatus } from "@/utils/appStatus";
 import {
-  displayFulfillmentLabel,
   formatMoney,
   isPendingFulfillment,
   parseApiDate,
@@ -74,7 +74,10 @@ export function OrderRow({ order, onPress, highlight = false }: OrderRowProps) {
   // tego nie powie, gdy zamówienie jest z wczoraj.
   const waiting = isPendingFulfillment(order) ? waitingLabel(order.order_date) : null;
 
-  const label = displayFulfillmentLabel(order);
+  // Status aplikacyjny (Nowe / W realizacji / Zrealizowane / Anulowane);
+  // zmieniony ręcznie na desktopie ma dopisek "ręcznie".
+  const label = appStatusLabel(order);
+  const manual = isManualStatus(order);
   const tone = toneStyle(ORDER_TONE[label] ?? "mute", c);
   const channelPalette = mode === "day" ? channelDay : channelNight;
   const channel = channelPalette[order.marketplace] ?? {
@@ -91,7 +94,7 @@ export function OrderRow({ order, onPress, highlight = false }: OrderRowProps) {
       accessibilityLabel={`${order.buyer_login}, ${formatMoney(
         order.total_amount,
         order.currency
-      )}, ${label}`}
+      )}, ${label}${manual ? ", zmieniono ręcznie w aplikacji" : ""}`}
       style={({ pressed }) => [styles.card, pressed && styles.pressed]}
     >
       <Animated.View
@@ -123,7 +126,7 @@ export function OrderRow({ order, onPress, highlight = false }: OrderRowProps) {
           {formatMoney(order.total_amount, order.currency)}
         </Text>
         <Text style={[styles.status, { color: tone.text }]} numberOfLines={1}>
-          {label}
+          {manual ? `${label} · ręcznie` : label}
         </Text>
       </View>
     </Pressable>

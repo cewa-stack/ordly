@@ -21,6 +21,7 @@ import { StatusBadge } from "@/components/StatusBadge";
 import { CheckIcon, TruckIcon } from "@/icons";
 import type { OrderProduct } from "@/api/types";
 import { displayFulfillmentLabel, formatDate, formatMoney } from "@/utils/format";
+import { appStatusLabel, isManualStatus } from "@/utils/appStatus";
 import type { RootStackParamList } from "@/navigation/types";
 
 const TIMELINE_STAGES = ["Nowe", "Pakowanie", "Wysłane"] as const;
@@ -160,6 +161,8 @@ export function OrderDetailScreen() {
 
   const data = order.data;
   const label = displayFulfillmentLabel(data);
+  const appLabel = appStatusLabel(data);
+  const manual = isManualStatus(data);
   const statusColor = toneStyle(ORDER_TONE[label] ?? "mute", c).text;
   const productsTotal = data.products.reduce(
     (sum: number, product: OrderProduct) => sum + Number(product.total_price || 0),
@@ -173,8 +176,14 @@ export function OrderDetailScreen() {
           <Text style={styles.orderId}>
             {data.marketplace} · #{data.external_id}
           </Text>
-          <StatusBadge label={label} />
+          <StatusBadge label={appLabel} />
         </View>
+        {manual ? (
+          <Text style={styles.manualNote}>
+            Status zmieniono ręcznie w aplikacji
+            {data.app_status_changed_at ? ` · ${formatDate(data.app_status_changed_at)}` : ""}
+          </Text>
+        ) : null}
         <Text style={styles.amount}>{formatMoney(data.total_amount, data.currency)}</Text>
 
         {label === "Anulowane" || data.status === "CANCELLED" ? (
@@ -193,6 +202,10 @@ export function OrderDetailScreen() {
           <View style={styles.metaRow}>
             <Text style={styles.metaLabel}>Data zamówienia</Text>
             <Text style={styles.metaValue}>{formatDate(data.order_date)}</Text>
+          </View>
+          <View style={styles.metaRow}>
+            <Text style={styles.metaLabel}>Etap na Allegro</Text>
+            <Text style={styles.metaValue}>{label}</Text>
           </View>
           <View style={[styles.metaRow, styles.metaRowLast]}>
             <Text style={styles.metaLabel}>Marketplace</Text>
@@ -305,6 +318,11 @@ const createStyles = (c: Palette) =>
     fontSize: 30,
     lineHeight: 36,
     color: c.tx,
+    marginTop: spacing.sm,
+  },
+  manualNote: {
+    ...typography.footnote,
+    color: c.tx3,
     marginTop: spacing.sm,
   },
   cancelledNote: {

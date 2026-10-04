@@ -1,4 +1,5 @@
 import type {
+  AppStatus,
   BridgeResult,
   CatalogSyncResult,
   DashboardSummary,
@@ -19,6 +20,7 @@ import type {
   OrdlakSaveResult,
   OrdlakStatus,
   Order,
+  OrderStatusChange,
   ReplyTemplate,
   ReplyTemplateInput,
   ReturnItem,
@@ -62,6 +64,9 @@ export interface OrdlyBridge {
       externalId: string,
       status: "NEW" | "PROCESSING" | "READY_FOR_SHIPMENT" | "SENT" | "PICKED_UP"
     ) => Promise<BridgeResult<Order>>;
+    /** Status aplikacyjny (tylko ORDLY); `null` = przywroc status z Allegro. */
+    setAppStatus: (externalId: string, status: AppStatus | null) => Promise<BridgeResult<Order>>;
+    appStatusHistory: (externalId: string) => Promise<BridgeResult<OrderStatusChange[]>>;
     sync: () => Promise<BridgeResult<SyncResult>>;
   };
   returns: {

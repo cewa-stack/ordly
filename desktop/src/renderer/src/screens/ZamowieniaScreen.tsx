@@ -21,7 +21,15 @@
  */
 import * as React from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { BoxIcon, CheckIcon, ExportIcon, SortIcon, TruckIcon } from "../icons";
+import {
+  BoxIcon,
+  CheckIcon,
+  ExportIcon,
+  PencilIcon,
+  RefreshIcon,
+  SortIcon,
+  TruckIcon,
+} from "../icons";
 import {
   Button,
   Chip,
@@ -49,14 +57,21 @@ import {
 import {
   ORDER_FILTER_LABEL,
   displayFulfillmentLabel,
-  displayFulfillmentTone,
   isPendingOrder,
   isShippedForDisplay,
   matchesOrderFilter,
   type OrderFilter,
 } from "../lib/fulfillment";
+import {
+  APP_STATUSES,
+  APP_STATUS_LABEL,
+  appStatusLabel,
+  appStatusOf,
+  appStatusTone,
+  isManualStatus,
+} from "../lib/appStatus";
 import { useNewIds } from "../lib/useNewIds";
-import type { MarketplaceOffer, Order } from "../types/api";
+import type { AppStatus, MarketplaceOffer, Order } from "../types/api";
 
 type SortMode = "newest" | "amount";
 
@@ -69,7 +84,119 @@ type SortMode = "newest" | "amount";
  * "Czas" to godzina zlozenia, a przy zamowieniu czekajacym na spakowanie -
  * ile juz czeka (po dobie koralowo). Godzina zostaje w podpowiedzi.
  */
-const GRID_COLUMNS = "22px 68px minmax(0,1fr) 76px 88px 92px 52px";
+const GRID_COLUMNS = "22px 68px minmax(0,1fr) 76px 108px 92px 52px";
+
+/**
+ * Pigulka statusu aplikacyjnego (Nowe / W realizacji / Zrealizowane /
+ * Anulowane). Status zmieniony recznie w aplikacji ma olowek - zeby bylo
+ * jasne, ze nie pochodzi z Allegro. Etap z Allegro jest w podpowiedzi.
+ */
+function AppStatusPill({ order }: { order: Order }) {
+  const manual = isManualStatus(order);
+  const hint = [
+    manual ? "Status zmieniono ręcznie w aplikacji" : "Status wynika z Allegro",
+    `Allegro: ${displayFulfillmentLabel(order)}`,
+  ].join(" · ");
+  return (
+    <span title={hint} className="min-w-0">
+      <Pill tone={appStatusTone(order)}>
+        <span className="inline-flex items-center gap-1">
+          {manual && <PencilIcon size={10} aria-label="zmieniono ręcznie" />}
+          {appStatusLabel(order)}
+        </span>
+      </Pill>
+    </span>
+  );
+}
+
+/** Zapis statusu aplikacyjnego - tylko ORDLY, nic nie idzie do Allegro. */
+async function saveAppStatus(externalId: string, status: AppStatus | null): Promise<Order> {
+  const result = await window.ordly.orders.setAppStatus(externalId, status);
+  if (!result.ok) throw new Error(result.message);
+  return result.data;
+}
+
+/**
+ * Status w aplikacji - przelacznik czterech statusow z Notion. Zmiana
+ * NIE zmienia niczego na Allegro i nie wymaga potwierdzenia: jednym
+ * kliknieciem da sie ja cofnac ("Przywróć status z Allegro").
+ */
+function AppStatusPanel({ order }: { order: Order }) {
+  const queryClient = useQueryClient();
+  const toast = useToast();
+  const current = appStatusOf(order);
+  const manual = isManualStatus(order);
+
+  const mutation = useMutation({
+    mutationFn: (status: AppStatus | null) => saveAppStatus(order.external_id, status),
+    onSuccess: (updated, status) => {
+      void queryClient.invalidateQueries({ queryKey: ["orders"] });
+      void queryClient.invalidateQueries({ queryKey: ["dashboard"] });
+      toast.success(
+        status === null
+          ? "Przywrócono status z Allegro"
+          : `Status: ${APP_STATUS_LABEL[status]}`,
+        `${updated.buyer_login} · zmiana tylko w ORDLY`
+      );
+    },
+    onError: (error) => {
+      toast.error(
+        "Nie udało się zmienić statusu",
+        error instanceof Error ? error.message : "Spróbuj ponownie za chwilę."
+      );
+    },
+  });
+
+  return (
+    <div className="flex flex-col gap-2">
+      <div className="flex items-baseline justify-between gap-2">
+        <span className="o-eyebrow">Status w aplikacji</span>
+        {manual && (
+          <button
+            onClick={() => mutation.mutate(null)}
+            disabled={mutation.isPending}
+            className="flex items-center gap-1 text-[10.5px] text-text-3 transition-colors hover:text-teal disabled:opacity-45"
+          >
+            <RefreshIcon size={11} />
+            Przywróć status z Allegro
+          </button>
+        )}
+      </div>
+      <div className="grid grid-cols-2 gap-1.5" role="radiogroup" aria-label="Status w aplikacji">
+        {APP_STATUSES.map((status) => {
+          const active = current === status;
+          return (
+            <button
+              key={status}
+              role="radio"
+              aria-checked={active}
+              disabled={mutation.isPending || (active && manual)}
+              onClick={() => mutation.mutate(status)}
+              className={`rounded-md border px-2.5 py-[7px] text-[11.5px] transition-colors duration-150 disabled:cursor-default ${
+                active
+                  ? "border-teal bg-teal-glow font-semibold text-teal"
+                  : "border-line text-text-2 hover:border-line-2 hover:text-text"
+              }`}
+            >
+              {APP_STATUS_LABEL[status]}
+            </button>
+          );
+        })}
+      </div>
+      <p className="flex items-center gap-1.5 text-[10.5px] leading-[1.5] text-text-3">
+        {manual ? (
+          <>
+            <PencilIcon size={10} />
+            Zmieniono ręcznie w aplikacji
+            {order.app_status_changed_at ? ` · ${formatDateTime(order.app_status_changed_at)}` : ""}
+          </>
+        ) : (
+          "Status wynika z Allegro. Zmiana tutaj nie zmienia niczego na Allegro."
+        )}
+      </p>
+    </div>
+  );
+}
 
 interface ZamowieniaScreenProps {
   focusOrderId: string | null;
@@ -296,7 +423,7 @@ function OrderDetail({
           {order.buyer_login}
         </h3>
         <div className="mt-2 flex items-center gap-2">
-          <Pill tone={displayFulfillmentTone(order)}>{displayFulfillmentLabel(order)}</Pill>
+          <AppStatusPill order={order} />
           <span className="o-mono text-[10px] text-text-3">
             czeka {formatAge(order.order_date)}
           </span>
@@ -341,6 +468,7 @@ function OrderDetail({
           <Fact label="Wartość" value={formatCurrency(itemsTotal)} />
           <Fact label="Złożone" value={formatDateTime(order.order_date)} />
           <Fact label="Kanał" value={order.marketplace} />
+          <Fact label="Etap na Allegro" value={displayFulfillmentLabel(order)} />
           <Fact
             label="Przesyłka"
             value={
@@ -352,6 +480,8 @@ function OrderDetail({
             }
           />
         </div>
+
+        <AppStatusPanel order={order} />
 
         <ProgressBar order={order} />
 
@@ -513,6 +643,46 @@ export function ZamowieniaScreen({ focusOrderId, onFocusHandled }: ZamowieniaScr
     },
   });
 
+  // "Ustaw status" dla zaznaczonych - zmiana statusu z poziomu listy.
+  const [statusMenu, setStatusMenu] = React.useState(false);
+  const bulkStatusMutation = useMutation({
+    mutationFn: async (status: AppStatus) => {
+      const failures: string[] = [];
+      for (const externalId of checked) {
+        try {
+          await saveAppStatus(externalId, status);
+        } catch {
+          failures.push(externalId);
+        }
+      }
+      return { status, total: checked.size, failures };
+    },
+    onSuccess: ({ status, total, failures }) => {
+      setStatusMenu(false);
+      setChecked(new Set());
+      void queryClient.invalidateQueries({ queryKey: ["orders"] });
+      void queryClient.invalidateQueries({ queryKey: ["dashboard"] });
+      if (failures.length === 0) {
+        toast.success(
+          `Status: ${APP_STATUS_LABEL[status]}`,
+          `${formatPlural(total, ["zamówienie", "zamówienia", "zamówień"])} · zmiana tylko w ORDLY`
+        );
+      } else {
+        toast.error(
+          `${failures.length} z ${total} nie przeszło`,
+          "Odśwież listę i spróbuj ponownie."
+        );
+      }
+    },
+    onError: (error) => {
+      setStatusMenu(false);
+      toast.error(
+        "Nie udało się zmienić statusu",
+        error instanceof Error ? error.message : "Spróbuj ponownie za chwilę."
+      );
+    },
+  });
+
   function toggleChecked(id: string) {
     setChecked((prev) => {
       const next = new Set(prev);
@@ -523,13 +693,14 @@ export function ZamowieniaScreen({ focusOrderId, onFocusHandled }: ZamowieniaScr
   }
 
   function exportCsv() {
-    const header = "numer;kanal;kupujacy;kwota;status;data";
+    const header = "numer;kanal;kupujacy;kwota;status;etap_allegro;data";
     const rows = visible.map((order) =>
       [
         order.external_id,
         order.marketplace,
         order.buyer_login,
         toAmount(order.total_amount).toFixed(2).replace(".", ","),
+        appStatusLabel(order) + (isManualStatus(order) ? " (ręcznie)" : ""),
         displayFulfillmentLabel(order),
         order.order_date,
       ].join(";")
@@ -676,9 +847,7 @@ export function ZamowieniaScreen({ focusOrderId, onFocusHandled }: ZamowieniaScr
                   <span className="o-mono truncate text-[10.5px] text-text-3">
                     {order.external_id.slice(0, 8).toUpperCase()}
                   </span>
-                  <Pill tone={displayFulfillmentTone(order)}>
-                    {displayFulfillmentLabel(order)}
-                  </Pill>
+                  <AppStatusPill order={order} />
                   <span className="o-mono whitespace-nowrap text-right text-[11.5px] text-text-2">
                     {formatCurrency(order.total_amount)}
                   </span>
@@ -712,8 +881,39 @@ export function ZamowieniaScreen({ focusOrderId, onFocusHandled }: ZamowieniaScr
               >
                 Wyczyść
               </button>
+              <div className="relative ml-auto">
+                <MiniButton
+                  icon={<PencilIcon size={12} />}
+                  onClick={() => setStatusMenu((open) => !open)}
+                  disabled={bulkStatusMutation.isPending}
+                  aria-haspopup="menu"
+                  aria-expanded={statusMenu}
+                >
+                  {bulkStatusMutation.isPending ? "Zapisuję…" : "Ustaw status"}
+                </MiniButton>
+                {statusMenu && (
+                  <div
+                    role="menu"
+                    className="absolute bottom-full right-0 z-20 mb-1.5 flex min-w-[160px] flex-col rounded-md border border-line bg-panel py-1 shadow-lg"
+                  >
+                    {APP_STATUSES.map((status) => (
+                      <button
+                        key={status}
+                        role="menuitem"
+                        onClick={() => bulkStatusMutation.mutate(status)}
+                        className="px-3 py-1.5 text-left text-[11.5px] text-text-2 transition-colors hover:bg-panel-2 hover:text-text"
+                      >
+                        {APP_STATUS_LABEL[status]}
+                      </button>
+                    ))}
+                    <p className="border-t border-line px-3 pb-1 pt-1.5 text-[10px] text-text-3">
+                      Zmiana tylko w ORDLY, nie na Allegro.
+                    </p>
+                  </div>
+                )}
+              </div>
               <Button
-                className="ml-auto !px-3 !py-1.5 !text-[11.5px]"
+                className="!px-3 !py-1.5 !text-[11.5px]"
                 onClick={() => setBulkConfirm(true)}
                 disabled={bulkMutation.isPending}
                 icon={<CheckIcon size={13} />}

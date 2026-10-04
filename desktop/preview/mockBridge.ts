@@ -11,7 +11,9 @@
  */
 import type { OrdlyBridge } from "../src/renderer/src/types/ordly-bridge";
 import type {
+  AppStatus,
   Order,
+  OrderStatusChange,
   Wholesaler,
   WholesalerTemplate,
   WholesalerTemplateInput,
@@ -22,6 +24,8 @@ const ok = <T,>(data: T) => Promise.resolve({ ok: true as const, data });
 function hoursAgo(hours: number): string {
   return new Date(Date.now() - hours * 3_600_000).toISOString();
 }
+
+const MOCK_HISTORY: OrderStatusChange[] = [];
 
 const ORDERS: Order[] = [
   {
@@ -292,7 +296,8 @@ export function installMockBridge(): void {
       history: () => ok([]),
     },
     orders: {
-      list: () => ok(ORDERS),
+      // Kopie - podglad zmienia statusy w miejscu, a react-query porownuje dane.
+      list: () => ok(ORDERS.map((order) => ({ ...order }))),
       search: () => ok(ORDERS),
       get: (externalId: string) =>
         ok(ORDERS.find((order) => order.external_id === externalId) ?? ORDERS[0]),
@@ -305,6 +310,33 @@ export function installMockBridge(): void {
           status: "IN_TRANSIT",
         }),
       setFulfillment: () => ok(ORDERS[0]),
+      setAppStatus: (externalId: string, status: AppStatus | null) => {
+        const index = ORDERS.findIndex((order) => order.external_id === externalId);
+        const current = ORDERS[Math.max(index, 0)];
+        const label = status
+          ? { NEW: "Nowe", IN_PROGRESS: "W realizacji", DONE: "Zrealizowane", CANCELLED: "Anulowane" }[
+              status
+            ]
+          : "Nowe";
+        const updated: Order = {
+          ...current,
+          app_status: status ?? "NEW",
+          app_status_label: label,
+          app_status_manual: status !== null,
+          app_status_changed_at: status ? new Date().toISOString() : null,
+        };
+        if (index >= 0) ORDERS[index] = updated;
+        MOCK_HISTORY.unshift({
+          previous_status: current.app_status ?? "NEW",
+          previous_label: current.app_status_label ?? "Nowe",
+          new_status: updated.app_status ?? null,
+          new_label: label,
+          source: status ? "manual" : "restore_allegro",
+          changed_at: new Date().toISOString(),
+        });
+        return ok(updated);
+      },
+      appStatusHistory: () => ok(MOCK_HISTORY),
       sync: () =>
         ok({
           new_orders_count: 2,

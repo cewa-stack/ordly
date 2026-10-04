@@ -29,6 +29,10 @@ const ordly = {
     tracking: (externalId: string) => ipcRenderer.invoke("ordly:orders:tracking", externalId),
     setFulfillment: (externalId: string, status: string) =>
       ipcRenderer.invoke("ordly:orders:setFulfillment", externalId, status),
+    setAppStatus: (externalId: string, status: string | null) =>
+      ipcRenderer.invoke("ordly:orders:setAppStatus", externalId, status),
+    appStatusHistory: (externalId: string) =>
+      ipcRenderer.invoke("ordly:orders:appStatusHistory", externalId),
     sync: () => ipcRenderer.invoke("ordly:orders:sync"),
   },
   returns: {

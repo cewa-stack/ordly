@@ -62,6 +62,33 @@ export function registerOrdersIpc(): void {
       })
   );
 
+  // Status aplikacyjny - zmiana TYLKO w ORDLY, nic nie idzie do Allegro.
+  // `status: null` = "Przywroc status z Allegro".
+  ipcMain.handle(
+    "ordly:orders:setAppStatus",
+    async (_event, externalId: string, status: string | null) =>
+      toResult(async () => {
+        const session = requireSession();
+        return apiRequest(
+          session.baseUrl,
+          session.token,
+          `/api/v1/orders/${encodeURIComponent(externalId)}/app-status`,
+          { method: "POST", body: { status } }
+        );
+      })
+  );
+
+  ipcMain.handle("ordly:orders:appStatusHistory", async (_event, externalId: string) =>
+    toResult(async () => {
+      const session = requireSession();
+      return apiRequest(
+        session.baseUrl,
+        session.token,
+        `/api/v1/orders/${encodeURIComponent(externalId)}/app-status/history`
+      );
+    })
+  );
+
   ipcMain.handle("ordly:orders:sync", async () =>
     toResult(async () => {
       const session = requireSession();
