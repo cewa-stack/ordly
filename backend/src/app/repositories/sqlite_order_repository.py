@@ -10,6 +10,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from app.database.models.order_model import OrderModel
+from app.database.models.order_status_change_model import OrderStatusChangeModel
 from app.database.models.product_model import ProductModel
 from app.database.models.shipment_model import ShipmentModel
 from app.domain.entities.customer import Customer
@@ -23,6 +24,13 @@ from app.domain.fulfillment import (
     REFRESHABLE_FULFILLMENT_STATUSES,
 )
 from app.domain.interfaces.order_repository import OrderRepository
+from app.domain.order_status import (
+    OPEN_APP_STATUSES,
+    OrderStatusChange,
+    order_awaits_shipment,
+    order_needs_new_reminder,
+    order_requires_packing,
+)
 from app.utils.time import utc_now
 
 _CANCELLED_STATUS = "CANCELLED"
@@ -41,6 +49,17 @@ def _open_without_waybill(fulfillment_statuses: frozenset[str]) -> ColumnElement
         func.upper(OrderModel.fulfillment_status).in_(list(fulfillment_statuses)),
         ShipmentModel.tracking_number.is_(None),
     )
+
+
+def _or_manually_open(rule: ColumnElement[bool]) -> ColumnElement[bool]:
+    """
+    Kandydaci do reguł z uwzględnieniem statusu aplikacyjnego
+    (app/domain/order_status.py): dotychczasowa reguła SQL ALBO zamówienie
+    ręcznie oznaczone jako Nowe / W realizacji. Ostateczną decyzję podejmuje
+    reguła domenowa w Pythonie - ręcznie zamknięte zamówienia odpadają tam,
+    a SQL tylko zawęża zbiór, żeby nie czytać całej tabeli.
+    """
+    return or_(rule, OrderModel.app_status.in_(list(OPEN_APP_STATUSES)))
 
 
 class SqliteOrderRepository(OrderRepository):
@@ -152,7 +171,9 @@ class SqliteOrderRepository(OrderRepository):
             .order_by(OrderModel.order_date.desc())
         )
         result = await self._session.execute(stmt)
-        return [self._to_domain(m) for m in result.scalars().all()]
+        orders = [self._to_domain(m) for m in result.scalars().all()]
+        # Ręcznie zamknięte w aplikacji (Zrealizowane / Anulowane) odpadają.
+        return [order for order in orders if order_awaits_shipment(order)]
 
     async def get_new_status(self) -> list[Order]:
         """
@@ -170,13 +191,18 @@ class SqliteOrderRepository(OrderRepository):
                 # Podzbiór `requires_packing`: tylko nietknięte (NEW).
                 # Wykryty numer przesyłki = paczka nadana, nawet gdy
                 # Allegro zostawiło etap NEW - tak samo jak w aplikacjach.
-                _open_without_waybill(PACKING_FULFILLMENT_STATUSES),
-                func.upper(OrderModel.fulfillment_status) == FULFILLMENT_NEW,
+                _or_manually_open(
+                    and_(
+                        _open_without_waybill(PACKING_FULFILLMENT_STATUSES),
+                        func.upper(OrderModel.fulfillment_status) == FULFILLMENT_NEW,
+                    )
+                ),
             )
             .order_by(OrderModel.order_date.desc())
         )
         result = await self._session.execute(stmt)
-        return [self._to_domain(m) for m in result.scalars().all()]
+        orders = [self._to_domain(m) for m in result.scalars().all()]
+        return [order for order in orders if order_needs_new_reminder(order)]
 
     async def get_active(self, limit: int) -> list[Order]:
         """
@@ -190,12 +216,14 @@ class SqliteOrderRepository(OrderRepository):
             select(OrderModel)
             .options(selectinload(OrderModel.products), selectinload(OrderModel.shipment))
             .outerjoin(ShipmentModel, ShipmentModel.order_id == OrderModel.id)
-            .where(_open_without_waybill(PACKING_FULFILLMENT_STATUSES))
+            .where(_or_manually_open(_open_without_waybill(PACKING_FULFILLMENT_STATUSES)))
             .order_by(OrderModel.order_date.desc())
-            .limit(limit)
         )
         result = await self._session.execute(stmt)
-        return [self._to_domain(m) for m in result.scalars().all()]
+        orders = [self._to_domain(m) for m in result.scalars().all()]
+        # Limit PO regule domenowej - inaczej ręcznie zamknięte zamówienia
+        # zajmowałyby miejsca w limicie i wypychały aktywne.
+        return [order for order in orders if order_requires_packing(order)][:limit]
 
     async def get_open_for_refresh(self, marketplace: str, limit: int) -> list[Order]:
         """Zamówienia do potwierdzenia u źródła - patrz OrderRepository."""
@@ -321,6 +349,66 @@ class SqliteOrderRepository(OrderRepository):
         await self._session.execute(stmt)
         await self._session.flush()
 
+    async def set_app_status(
+        self,
+        marketplace: str,
+        external_id: str,
+        app_status: str | None,
+        basis: str | None,
+        changed_at: datetime | None,
+    ) -> None:
+        """Zapisuje ręczny status aplikacyjny (None = powrót do statusu z Allegro)."""
+        stmt = (
+            update(OrderModel)
+            .where(
+                OrderModel.marketplace == marketplace,
+                OrderModel.external_id == external_id,
+            )
+            .values(
+                app_status=app_status,
+                app_status_basis=basis,
+                app_status_changed_at=changed_at,
+            )
+        )
+        await self._session.execute(stmt)
+        await self._session.flush()
+
+    async def record_app_status_change(self, change: OrderStatusChange) -> None:
+        """Dopisuje wpis do historii zmian statusu aplikacyjnego."""
+        self._session.add(
+            OrderStatusChangeModel(
+                marketplace=change.marketplace,
+                order_external_id=change.order_external_id,
+                previous_status=change.previous_status,
+                new_status=change.new_status,
+                source=change.source,
+                changed_at=change.changed_at,
+            )
+        )
+        await self._session.flush()
+
+    async def get_app_status_history(self, external_id: str) -> list[OrderStatusChange]:
+        """Historia zmian statusu aplikacyjnego zamówienia, od najnowszej."""
+        stmt = (
+            select(OrderStatusChangeModel)
+            .where(OrderStatusChangeModel.order_external_id == external_id)
+            .order_by(
+                OrderStatusChangeModel.changed_at.desc(), OrderStatusChangeModel.id.desc()
+            )
+        )
+        result = await self._session.execute(stmt)
+        return [
+            OrderStatusChange(
+                marketplace=m.marketplace,
+                order_external_id=m.order_external_id,
+                previous_status=m.previous_status,
+                new_status=m.new_status,
+                source=m.source,
+                changed_at=m.changed_at,
+            )
+            for m in result.scalars().all()
+        ]
+
     async def mark_as_notified(self, marketplace: str, external_id: str) -> None:
         """Ustawia znacznik czasu wysłania powiadomienia dla danego zamówienia."""
         stmt = (
@@ -360,4 +448,7 @@ class SqliteOrderRepository(OrderRepository):
             order_date=model.order_date,
             fulfillment_status=model.fulfillment_status,
             tracking_number=model.shipment.tracking_number if model.shipment else None,
+            app_status=model.app_status,
+            app_status_basis=model.app_status_basis,
+            app_status_changed_at=model.app_status_changed_at,
         )

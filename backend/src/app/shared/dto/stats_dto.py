@@ -41,6 +41,10 @@ class SyncResult:
     new_returns: tuple[OrderReturn, ...] = field(default=())
     packing_started_orders: tuple[Order, ...] = field(default=())
     return_status_changes: tuple[ReturnStatusChange, ...] = field(default=())
+    #: Numery zamówień z `cancelled_orders`, które użytkownik zamknął już
+    #: ręcznie w aplikacji (Zrealizowane / Anulowane) - anulowanie z Allegro
+    #: jest dla nich zapisywane, ale bez powiadomienia.
+    muted_cancellations: frozenset[str] = field(default=frozenset())
 
 
 @dataclass(frozen=True, slots=True)

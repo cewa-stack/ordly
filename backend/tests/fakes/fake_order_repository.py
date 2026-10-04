@@ -6,13 +6,14 @@ from dataclasses import replace
 from datetime import datetime
 
 from app.domain.entities.order import Order
-from app.domain.fulfillment import (
-    FULFILLMENT_NEW,
-    REFRESHABLE_FULFILLMENT_STATUSES,
-    awaits_shipment,
-    requires_packing,
-)
+from app.domain.fulfillment import REFRESHABLE_FULFILLMENT_STATUSES
 from app.domain.interfaces.order_repository import OrderRepository
+from app.domain.order_status import (
+    OrderStatusChange,
+    order_awaits_shipment,
+    order_needs_new_reminder,
+    order_requires_packing,
+)
 
 
 class FakeOrderRepository(OrderRepository):
@@ -26,6 +27,7 @@ class FakeOrderRepository(OrderRepository):
     def __init__(self) -> None:
         self._orders: list[Order] = []
         self._notified: set[tuple[str, str]] = set()
+        self.app_status_history: list[OrderStatusChange] = []
 
     async def exists(self, marketplace: str, external_id: str) -> bool:
         return any(
@@ -46,26 +48,16 @@ class FakeOrderRepository(OrderRepository):
         unshipped = [
             o
             for o in self._orders
-            if o.order_date >= since
-            and awaits_shipment(o.status, o.fulfillment_status, o.tracking_number)
+            if o.order_date >= since and order_awaits_shipment(o)
         ]
         return sorted(unshipped, key=lambda o: o.order_date, reverse=True)
 
     async def get_new_status(self) -> list[Order]:
-        new_status = [
-            o
-            for o in self._orders
-            if requires_packing(o.status, o.fulfillment_status, o.tracking_number)
-            and (o.fulfillment_status or "").upper() == FULFILLMENT_NEW
-        ]
+        new_status = [o for o in self._orders if order_needs_new_reminder(o)]
         return sorted(new_status, key=lambda o: o.order_date, reverse=True)
 
     async def get_active(self, limit: int) -> list[Order]:
-        active = [
-            o
-            for o in self._orders
-            if requires_packing(o.status, o.fulfillment_status, o.tracking_number)
-        ]
+        active = [o for o in self._orders if order_requires_packing(o)]
         return sorted(active, key=lambda o: o.order_date, reverse=True)[:limit]
 
     async def get_open_for_refresh(self, marketplace: str, limit: int) -> list[Order]:
@@ -140,6 +132,36 @@ class FakeOrderRepository(OrderRepository):
                 else o
             )
             for o in self._orders
+        ]
+
+    async def set_app_status(
+        self,
+        marketplace: str,
+        external_id: str,
+        app_status: str | None,
+        basis: str | None,
+        changed_at: datetime | None,
+    ) -> None:
+        self._orders = [
+            (
+                replace(
+                    o,
+                    app_status=app_status,
+                    app_status_basis=basis,
+                    app_status_changed_at=changed_at,
+                )
+                if o.marketplace == marketplace and o.external_id == external_id
+                else o
+            )
+            for o in self._orders
+        ]
+
+    async def record_app_status_change(self, change: OrderStatusChange) -> None:
+        self.app_status_history.append(change)
+
+    async def get_app_status_history(self, external_id: str) -> list[OrderStatusChange]:
+        return [
+            c for c in reversed(self.app_status_history) if c.order_external_id == external_id
         ]
 
     async def mark_as_notified(self, marketplace: str, external_id: str) -> None:

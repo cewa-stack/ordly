@@ -17,11 +17,14 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.dependencies import get_container, get_session
 from app.api.schemas import (
+    AppStatusIn,
     FulfillmentStatusIn,
     OrderOut,
+    OrderStatusChangeOut,
     ShipmentOut,
     SyncResultOut,
     order_out,
+    order_status_change_out,
     shipment_out,
     sync_result_out,
 )
@@ -113,6 +116,39 @@ async def set_order_fulfillment(
         orders_service = container.orders_service(session)
         order = await orders_service.set_fulfillment_status(external_id, payload.status)
     return order_out(order)
+
+
+@router.post("/orders/{external_id}/app-status", response_model=OrderOut)
+async def set_order_app_status(
+    container: Annotated[Container, Depends(get_container)],
+    external_id: str,
+    payload: AppStatusIn,
+) -> OrderOut:
+    """
+    Ustawia ręczny status aplikacyjny zamówienia (Nowe / W realizacji /
+    Zrealizowane / Anulowane) albo - dla `status: null` - przywraca status
+    wynikający z Allegro.
+
+    Zmiana dotyczy WYŁĄCZNIE ORDLY: nic nie jest wysyłane do Allegro.
+    Własny zakres sesji, żeby zapis był zatwierdzony przed odpowiedzią.
+    """
+    async with container.session_scope() as session:
+        service = container.order_status_service(session)
+        order = await service.set_app_status(external_id, payload.status)
+    return order_out(order)
+
+
+@router.get(
+    "/orders/{external_id}/app-status/history", response_model=list[OrderStatusChangeOut]
+)
+async def get_order_app_status_history(
+    container: Annotated[Container, Depends(get_container)],
+    session: Annotated[AsyncSession, Depends(get_session)],
+    external_id: str,
+) -> list[OrderStatusChangeOut]:
+    """Historia ręcznych zmian statusu aplikacyjnego, od najnowszej."""
+    service = container.order_status_service(session)
+    return [order_status_change_out(c) for c in await service.history(external_id)]
 
 
 @router.get("/orders/{external_id}/tracking", response_model=ShipmentOut)

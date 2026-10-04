@@ -36,6 +36,14 @@ class Order:
     przesyłki". Nie jest zapisywane w bazie: służy synchronizacji jako
     sygnał, że Allegro przypisało numer (np. automatycznie po wygenerowaniu
     etykiety) i trzeba go dociągnąć od razu, a nie czekać na osobny job.
+
+    `app_status` to status ustawiony RĘCZNIE w aplikacji (Nowe / W realizacji
+    / Zrealizowane / Anulowane), niezależny od Allegro; None = brak ręcznej
+    zmiany. `app_status_basis` to status aplikacyjny wynikający z Allegro
+    w chwili ręcznej zmiany - z niego reguła priorytetu poznaje, czy Allegro
+    od tego czasu coś zmieniło. Status widoczny dla użytkownika liczy
+    `app.domain.order_status.effective_app_status`. Synchronizacja z
+    marketplace nigdy tych pól nie ustawia (zamówienie z Allegro ma None).
     """
 
     external_id: str
@@ -49,6 +57,9 @@ class Order:
     fulfillment_status: str | None = None
     tracking_number: str | None = None
     line_items_sent: str | None = None
+    app_status: str | None = None
+    app_status_basis: str | None = None
+    app_status_changed_at: datetime | None = None
     products_summary: str = field(init=False)
 
     def __post_init__(self) -> None:

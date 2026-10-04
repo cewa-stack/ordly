@@ -47,6 +47,7 @@ from app.domain.interfaces.marketplace_plugin import MarketplacePlugin
 from app.domain.interfaces.order_repository import OrderRepository
 from app.domain.interfaces.return_repository import ReturnRepository
 from app.domain.interfaces.shipment_repository import ShipmentRepository
+from app.domain.order_status import is_closed_in_app
 from app.domain.returns import (
     RETURN_CHANGE_SOURCE_ALLEGRO,
     UNKNOWN_RETURN_STATUS,
@@ -77,6 +78,9 @@ class _ExistingOrderChange:
 
     cancelled: bool = False
     packing_started: bool = False
+    #: Zamówienie było już ręcznie zamknięte w aplikacji - zmiany z Allegro
+    #: są zapisywane, ale nie wywołują powiadomień ani SMS-a.
+    muted: bool = False
 
 
 class SyncOrdersService:
@@ -135,6 +139,7 @@ class SyncOrdersService:
 
         new_orders: list[Order] = []
         cancelled_orders: list[Order] = []
+        muted_cancellations: set[str] = set()
         packing_started_orders: list[Order] = []
         for order in orders:
             already_exists = await self._order_repository.exists(
@@ -144,6 +149,8 @@ class SyncOrdersService:
                 change = await self._sync_existing_order_status(order)
                 if change.cancelled:
                     cancelled_orders.append(order)
+                    if change.muted:
+                        muted_cancellations.add(order.external_id)
                 if change.packing_started:
                     packing_started_orders.append(order)
                 await self._capture_reported_waybill(order)
@@ -166,6 +173,8 @@ class SyncOrdersService:
         for refreshed, change in await self._refresh_orders_outside_window(fetched_ids):
             if change.cancelled:
                 cancelled_orders.append(refreshed)
+                if change.muted:
+                    muted_cancellations.add(refreshed.external_id)
             if change.packing_started:
                 packing_started_orders.append(refreshed)
 
@@ -179,6 +188,7 @@ class SyncOrdersService:
             new_returns=tuple(new_returns),
             packing_started_orders=tuple(packing_started_orders),
             return_status_changes=tuple(return_changes),
+            muted_cancellations=frozenset(muted_cancellations),
         )
 
     async def _sync_existing_order_status(self, order: Order) -> _ExistingOrderChange:
@@ -189,6 +199,13 @@ class SyncOrdersService:
         wykrywa anulowanie) oraz etap realizacji (`fulfillment_status`,
         wykrywa rozpoczęcie pakowania). Oba są utrwalane osobno.
 
+        Status aplikacyjny ustawiony ręcznie NIGDY nie jest tu zapisywany -
+        synchronizacja zmienia wyłącznie dane z Allegro, a o tym, co widzi
+        użytkownik, decyduje reguła priorytetu (app/domain/order_status.py).
+        Zamówienie ręcznie zamknięte w aplikacji (Zrealizowane / Anulowane)
+        nie generuje już powiadomień: anulowanie z Allegro jest oznaczane
+        jako wyciszone, a SMS o pakowaniu nie wychodzi.
+
         Returns:
             Flagi mówiące, czy zamówienie właśnie zostało anulowane
             oraz czy właśnie weszło w etap pakowania.
@@ -196,6 +213,7 @@ class SyncOrdersService:
         stored = await self._order_repository.get_by_external_id(order.external_id)
         if stored is None:
             return _ExistingOrderChange()
+        muted = is_closed_in_app(stored)
 
         # Niepełna odpowiedź marketplace (brak `status` albo brak
         # `fulfillment.status`) nie jest informacją o zmianie - nie może
@@ -235,7 +253,16 @@ class SyncOrdersService:
                 stored.fulfillment_status, order.fulfillment_status
             )
 
-        return _ExistingOrderChange(cancelled=cancelled, packing_started=packing_started)
+        if muted and packing_started:
+            logger.info(
+                "Zamówienie {} zamknięte ręcznie w aplikacji - SMS o pakowaniu pominięty",
+                order.external_id,
+            )
+        return _ExistingOrderChange(
+            cancelled=cancelled,
+            packing_started=packing_started and not muted,
+            muted=muted,
+        )
 
     async def _capture_reported_waybill(self, order: Order) -> None:
         """
@@ -507,7 +534,13 @@ class SyncOrdersService:
             await self._event_bus.publish(OrderCreated(occurred_at=utc_now(), order=order))
 
         for order in result.cancelled_orders:
-            await self._event_bus.publish(OrderCancelled(occurred_at=utc_now(), order=order))
+            await self._event_bus.publish(
+                OrderCancelled(
+                    occurred_at=utc_now(),
+                    order=order,
+                    notify=order.external_id not in result.muted_cancellations,
+                )
+            )
 
         for order in result.packing_started_orders:
             await self._event_bus.publish(

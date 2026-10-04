@@ -22,9 +22,15 @@ from app.api.schemas import order_out
 from app.domain.entities.order import Order
 from app.domain.entities.shipment import Shipment
 from app.domain.fulfillment import awaits_shipment, requires_packing
+from app.domain.order_status import (
+    order_awaits_shipment,
+    order_needs_new_reminder,
+    order_requires_packing,
+)
 from app.repositories.sqlite_order_repository import SqliteOrderRepository
 from app.repositories.sqlite_shipment_repository import SqliteShipmentRepository
 from app.services.attention_service import is_pending_packing
+from app.services.order_status_service import OrderStatusService
 from app.services.shipping_reminder_service import ShippingReminderService
 
 _STATUSES = ("READY_FOR_PROCESSING", "CANCELLED")
@@ -118,6 +124,48 @@ class TestJednaRegula:
         assert _ids(await repository.get_unshipped_since(datetime(2000, 1, 1))) == (
             expected_shipment
         )
+
+    @pytest.mark.asyncio
+    async def test_reczny_status_sql_i_regula_domenowa_licza_tak_samo(
+        self, in_memory_session, sample_order
+    ):
+        """
+        Status aplikacyjny (app/domain/order_status.py): dla każdej kombinacji
+        danych Allegro i każdego ręcznego statusu baza, bot, API i plakietka
+        mówią to samo - także po kolejnym ruchu Allegro.
+        """
+        seeded = await _seed(in_memory_session, sample_order)
+        repository = SqliteOrderRepository(in_memory_session)
+        service = OrderStatusService(repository)
+        manual_cycle = (None, "NEW", "IN_PROGRESS", "DONE", "CANCELLED")
+        for index, order in enumerate(seeded):
+            manual = manual_cycle[index % len(manual_cycle)]
+            if manual is not None:
+                await service.set_app_status(order.external_id, manual)
+        # Allegro rusza połowę zamówień do przodu po ręcznej zmianie.
+        for order in seeded[::2]:
+            await repository.update_fulfillment_status(order.marketplace, order.external_id, "SENT")
+        await in_memory_session.commit()
+
+        stored = await repository.get_recent(limit=500)
+        expected_packing = {o.external_id for o in stored if order_requires_packing(o)}
+        expected_new = {o.external_id for o in stored if order_needs_new_reminder(o)}
+        expected_shipment = {o.external_id for o in stored if order_awaits_shipment(o)}
+
+        assert {o.external_id for o in stored if order_out(o).requires_packing} == (
+            expected_packing
+        )
+        assert {o.external_id for o in stored if is_pending_packing(o)} == expected_packing
+        assert _ids(await repository.get_active(500)) == expected_packing
+        assert _ids(await repository.get_new_status()) == expected_new
+        assert _ids(await repository.get_unshipped_since(datetime(2000, 1, 1))) == (
+            expected_shipment
+        )
+        # Ręcznie zamknięte nigdy nie wracają do nieobsłużonych.
+        for order in stored:
+            if order.app_status in ("DONE", "CANCELLED"):
+                assert order.external_id not in expected_packing
+                assert order.external_id not in expected_new
 
     def test_regula_w_punktach(self):
         # Czeka na spakowanie tylko NEW/PROCESSING bez numeru, nieanulowane.

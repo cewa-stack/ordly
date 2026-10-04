@@ -41,9 +41,16 @@ class OrderUpdated(DomainEvent):
 
 @dataclass(frozen=True, slots=True)
 class OrderCancelled(DomainEvent):
-    """Emitowane, gdy status znanego zamówienia zmienił się na anulowane."""
+    """
+    Emitowane, gdy status znanego zamówienia zmienił się na anulowane.
+
+    `notify=False`, gdy użytkownik zamknął już zamówienie ręcznie
+    w aplikacji (Zrealizowane / Anulowane) - zdarzenie trafia do audytu,
+    ale bez powiadomienia (app/domain/order_status.py).
+    """
 
     order: Order
+    notify: bool = True
 
 
 @dataclass(frozen=True, slots=True)

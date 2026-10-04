@@ -11,6 +11,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.bot.formatting import header
 from app.container import Container
 from app.domain.exceptions.domain_exceptions import OrderNotFoundError
+from app.domain.order_status import app_status_display
 
 router = Router(name="orders")
 
@@ -33,7 +34,7 @@ async def handle_orders(message: Message, container: Container, session: AsyncSe
             f"🛒 <code>{html.quote(order.external_id)}</code>\n"
             f"   👤 {html.quote(order.buyer.login)}\n"
             f"   💰 {order.total_amount} {order.currency}\n"
-            f"   📌 {html.quote(order.status)}"
+            f"   📌 {html.quote(app_status_display(order))}"
         )
     await message.answer("\n\n".join(blocks))
 
@@ -68,7 +69,7 @@ async def handle_order_detail(
         f"{header('📦', f'ZAMÓWIENIE {html.quote(order.external_id)}')}\n\n"
         f"👤 Kupujący: {html.quote(order.buyer.login)}\n"
         f"💰 Kwota: {order.total_amount} {order.currency}\n"
-        f"📌 Status: {html.quote(order.status)}\n"
+        f"📌 Status: {html.quote(app_status_display(order))}\n"
         f"📅 Data: {order.order_date.strftime('%Y-%m-%d %H:%M')}\n\n"
         f"🛍 <b>Produkty:</b>\n{products_text}"
     )

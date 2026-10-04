@@ -28,9 +28,9 @@ from datetime import datetime
 from loguru import logger
 
 from app.domain.entities.order import Order
-from app.domain.fulfillment import requires_packing
 from app.domain.interfaces.order_repository import OrderRepository
 from app.domain.interfaces.return_repository import ReturnRepository
+from app.domain.order_status import order_requires_packing
 from app.domain.returns import return_requires_action
 from app.services.issues_service import IssuesService
 
@@ -46,7 +46,7 @@ def is_pending_packing(order: Order) -> bool:
     wynik gotowy w polu `requires_packing` z `GET /orders`, więc nie
     liczą niczego po swojemu.
     """
-    return requires_packing(order.status, order.fulfillment_status, order.tracking_number)
+    return order_requires_packing(order)
 
 
 @dataclass(frozen=True, slots=True)

@@ -11,6 +11,7 @@ from app.database.models.mail_message_model import MailMessageModel
 from app.database.models.marketplace_offer_model import MarketplaceOfferModel
 from app.database.models.offer_stock_movement_model import OfferStockMovementModel
 from app.database.models.order_model import OrderModel
+from app.database.models.order_status_change_model import OrderStatusChangeModel
 from app.database.models.ordlak_conversation_model import (
     OrdlakConversationModel,
     OrdlakMessageModel,
@@ -33,6 +34,7 @@ __all__ = [
     "OrdlakConversationModel",
     "OrdlakMessageModel",
     "OrderModel",
+    "OrderStatusChangeModel",
     "ProductModel",
     "PushSubscriptionModel",
     "ReplyTemplateModel",

@@ -86,15 +86,24 @@ def register_event_subscriptions(container: Container) -> None:
         order = event.order
         notifier = container.notifier()
 
-        try:
-            await notifier.notify_order_cancelled(order)
-            notification_sent = True
-        except Exception:
-            logger.exception(
-                "Nie udało się wysłać powiadomienia o anulowaniu zamówienia {}",
+        notification_sent = False
+        if not event.notify:
+            # Zamówienie zamknięte już ręcznie w aplikacji (Zrealizowane /
+            # Anulowane) - po takiej zmianie nie wysyłamy kolejnych
+            # powiadomień o nim (app/domain/order_status.py).
+            logger.info(
+                "Anulowanie zamówienia {} bez powiadomienia - zamknięte ręcznie w aplikacji",
                 order.external_id,
             )
-            notification_sent = False
+        else:
+            try:
+                await notifier.notify_order_cancelled(order)
+                notification_sent = True
+            except Exception:
+                logger.exception(
+                    "Nie udało się wysłać powiadomienia o anulowaniu zamówienia {}",
+                    order.external_id,
+                )
 
         async with container.session_scope() as session:
             event_repository = SqliteEventRepository(session)
@@ -105,6 +114,7 @@ def register_event_subscriptions(container: Container) -> None:
                     "external_id": order.external_id,
                     "amount": str(order.total_amount),
                     "notification_sent": notification_sent,
+                    "muted_by_app_status": not event.notify,
                 },
             )
 

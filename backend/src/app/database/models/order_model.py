@@ -46,6 +46,12 @@ class OrderModel(Base, TimestampMixin):
     )
     order_date: Mapped[datetime] = mapped_column(nullable=False)
     notified_at: Mapped[datetime | None] = mapped_column(nullable=True, index=True)
+    # Status ustawiony ręcznie w aplikacji (NEW / IN_PROGRESS / DONE /
+    # CANCELLED) - patrz app/domain/order_status.py. Synchronizacja z
+    # marketplace nigdy tych trzech kolumn nie zapisuje.
+    app_status: Mapped[str | None] = mapped_column(String(20), nullable=True, index=True)
+    app_status_basis: Mapped[str | None] = mapped_column(String(20), nullable=True)
+    app_status_changed_at: Mapped[datetime | None] = mapped_column(nullable=True)
     raw_payload_json: Mapped[str | None] = mapped_column(nullable=True)
 
     products: Mapped[list[ProductModel]] = relationship(

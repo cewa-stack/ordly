@@ -23,7 +23,13 @@ from app.domain.entities.order_return import ReturnRecord
 from app.domain.entities.ordlak_conversation import OrdlakConversation
 from app.domain.entities.reply_template import ReplyTemplate
 from app.domain.entities.shipment import Shipment
-from app.domain.fulfillment import requires_packing
+from app.domain.order_status import (
+    OrderStatusChange,
+    app_status_label,
+    effective_app_status,
+    is_manual_in_force,
+    order_requires_packing,
+)
 from app.domain.returns import return_requires_action, return_status_label
 from app.infrastructure.mail.mime import MailBodies, html_to_plain_text
 from app.repositories.sqlite_event_repository import EventRecord
@@ -116,7 +122,17 @@ class OrderOut(BaseModel):
     products: list[OrderProductOut]
     #: Wynik wspólnej reguły `requires_packing` - z tej flagi desktop
     #: i telefon liczą "Do spakowania", zamiast powielać regułę u siebie.
+    #: Uwzględnia status aplikacyjny (app/domain/order_status.py).
     requires_packing: bool
+    #: Status aplikacyjny widoczny dla użytkownika: NEW / IN_PROGRESS /
+    #: DONE / CANCELLED, albo None, gdy Allegro nie potwierdziło etapu.
+    app_status: str | None = None
+    #: "Nowe" / "W realizacji" / "Zrealizowane" / "Anulowane" / "Brak danych".
+    app_status_label: str = "Brak danych"
+    #: True = status ustawiono ręcznie w aplikacji i nadal obowiązuje.
+    app_status_manual: bool = False
+    #: Kiedy ustawiono ręczny status (None = brak ręcznej zmiany).
+    app_status_changed_at: UtcDatetime | None = None
 
 
 def order_out(order: Order) -> OrderOut:
@@ -131,8 +147,12 @@ def order_out(order: Order) -> OrderOut:
         fulfillment_status=order.fulfillment_status,
         tracking_number=order.tracking_number,
         order_date=order.order_date,
-        requires_packing=requires_packing(
-            order.status, order.fulfillment_status, order.tracking_number
+        requires_packing=order_requires_packing(order),
+        app_status=effective_app_status(order),
+        app_status_label=app_status_label(effective_app_status(order)),
+        app_status_manual=is_manual_in_force(order),
+        app_status_changed_at=(
+            order.app_status_changed_at if is_manual_in_force(order) else None
         ),
         products=[
             OrderProductOut(
@@ -178,6 +198,40 @@ class FulfillmentStatusIn(BaseModel):
     """
 
     status: Literal["NEW", "PROCESSING", "READY_FOR_SHIPMENT", "SENT", "PICKED_UP"]
+
+
+class AppStatusIn(BaseModel):
+    """
+    Ciało żądania `POST /api/v1/orders/{id}/app-status`.
+
+    Ręczny status aplikacyjny - niczego nie zmienia na Allegro.
+    `null` = "Przywróć status z Allegro" (usuwa ręczną zmianę).
+    """
+
+    status: Literal["NEW", "IN_PROGRESS", "DONE", "CANCELLED"] | None
+
+
+class OrderStatusChangeOut(BaseModel):
+    """Wpis historii statusu aplikacyjnego (`GET /orders/{id}/app-status/history`)."""
+
+    previous_status: str | None
+    previous_label: str
+    new_status: str | None
+    new_label: str
+    source: str
+    changed_at: UtcDatetime
+
+
+def order_status_change_out(change: OrderStatusChange) -> OrderStatusChangeOut:
+    """Mapuje wpis historii statusu na schemat odpowiedzi API."""
+    return OrderStatusChangeOut(
+        previous_status=change.previous_status,
+        previous_label=app_status_label(change.previous_status),
+        new_status=change.new_status,
+        new_label=app_status_label(change.new_status),
+        source=change.source,
+        changed_at=change.changed_at,
+    )
 
 
 class SyncResultOut(BaseModel):

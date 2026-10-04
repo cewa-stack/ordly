@@ -56,6 +56,7 @@ from app.services.issues_service import IssuesService
 from app.services.mail_service import MailService
 from app.services.mailbox_service import MailboxService
 from app.services.offer_catalog_service import OfferCatalogService
+from app.services.order_status_service import OrderStatusService
 from app.services.ordlak_assistant_service import OrdlakAssistantService
 from app.services.returns_service import ReturnsService
 from app.services.search_service import SearchService
@@ -131,6 +132,10 @@ class Container:
             return_repository,
             shipment_repository=SqliteShipmentRepository(session),
         )
+
+    def order_status_service(self, session: AsyncSession) -> OrderStatusService:
+        """Buduje OrderStatusService - ręczny status aplikacyjny zamówienia."""
+        return OrderStatusService(SqliteOrderRepository(session))
 
     def sync_orders_service(self, session: AsyncSession) -> SyncOrdersService:
         """Alias semantyczny używany przez komendę /sync i scheduler."""

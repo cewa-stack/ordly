@@ -6,6 +6,7 @@ from abc import ABC, abstractmethod
 from datetime import datetime
 
 from app.domain.entities.order import Order
+from app.domain.order_status import OrderStatusChange
 
 
 class OrderRepository(ABC):
@@ -166,6 +167,34 @@ class OrderRepository(ABC):
         Wywoływane przez synchronizację, gdy Allegro zwróci inny etap
         realizacji niż zapisany w bazie (np. NEW -> PROCESSING -> SENT).
         """
+        raise NotImplementedError
+
+    @abstractmethod
+    async def set_app_status(
+        self,
+        marketplace: str,
+        external_id: str,
+        app_status: str | None,
+        basis: str | None,
+        changed_at: datetime | None,
+    ) -> None:
+        """
+        Zapisuje ręczny status aplikacyjny zamówienia.
+
+        Wywoływane WYŁĄCZNIE przez ręczną zmianę w aplikacji
+        (OrderStatusService) - nigdy przez synchronizację. `app_status=None`
+        przywraca status wynikający z Allegro.
+        """
+        raise NotImplementedError
+
+    @abstractmethod
+    async def record_app_status_change(self, change: OrderStatusChange) -> None:
+        """Dopisuje wpis do historii zmian statusu aplikacyjnego."""
+        raise NotImplementedError
+
+    @abstractmethod
+    async def get_app_status_history(self, external_id: str) -> list[OrderStatusChange]:
+        """Zwraca historię zmian statusu aplikacyjnego zamówienia, od najnowszej."""
         raise NotImplementedError
 
     @abstractmethod
