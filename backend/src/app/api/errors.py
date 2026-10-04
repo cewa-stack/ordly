@@ -11,6 +11,7 @@ from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
 
 from app.domain.exceptions.domain_exceptions import (
+    CustomerCaseNotFoundError,
     DomainError,
     DuplicateOrderError,
     DuplicateReturnError,
@@ -24,7 +25,12 @@ from app.domain.exceptions.domain_exceptions import (
     ShipmentNotAvailableError,
 )
 
-_NOT_FOUND = (OrderNotFoundError, OfferNotFoundError, MailMessageNotFoundError)
+_NOT_FOUND = (
+    OrderNotFoundError,
+    OfferNotFoundError,
+    MailMessageNotFoundError,
+    CustomerCaseNotFoundError,
+)
 _CONFLICT = (DuplicateOrderError, DuplicateReturnError)
 _UNAVAILABLE = (
     MarketplaceUnavailableError,

@@ -29,7 +29,10 @@ from app.api.schemas import (
     sync_result_out,
 )
 from app.container import Container
+from app.core.event_bus.events import OrderAppStatusChanged
 from app.domain.exceptions.domain_exceptions import MarketplaceUnavailableError
+from app.domain.order_status import effective_app_status
+from app.utils.time import utc_now
 
 router = APIRouter()
 
@@ -134,7 +137,18 @@ async def set_order_app_status(
     """
     async with container.session_scope() as session:
         service = container.order_status_service(session)
+        previous = effective_app_status(await service.get(external_id))
         order = await service.set_app_status(external_id, payload.status)
+    # Zdarzenie PO zatwierdzeniu zapisu - subskrybenci (audyt, rejestr
+    # anulowań) piszą we własnych sesjach.
+    await container.event_bus.publish(
+        OrderAppStatusChanged(
+            occurred_at=utc_now(),
+            order=order,
+            previous_status=previous,
+            new_status=effective_app_status(order),
+        )
+    )
     return order_out(order)
 
 

@@ -19,6 +19,8 @@ from fastapi.testclient import TestClient
 from app.api.dependencies import get_container, get_session
 from app.api.endpoints import orders as orders_endpoints
 from app.api.errors import register_exception_handlers
+from app.core.event_bus.bus import EventBus
+from app.core.event_bus.events import OrderAppStatusChanged
 from app.services.order_status_service import OrderStatusService
 from tests.fakes.fake_order_repository import FakeOrderRepository
 
@@ -26,6 +28,13 @@ from tests.fakes.fake_order_repository import FakeOrderRepository
 class _StubContainer:
     def __init__(self, repository: FakeOrderRepository) -> None:
         self.repository = repository
+        self.event_bus = EventBus()
+        self.events: list[object] = []
+
+        async def capture(event) -> None:
+            self.events.append(event)
+
+        self.event_bus.subscribe(OrderAppStatusChanged, capture)
 
     @asynccontextmanager
     async def session_scope(self) -> AsyncIterator[None]:
@@ -84,6 +93,16 @@ class TestRecznyStatus:
         assert [h["source"] for h in history] == ["restore_allegro", "manual"]
         assert history[1]["previous_label"] == "Nowe"
         assert history[1]["new_label"] == "W realizacji"
+
+    def test_zmiana_publikuje_zdarzenie_po_zapisie(self, client: TestClient, sample_order):
+        container = client.app.dependency_overrides[get_container]()
+        client.post(
+            f"/api/v1/orders/{sample_order.external_id}/app-status",
+            json={"status": "CANCELLED"},
+        )
+        assert [(e.previous_status, e.new_status) for e in container.events] == [
+            ("NEW", "CANCELLED")
+        ]
 
     def test_status_spoza_listy_to_422(self, client: TestClient, sample_order):
         response = client.post(

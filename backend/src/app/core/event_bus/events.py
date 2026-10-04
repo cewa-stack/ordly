@@ -172,3 +172,26 @@ class SyncFinished(DomainEvent):
 
     new_orders_count: int
     checked_orders_count: int
+
+
+@dataclass(frozen=True, slots=True)
+class ReturnRefunded(DomainEvent):
+    """
+    Emitowane, gdy zwrot klienta wszedł w status "pieniądze oddane"
+    (albo został pierwszy raz zobaczony już w takim statusie) - wyzwalacz
+    zapisu w rejestrze anulowań i zwrotów (app/domain/customer_cases.py).
+    """
+
+    order_return: OrderReturn
+
+
+@dataclass(frozen=True, slots=True)
+class OrderAppStatusChanged(DomainEvent):
+    """
+    Emitowane po RĘCZNEJ zmianie statusu aplikacyjnego zamówienia
+    (po zatwierdzeniu zapisu). `new_status` = status widoczny po zmianie.
+    """
+
+    order: Order
+    previous_status: str | None
+    new_status: str | None

@@ -82,6 +82,23 @@ RETURN_STATUS_LABELS: dict[str, str] = {
 }
 
 
+#: Statusy, w których pieniądze zostały już oddane kupującemu (zwrot
+#: pieniędzy) - z nich rejestr anulowań i zwrotów zapisuje "zwrot pieniędzy".
+REFUNDED_RETURN_STATUSES = frozenset(
+    {
+        RETURN_FINISHED,
+        RETURN_FINISHED_APT,
+        RETURN_COMMISSION_REFUND_CLAIMED,
+        RETURN_COMMISSION_REFUNDED,
+    }
+)
+
+
+def is_refunded_return_status(status: str | None) -> bool:
+    """Czy w tym statusie zwrotu pieniądze zostały już oddane."""
+    return (status or "").upper() in REFUNDED_RETURN_STATUSES
+
+
 def is_closed_return_status(status: str | None) -> bool:
     """Czy status zwrotu oznacza sprawę zakończoną."""
     return (status or "").upper() in CLOSED_RETURN_STATUSES

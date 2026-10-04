@@ -120,3 +120,11 @@ class MailMessageNotFoundError(DomainError):
             f"Wiadomości {message_id} nie ma już w skrzynce - mogła zostać "
             "usunięta lub przeniesiona poza INBOX"
         )
+
+
+class CustomerCaseNotFoundError(DomainError):
+    """Rekord rejestru anulowań i zwrotów o podanym identyfikatorze nie istnieje."""
+
+    def __init__(self, case_id: int) -> None:
+        self.case_id = case_id
+        super().__init__(f"Rekord anulowania/zwrotu {case_id} nie istnieje")

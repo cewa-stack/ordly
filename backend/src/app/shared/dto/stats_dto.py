@@ -45,6 +45,8 @@ class SyncResult:
     #: ręcznie w aplikacji (Zrealizowane / Anulowane) - anulowanie z Allegro
     #: jest dla nich zapisywane, ale bez powiadomienia.
     muted_cancellations: frozenset[str] = field(default=frozenset())
+    #: Zwroty, w których właśnie oddano pieniądze (rejestr anulowań i zwrotów).
+    refunded_returns: tuple[OrderReturn, ...] = field(default=())
 
 
 @dataclass(frozen=True, slots=True)

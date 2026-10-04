@@ -26,6 +26,7 @@ from app.core.event_bus.events import (
     OrderCreated,
     OrderPackingStarted,
     OrderReturnCreated,
+    ReturnRefunded,
     ReturnStatusChanged,
     SyncFinished,
     SyncStarted,
@@ -52,6 +53,7 @@ from app.domain.returns import (
     RETURN_CHANGE_SOURCE_ALLEGRO,
     UNKNOWN_RETURN_STATUS,
     ReturnStatusChange,
+    is_refunded_return_status,
     is_reopening,
     return_requires_action,
 )
@@ -70,6 +72,13 @@ _CANCELLED_STATUS = "CANCELLED"
 _MAX_OUT_OF_WINDOW_REFRESHES = 25
 _REFRESH_CANDIDATES_LIMIT = 200
 _HTTP_NOT_FOUND = 404
+
+
+def _became_refunded(change: ReturnStatusChange) -> bool:
+    """Zmiana statusu zwrotu, w której pieniądze właśnie zostały oddane."""
+    return is_refunded_return_status(change.new_status) and not is_refunded_return_status(
+        change.previous_status
+    )
 
 
 @dataclass(frozen=True, slots=True)
@@ -178,7 +187,7 @@ class SyncOrdersService:
             if change.packing_started:
                 packing_started_orders.append(refreshed)
 
-        new_returns, return_changes = await self._sync_customer_returns()
+        new_returns, return_changes, refunded_returns = await self._sync_customer_returns()
 
         return SyncResult(
             new_orders_count=len(new_orders),
@@ -189,6 +198,7 @@ class SyncOrdersService:
             packing_started_orders=tuple(packing_started_orders),
             return_status_changes=tuple(return_changes),
             muted_cancellations=frozenset(muted_cancellations),
+            refunded_returns=tuple(refunded_returns),
         )
 
     async def _sync_existing_order_status(self, order: Order) -> _ExistingOrderChange:
@@ -381,7 +391,7 @@ class SyncOrdersService:
 
     async def _sync_customer_returns(
         self,
-    ) -> tuple[list[OrderReturn], list[ReturnStatusChange]]:
+    ) -> tuple[list[OrderReturn], list[ReturnStatusChange], list[OrderReturn]]:
         """
         Pobiera zwroty klientów z marketplace i zapisuje nowe.
 
@@ -390,7 +400,7 @@ class SyncOrdersService:
         następnym cyklu (zasada odporności projektu).
         """
         if self._return_repository is None:
-            return [], []
+            return [], [], []
 
         try:
             returns = await self._plugin.get_customer_returns()
@@ -399,10 +409,11 @@ class SyncOrdersService:
                 "Nie udało się pobrać zwrotów klientów - pominięto w tym cyklu: {}",
                 exc,
             )
-            return [], []
+            return [], [], []
 
         new_returns: list[OrderReturn] = []
         changes: list[ReturnStatusChange] = []
+        refunded: list[OrderReturn] = []
         for order_return in returns:
             stored_status = await self._return_repository.get_status(
                 order_return.marketplace, order_return.external_id
@@ -411,6 +422,8 @@ class SyncOrdersService:
                 change = await self._sync_return_status(order_return, stored_status)
                 if change is not None:
                     changes.append(change)
+                    if _became_refunded(change):
+                        refunded.append(order_return)
                 continue
 
             try:
@@ -433,11 +446,17 @@ class SyncOrdersService:
             # nie może przyjść jako "Nowy zwrot" do obsługi.
             if await self._return_requires_action(order_return):
                 new_returns.append(order_return)
+            # Zwrot zobaczony pierwszy raz już po oddaniu pieniędzy też
+            # trafia do rejestru anulowań i zwrotów.
+            if is_refunded_return_status(order_return.status):
+                refunded.append(order_return)
 
-        changes.extend(
-            await self._refresh_returns_outside_window({r.external_id for r in returns})
+        outside_changes, outside_refunded = await self._refresh_returns_outside_window(
+            {r.external_id for r in returns}
         )
-        return new_returns, changes
+        changes.extend(outside_changes)
+        refunded.extend(outside_refunded)
+        return new_returns, changes, refunded
 
     async def _return_requires_action(self, order_return: OrderReturn) -> bool:
         order = await self._order_repository.get_by_external_id(order_return.order_external_id)
@@ -490,7 +509,7 @@ class SyncOrdersService:
 
     async def _refresh_returns_outside_window(
         self, fetched_ids: set[str]
-    ) -> list[ReturnStatusChange]:
+    ) -> tuple[list[ReturnStatusChange], list[OrderReturn]]:
         """
         Dopytuje o otwarte zwroty, których nie było w pobranej liście.
 
@@ -505,6 +524,7 @@ class SyncOrdersService:
         )
         stale = [r for r in candidates if r.external_id not in fetched_ids]
         changes: list[ReturnStatusChange] = []
+        refunded: list[OrderReturn] = []
         for record in stale[:_MAX_OUT_OF_WINDOW_REFRESHES]:
             try:
                 fresh = await self._plugin.get_customer_return(record.external_id)
@@ -519,7 +539,9 @@ class SyncOrdersService:
             change = await self._sync_return_status(fresh, record.status)
             if change is not None:
                 changes.append(change)
-        return changes
+                if _became_refunded(change):
+                    refunded.append(fresh)
+        return changes, refunded
 
     async def publish_sync_events(self, result: SyncResult) -> None:
         """
@@ -555,6 +577,11 @@ class SyncOrdersService:
         for change in result.return_status_changes:
             await self._event_bus.publish(
                 ReturnStatusChanged(occurred_at=change.changed_at, change=change)
+            )
+
+        for order_return in result.refunded_returns:
+            await self._event_bus.publish(
+                ReturnRefunded(occurred_at=utc_now(), order_return=order_return)
             )
 
         await self._event_bus.publish(

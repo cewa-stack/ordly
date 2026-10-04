@@ -20,6 +20,7 @@ from app.api.auth import require_api_token
 from app.api.endpoints import (
     auth,
     backup,
+    customer_cases,
     dashboard,
     health,
     issues,
@@ -57,6 +58,11 @@ mobile_api_router.include_router(
 )
 mobile_api_router.include_router(
     returns.router, tags=["mobile-returns"], dependencies=[Depends(require_api_token)]
+)
+mobile_api_router.include_router(
+    customer_cases.router,
+    tags=["mobile-customer-cases"],
+    dependencies=[Depends(require_api_token)],
 )
 mobile_api_router.include_router(
     issues.router, tags=["mobile-issues"], dependencies=[Depends(require_api_token)]

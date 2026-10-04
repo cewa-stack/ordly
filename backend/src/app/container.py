@@ -27,6 +27,7 @@ from app.infrastructure.plugins.allegro.plugin import AllegroPlugin
 from app.infrastructure.sms.logging_sms_provider import LoggingSmsProvider
 from app.infrastructure.telegram.telegram_notifier import TelegramNotifier
 from app.infrastructure.webpush.web_push_notifier import WebPushNotifier
+from app.repositories.sqlite_customer_case_repository import SqliteCustomerCaseRepository
 from app.repositories.sqlite_event_repository import SqliteEventRepository
 from app.repositories.sqlite_mail_repository import SqliteMailRepository
 from app.repositories.sqlite_offer_catalog_repository import SqliteOfferCatalogRepository
@@ -49,6 +50,7 @@ from app.services.allegro_lokalnie_orders_service import AllegroLokalnieOrdersSe
 from app.services.assistant_actions import AssistantActionExecutor
 from app.services.attention_service import AttentionCounts, AttentionService
 from app.services.backup_service import BackupService
+from app.services.customer_case_service import CustomerCaseService
 from app.services.dashboard_service import DashboardService
 from app.services.events_service import EventsService
 from app.services.health_service import HealthService, SyncStatus
@@ -131,6 +133,12 @@ class Container:
             self.event_bus,
             return_repository,
             shipment_repository=SqliteShipmentRepository(session),
+        )
+
+    def customer_case_service(self, session: AsyncSession) -> CustomerCaseService:
+        """Buduje CustomerCaseService - rejestr anulowań i zwrotów pieniędzy."""
+        return CustomerCaseService(
+            SqliteCustomerCaseRepository(session), SqliteOrderRepository(session)
         )
 
     def order_status_service(self, session: AsyncSession) -> OrderStatusService:

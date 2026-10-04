@@ -16,14 +16,18 @@ from app.core.event_bus.events import (
     DisputeNoticeDetected,
     NotificationSent,
     OlxEventDetected,
+    OrderAppStatusChanged,
     OrderCancelled,
     OrderCreated,
     OrderPackingStarted,
     OrderReturnCreated,
+    ReturnRefunded,
     ReturnStatusChanged,
     SyncFinished,
     SyncStarted,
 )
+from app.domain.customer_cases import SOURCE_ALLEGRO_ORDER, SOURCE_APP_STATUS
+from app.domain.order_status import APP_STATUS_CANCELLED
 from app.repositories.sqlite_event_repository import SqliteEventRepository
 from app.repositories.sqlite_order_repository import SqliteOrderRepository
 from app.utils.time import utc_now
@@ -115,6 +119,61 @@ def register_event_subscriptions(container: Container) -> None:
                     "amount": str(order.total_amount),
                     "notification_sent": notification_sent,
                     "muted_by_app_status": not event.notify,
+                },
+            )
+
+    async def record_cancellation_case(event: OrderCancelled) -> None:
+        """
+        Anulowanie z Allegro -> rejestr anulowań i zwrotów (jeden rekord na
+        zamówienie). Działa także dla anulowań wyciszonych (`notify=False`) -
+        wyciszenie dotyczy powiadomień, nie zapisu.
+        """
+        try:
+            async with container.session_scope() as session:
+                await container.customer_case_service(session).record_cancellation(
+                    event.order, event.occurred_at, SOURCE_ALLEGRO_ORDER
+                )
+        except Exception:
+            logger.exception(
+                "Nie udało się zapisać anulowania {} w rejestrze", event.order.external_id
+            )
+
+    async def record_refund_case(event: ReturnRefunded) -> None:
+        """Zwrot pieniędzy w zwrocie klienta -> rejestr anulowań i zwrotów."""
+        order_return = event.order_return
+        try:
+            async with container.session_scope() as session:
+                await container.customer_case_service(session).record_refund(
+                    order_return, event.occurred_at
+                )
+        except Exception:
+            logger.exception(
+                "Nie udało się zapisać zwrotu pieniędzy dla {} w rejestrze",
+                order_return.order_external_id,
+            )
+
+    async def handle_order_app_status_changed(event: OrderAppStatusChanged) -> None:
+        """
+        Ręczna zmiana statusu aplikacyjnego: audyt, a ręczne "Anulowane" -
+        także rekord w rejestrze anulowań i zwrotów (źródło: status
+        w aplikacji).
+        """
+        order = event.order
+        async with container.session_scope() as session:
+            if (
+                event.new_status == APP_STATUS_CANCELLED
+                and event.previous_status != APP_STATUS_CANCELLED
+            ):
+                await container.customer_case_service(session).record_cancellation(
+                    order, event.occurred_at, SOURCE_APP_STATUS
+                )
+            await SqliteEventRepository(session).record(
+                event_type="OrderAppStatusChanged",
+                level="INFO",
+                payload={
+                    "external_id": order.external_id,
+                    "previous_status": event.previous_status,
+                    "new_status": event.new_status,
                 },
             )
 
@@ -369,6 +428,9 @@ def register_event_subscriptions(container: Container) -> None:
 
     container.event_bus.subscribe(OrderCreated, handle_order_created)
     container.event_bus.subscribe(OrderCancelled, handle_order_cancelled)
+    container.event_bus.subscribe(OrderCancelled, record_cancellation_case)
+    container.event_bus.subscribe(ReturnRefunded, record_refund_case)
+    container.event_bus.subscribe(OrderAppStatusChanged, handle_order_app_status_changed)
     container.event_bus.subscribe(OrderPackingStarted, handle_order_packing_started)
     container.event_bus.subscribe(OrderReturnCreated, handle_order_return_created)
     container.event_bus.subscribe(ReturnStatusChanged, handle_return_status_changed)

@@ -14,6 +14,14 @@ from typing import Annotated, Any, Literal
 
 from pydantic import BaseModel, Field, PlainSerializer, field_validator
 
+from app.domain.customer_cases import (
+    CaseReasonChange,
+    CustomerCase,
+    handling_label,
+    kind_label,
+    reason_label,
+    source_label,
+)
 from app.domain.entities.issue import Issue, IssueMessage
 from app.domain.entities.mail_message import MailMessage
 from app.domain.entities.marketplace_offer import MarketplaceOffer
@@ -287,6 +295,98 @@ def return_out(record: ReturnRecord) -> ReturnOut:
         return_date=record.return_date,
         status_label=return_status_label(record.status),
         requires_action=return_requires_action(record.status, record.order_status),
+    )
+
+
+# --------------------------------------------------------------------------
+# Rejestr anulowań i zwrotów pieniędzy
+# --------------------------------------------------------------------------
+
+
+class CustomerCaseOut(BaseModel):
+    """
+    Rekord `GET /api/v1/customer-cases`. Puste pole = "nieuzupełnione".
+    Bez telefonu, e-maila i imienia i nazwiska (decyzja D7).
+    """
+
+    id: int
+    marketplace: str
+    order_external_id: str
+    allegro_order_id: str | None
+    kind: str
+    kind_label: str
+    buyer_login: str | None
+    order_date: UtcDatetime | None
+    cancelled_at: UtcDatetime | None
+    refunded_at: UtcDatetime | None
+    reason: str | None
+    reason_label: str
+    #: Kod powodu z Allegro (np. kod powodu zwrotu), jeśli był.
+    reason_detail: str | None
+    handling_status: str
+    handling_label: str
+    source: str
+    source_label: str
+    created_at: UtcDatetime
+    updated_at: UtcDatetime
+
+
+def customer_case_out(case: CustomerCase) -> CustomerCaseOut:
+    """Mapuje rekord rejestru na schemat odpowiedzi API."""
+    assert case.id is not None and case.created_at and case.updated_at
+    return CustomerCaseOut(
+        id=case.id,
+        marketplace=case.marketplace,
+        order_external_id=case.order_external_id,
+        allegro_order_id=case.allegro_order_id,
+        kind=case.kind,
+        kind_label=kind_label(case.kind),
+        buyer_login=case.buyer_login,
+        order_date=case.order_date,
+        cancelled_at=case.cancelled_at,
+        refunded_at=case.refunded_at,
+        reason=case.reason,
+        reason_label=reason_label(case.reason),
+        reason_detail=case.reason_detail,
+        handling_status=case.handling_status,
+        handling_label=handling_label(case.handling_status),
+        source=case.source,
+        source_label=source_label(case.source),
+        created_at=case.created_at,
+        updated_at=case.updated_at,
+    )
+
+
+class CustomerCaseUpdateIn(BaseModel):
+    """
+    Ciało `PATCH /api/v1/customer-cases/{id}`. Pominięte pole = bez zmian;
+    `"reason": null` = powód "nieuzupełnione".
+    """
+
+    reason: Literal["OUT_OF_STOCK", "PAYMENT_PROBLEM", "BUYER_RESIGNED", "OTHER"] | None = None
+    handling_status: Literal["REPORTED", "IN_PROGRESS", "DONE"] | None = None
+
+
+class CaseReasonChangeOut(BaseModel):
+    """Wpis historii powodu (`GET /customer-cases/{id}/reason-history`)."""
+
+    previous_reason: str | None
+    previous_label: str
+    new_reason: str | None
+    new_label: str
+    #: "allegro" albo "manual".
+    source: str
+    changed_at: UtcDatetime
+
+
+def case_reason_change_out(change: CaseReasonChange) -> CaseReasonChangeOut:
+    return CaseReasonChangeOut(
+        previous_reason=change.previous_reason,
+        previous_label=reason_label(change.previous_reason),
+        new_reason=change.new_reason,
+        new_label=reason_label(change.new_reason),
+        source=change.source,
+        changed_at=change.changed_at,
     )
 
 

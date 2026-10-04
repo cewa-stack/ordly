@@ -6,6 +6,10 @@ zostanie tu zaimportowany, Alembic go nie "zobaczy" i nie
 wygeneruje dla niego migracji, mimo że dziedziczy po Base.
 """
 
+from app.database.models.customer_case_model import (
+    CustomerCaseModel,
+    CustomerCaseReasonChangeModel,
+)
 from app.database.models.event_model import EventModel
 from app.database.models.mail_message_model import MailMessageModel
 from app.database.models.marketplace_offer_model import MarketplaceOfferModel
@@ -27,6 +31,8 @@ from app.database.models.telegram_message_model import TelegramMessageModel
 from app.database.models.token_model import TokenModel
 
 __all__ = [
+    "CustomerCaseModel",
+    "CustomerCaseReasonChangeModel",
     "EventModel",
     "MailMessageModel",
     "MarketplaceOfferModel",

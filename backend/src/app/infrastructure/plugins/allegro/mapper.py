@@ -102,7 +102,23 @@ def map_customer_return_to_domain(raw: dict[str, Any]) -> OrderReturn:
         products=products,
         status=raw.get("status", "UNKNOWN"),
         created_at=_parse_datetime(raw.get("createdAt")),
+        reason_type=_first_return_reason(raw),
     )
+
+
+def _first_return_reason(raw: dict[str, Any]) -> str | None:
+    """
+    Kod powodu zwrotu (`items[].reason.type`) - pierwszy podany.
+
+    Komentarz kupującego (`reason.userComment`) celowo pomijamy: to wolny
+    tekst, w którym bywają dane osobowe, a rejestr ich nie przechowuje.
+    """
+    for item in raw.get("items") or []:
+        reason = (item or {}).get("reason") or {}
+        reason_type = reason.get("type")
+        if reason_type:
+            return str(reason_type)
+    return None
 
 
 def map_issue_to_domain(raw: dict[str, Any]) -> Issue:

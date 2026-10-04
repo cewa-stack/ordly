@@ -27,6 +27,10 @@ class OrderReturn:
     status: str
     created_at: datetime
     products_summary: str = field(init=False)
+    #: Kod powodu zwrotu podany przez kupującego (`items[].reason.type`
+    #: w Allegro), None = brak. Trafia do rejestru anulowań i zwrotów
+    #: (app/domain/customer_cases.py); nie jest zapisywany w tabeli zwrotów.
+    reason_type: str | None = None
 
     def __post_init__(self) -> None:
         """Wylicza czytelne podsumowanie zwracanych produktów do powiadomień."""

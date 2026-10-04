@@ -87,6 +87,13 @@ class OrderStatusService:
         )
         return updated
 
+    async def get(self, external_id: str) -> Order:
+        """Zamówienie po numerze albo OrderNotFoundError."""
+        order = await self._orders.get_by_external_id(external_id)
+        if order is None:
+            raise OrderNotFoundError(external_id)
+        return order
+
     async def history(self, external_id: str) -> list[OrderStatusChange]:
         """Historia zmian statusu aplikacyjnego zamówienia, od najnowszej."""
         if await self._orders.get_by_external_id(external_id) is None:
