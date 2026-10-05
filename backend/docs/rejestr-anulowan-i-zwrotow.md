@@ -1,6 +1,6 @@
 # Rejestr anulowań i zwrotów pieniędzy
 
-Jeden rekord na zamówienie (kanał i numer zamówienia), w którym zamówienie anulowano albo oddano pieniądze. Kod: `app/domain/customer_cases.py`, tabela `customer_cases` (migracja 0015).
+Jeden rekord na zamówienie (kanał i numer zamówienia), w którym zamówienie anulowano albo oddano pieniądze. Kod: `app/domain/customer_cases.py`, tabela `customer_cases` (migracja 0016).
 
 ## Co jest zapisywane
 
