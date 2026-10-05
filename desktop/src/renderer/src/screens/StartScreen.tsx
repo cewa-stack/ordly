@@ -342,7 +342,11 @@ export function StartScreen({ onNavigate, onAsk, username }: StartScreenProps) {
       className="flex min-h-0 flex-1 flex-col gap-3 overflow-hidden px-[22px] pb-[18px] pt-4"
     >
       {/* ---------------------------------------------- karta powitalna */}
-      <section className="relative flex h-[204px] shrink-0 items-center gap-5 overflow-hidden rounded-xl border border-line bg-panel px-6 py-4">
+      {/* Wysokosc to MINIMUM, nie sztywna wartosc: tresc karty (naglowek,
+          dwie linie zdania, mikrostatystyki, przyciski) ma ok. 200 px, wiec
+          przy stalych 204 px i py-4 wychodzila poza karte, a overflow-hidden
+          ucinal ja rowno z krawedzia - przyciski stykaly sie z obwodka. */}
+      <section className="relative flex min-h-[204px] shrink-0 items-center gap-5 overflow-hidden rounded-xl border border-line bg-panel px-6 py-5">
         <SyncSweep phase={phase} />
         {/* Jedno zrodlo swiatla na karcie - bez zmywu na cala powierzchnie. */}
         <span
