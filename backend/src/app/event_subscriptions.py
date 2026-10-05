@@ -380,3 +380,51 @@ def register_event_subscriptions(container: Container) -> None:
     container.event_bus.subscribe(DisputeNoticeDetected, handle_dispute_notice)
 
     logger.info("Zarejestrowano subskrybentów Event Busa")
+
+
+def register_hub_subscriptions(container: Container) -> None:
+    """
+    Podpina ORDLy Control Hub pod te same zdarzenia, które dostają
+    Telegram i telefon - jako osobni subskrybenci, więc awaria brokera
+    MQTT nie zatrzyma powiadomień ani zapisu w audycie.
+
+    Bez hasła MQTT w `.env` (`container.hub_events is None`) nic nie robi.
+    """
+    hub = container.hub_events
+    if hub is None:
+        logger.info("Control Hub: MQTT nie jest skonfigurowane - most wyłączony")
+        return
+
+    async def on_order_created(event: OrderCreated) -> None:
+        await hub.on_order_created(event.order)
+        # Nowe zamówienie zmienia statystyki dnia - Hub ma je od razu, nie za minutę.
+        await hub.publish_stats()
+
+    async def on_order_closed(event: OrderCancelled | OrderPackingStarted) -> None:
+        await hub.on_order_closed(event.order)
+
+    async def on_return_created(event: OrderReturnCreated) -> None:
+        await hub.on_return_created(event.order_return)
+
+    async def on_return_status_changed(event: ReturnStatusChanged) -> None:
+        await hub.on_return_status_changed(event.change)
+
+    async def on_dispute(event: DisputeNoticeDetected) -> None:
+        await hub.on_dispute(event.notice)
+
+    async def on_allegro_lokalnie(event: AllegroLokalnieEventDetected) -> None:
+        await hub.on_allegro_lokalnie(event.event)
+
+    async def on_olx(event: OlxEventDetected) -> None:
+        await hub.on_olx(event.event)
+
+    bus = container.event_bus
+    bus.subscribe(OrderCreated, on_order_created)  # type: ignore[arg-type]
+    bus.subscribe(OrderCancelled, on_order_closed)  # type: ignore[arg-type]
+    bus.subscribe(OrderPackingStarted, on_order_closed)  # type: ignore[arg-type]
+    bus.subscribe(OrderReturnCreated, on_return_created)  # type: ignore[arg-type]
+    bus.subscribe(ReturnStatusChanged, on_return_status_changed)  # type: ignore[arg-type]
+    bus.subscribe(DisputeNoticeDetected, on_dispute)  # type: ignore[arg-type]
+    bus.subscribe(AllegroLokalnieEventDetected, on_allegro_lokalnie)  # type: ignore[arg-type]
+    bus.subscribe(OlxEventDetected, on_olx)  # type: ignore[arg-type]
+    logger.info("Control Hub: zarejestrowano subskrybentów zdarzeń")
