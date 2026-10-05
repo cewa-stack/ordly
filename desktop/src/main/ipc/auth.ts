@@ -2,6 +2,7 @@ import { ipcMain } from "electron";
 import { apiRequest } from "../lib/apiClient";
 import { clearSession, getSession, saveSession } from "../lib/tokenStore";
 import { toResult } from "../lib/result";
+import { pushWholesaleCatalogToPi } from "./wholesalers";
 
 interface LoginResponse {
   token: string;
@@ -35,6 +36,8 @@ export function registerAuthIpc(): void {
           body: { username, password },
         });
         saveSession({ baseUrl, username, token });
+        // Hub (Zamow w hurtowni) potrzebuje kopii hurtowni na Pi.
+        void pushWholesaleCatalogToPi();
         return { baseUrl, username };
       })
   );

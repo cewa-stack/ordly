@@ -274,6 +274,10 @@ export interface WholesalerOrderRecord {
   sentAt: string;
   subject: string;
   itemsSummary: string;
+  /** "hub" = wyslane z ORDLy Control Hub. */
+  source?: "hub";
+  /** Wyslane z Huba w trybie testowym - mail poszedl do nadawcy, nie do hurtowni. */
+  testMode?: boolean;
 }
 
 export interface StatsSummary {

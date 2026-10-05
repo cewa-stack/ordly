@@ -6,7 +6,7 @@ import { registerStockIpc } from "./ipc/stock";
 import { registerOrdersIpc } from "./ipc/orders";
 import { registerReturnsIpc } from "./ipc/returns";
 import { registerIssuesIpc } from "./ipc/issues";
-import { registerWholesalersIpc } from "./ipc/wholesalers";
+import { pushWholesaleCatalogToPi, registerWholesalersIpc } from "./ipc/wholesalers";
 import { registerMailboxIpc } from "./ipc/mailbox";
 import { registerOlxIpc } from "./ipc/olx";
 import { registerStatsIpc } from "./ipc/stats";
@@ -142,6 +142,9 @@ app.whenReady().then(() => {
   registerOrdlakIpc();
   registerReplyTemplatesIpc();
   createWindow();
+  // Kopia hurtowni dla ORDLy Control Hub - zmiany zrobione, gdy Pi bylo
+  // niedostepne, docieraja przy nastepnym starcie.
+  void pushWholesaleCatalogToPi();
 
   app.on("activate", () => {
     if (BrowserWindow.getAllWindows().length === 0) {

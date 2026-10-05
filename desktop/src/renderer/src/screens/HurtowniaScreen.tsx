@@ -318,6 +318,18 @@ export function HurtowniaScreen() {
               {record.wholesalerName}
             </span>
             <span className="min-w-0 flex-1 truncate text-text-2">{record.itemsSummary}</span>
+            {record.source === "hub" && (
+              <span
+                className="o-mono shrink-0 rounded-sm border border-line px-1.5 py-0.5 text-[10px] text-text-3"
+                title={
+                  record.testMode
+                    ? "Wysłane z Control Huba w trybie testowym - mail poszedł do Ciebie, nie do hurtowni"
+                    : "Wysłane z Control Huba"
+                }
+              >
+                {record.testMode ? "Hub · test" : "Hub"}
+              </span>
+            )}
           </div>
         ))}
       </div>

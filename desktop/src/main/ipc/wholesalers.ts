@@ -1,9 +1,10 @@
 import { ipcMain } from "electron";
 import { apiRequest } from "../lib/apiClient";
-import { requireSession } from "../lib/tokenStore";
+import { getSession, requireSession } from "../lib/tokenStore";
 import { toResult } from "../lib/result";
 import {
   type Wholesaler,
+  type WholesalerOrderRecord,
   type WholesalerTemplate,
   appendOrderHistory,
   deleteWholesaler,
@@ -15,6 +16,65 @@ import {
   saveWholesalerTemplate,
   setDefaultWholesalerTemplate,
 } from "../lib/wholesalerStore";
+
+interface HubWholesaleOrder {
+  request_id: string;
+  wholesaler_id: string;
+  wholesaler_name: string;
+  sent_at: string;
+  subject: string;
+  items_summary: string;
+  test_mode: boolean;
+}
+
+/**
+ * Kopia hurtowni i szablonow na Pi - z niej korzysta ekran "Zamow w hurtowni"
+ * na ORDLy Control Hub (Hub rozmawia tylko z Pi). Wysylana po kazdej zmianie
+ * i przy starcie. Blad (brak sesji, Pi niedostepne) nie psuje zapisu na
+ * komputerze - kolejna zmiana albo start aplikacji wysle kopie jeszcze raz.
+ */
+export async function pushWholesaleCatalogToPi(): Promise<void> {
+  const session = getSession();
+  if (!session) return;
+  try {
+    await apiRequest(session.baseUrl, session.token, "/api/v1/hub/wholesale/catalog", {
+      method: "PUT",
+      body: { wholesalers: listWholesalers(), templates: listWholesalerTemplates() },
+    });
+  } catch (error) {
+    console.warn("Kopia hurtowni na Pi nie wyszla:", error);
+  }
+}
+
+function afterChange<T>(result: T): T {
+  void pushWholesaleCatalogToPi();
+  return result;
+}
+
+/** Zamowienia wyslane z Huba - do wspolnej historii. Bez Pi: pusta lista. */
+async function hubOrderHistory(): Promise<WholesalerOrderRecord[]> {
+  const session = getSession();
+  if (!session) return [];
+  try {
+    const orders = await apiRequest<HubWholesaleOrder[]>(
+      session.baseUrl,
+      session.token,
+      "/api/v1/hub/wholesale/orders?limit=50"
+    );
+    return orders.map((order) => ({
+      id: `hub:${order.request_id}`,
+      wholesalerId: order.wholesaler_id,
+      wholesalerName: order.wholesaler_name,
+      sentAt: order.sent_at,
+      subject: order.subject,
+      itemsSummary: order.items_summary,
+      source: "hub",
+      testMode: order.test_mode,
+    }));
+  } catch {
+    return [];
+  }
+}
 
 interface SendOrderPayload {
   wholesalerId: string;
@@ -30,29 +90,34 @@ export function registerWholesalersIpc(): void {
 
   ipcMain.handle(
     "ordly:wholesalers:save",
-    (_event, input: Omit<Wholesaler, "id"> & { id?: string }) => saveWholesaler(input)
+    (_event, input: Omit<Wholesaler, "id"> & { id?: string }) =>
+      afterChange(saveWholesaler(input))
   );
 
   ipcMain.handle("ordly:wholesalers:delete", (_event, id: string) => {
-    deleteWholesaler(id);
+    afterChange(deleteWholesaler(id));
   });
 
-  ipcMain.handle("ordly:wholesalers:history", () => listOrderHistory());
+  ipcMain.handle("ordly:wholesalers:history", async () =>
+    [...listOrderHistory(), ...(await hubOrderHistory())].sort(
+      (a, b) => new Date(b.sentAt).getTime() - new Date(a.sentAt).getTime()
+    )
+  );
 
   ipcMain.handle("ordly:wholesalers:templates", () => listWholesalerTemplates());
 
   ipcMain.handle(
     "ordly:wholesalers:saveTemplate",
     (_event, input: Omit<WholesalerTemplate, "id" | "isDefault"> & { id?: string }) =>
-      saveWholesalerTemplate(input)
+      afterChange(saveWholesalerTemplate(input))
   );
 
   ipcMain.handle("ordly:wholesalers:setDefaultTemplate", (_event, id: string) => {
-    setDefaultWholesalerTemplate(id);
+    afterChange(setDefaultWholesalerTemplate(id));
   });
 
   ipcMain.handle("ordly:wholesalers:deleteTemplate", (_event, id: string) => {
-    deleteWholesalerTemplate(id);
+    afterChange(deleteWholesalerTemplate(id));
   });
 
   ipcMain.handle("ordly:wholesalers:sendOrder", async (_event, payload: SendOrderPayload) =>

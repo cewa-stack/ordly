@@ -45,6 +45,10 @@ export interface WholesalerOrderRecord {
   sentAt: string;
   subject: string;
   itemsSummary: string;
+  /** "hub" = wyslane z ORDLy Control Hub (zapis na Pi, nie w tym pliku). */
+  source?: "hub";
+  /** Wyslane z Huba w trybie testowym (mail poszedl do nadawcy, nie do hurtowni). */
+  testMode?: boolean;
 }
 
 function wholesalersFilePath(): string {
