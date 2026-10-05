@@ -392,6 +392,38 @@ class OrdlakSettings(BaseSettings):
         return bool(self.api_key.get_secret_value())
 
 
+class HubMqttSettings(BaseSettings):
+    """
+    Połączenie z brokerem MQTT (Mosquitto na tym samym Raspberry Pi), przez
+    który ORDLY rozmawia z ORDLy Control Hub - konsolą powiadomień na ESP32.
+
+    Backend loguje się jako użytkownik `ordly` założony w etapie 3 budowy
+    Huba. Puste hasło = most do Huba wyłączony: ORDLY działa jak dotąd,
+    bez prób łączenia się z brokerem.
+    """
+
+    model_config = SettingsConfigDict(
+        env_file=".env",
+        env_file_encoding="utf-8",
+        extra="ignore",
+    )
+
+    host: str = Field(default="localhost", alias="MQTT_HOST")
+    port: int = Field(default=1883, alias="MQTT_PORT")
+    user: str = Field(default="ordly", alias="MQTT_USER")
+    password: SecretStr = Field(default=SecretStr(""), alias="MQTT_PASSWORD")
+    # Co ile sekund ORDLY wysyła Hubowi statystyki dnia i stan systemu
+    # (z godziną - z niej Hub bierze zegar do trybu nocnego).
+    publish_interval_seconds: int = Field(
+        default=60, alias="HUB_PUBLISH_INTERVAL_SECONDS", ge=15
+    )
+
+    @property
+    def enabled(self) -> bool:
+        """Most do Huba działa tylko z ustawionym hasłem MQTT."""
+        return bool(self.password.get_secret_value())
+
+
 class LoggingSettings(BaseSettings):
     """Konfiguracja logowania (Loguru)."""
 
@@ -438,6 +470,7 @@ class Settings:
         self.smtp = SmtpSettings()
         self.mail_watch = MailWatchSettings()
         self.ordlak = OrdlakSettings()
+        self.hub_mqtt = HubMqttSettings()
 
 
 @lru_cache

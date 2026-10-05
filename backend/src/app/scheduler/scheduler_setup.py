@@ -184,3 +184,30 @@ def register_telegram_cleanup_job(
         misfire_grace_time=1800,
     )
     logger.info("Zarejestrowano codzienny job czyszczenia czatu Telegram (02:00)")
+
+
+def register_hub_job(
+    scheduler: AsyncIOScheduler,
+    job_coroutine: Callable[[], Awaitable[None]],
+    interval_seconds: int,
+) -> None:
+    """
+    Rejestruje cykliczną wysyłkę do ORDLy Control Hub: stan systemu
+    z godziną (zegar Huba), statystyki dnia, problemy z systemem
+    i zamykanie zdarzeń, których sprawa zmieniła się w ORDLY.
+
+    Args:
+        scheduler: Instancja schedulera zwrócona przez create_scheduler().
+        job_coroutine: Bezargumentowa korutyna do wywołania cyklicznie.
+        interval_seconds: Odstęp w sekundach (domyślnie 60).
+    """
+    scheduler.add_job(
+        job_coroutine,
+        trigger="interval",
+        seconds=interval_seconds,
+        id="control_hub_job",
+        max_instances=1,
+        coalesce=True,
+        misfire_grace_time=30,
+    )
+    logger.info("Zarejestrowano job Control Huba co {}s", interval_seconds)
