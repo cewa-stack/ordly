@@ -417,6 +417,9 @@ class HubMqttSettings(BaseSettings):
     publish_interval_seconds: int = Field(
         default=60, alias="HUB_PUBLISH_INTERVAL_SECONDS", ge=15
     )
+    # Ekran "Zamów w hurtowni" na Hubie: dopóki True, mail z Huba idzie na
+    # adres nadawcy SMTP (z dopiskiem, do kogo poszedłby), a nie do hurtowni.
+    wholesale_test_mode: bool = Field(default=True, alias="HUB_WHOLESALE_TEST_MODE")
 
     @property
     def enabled(self) -> bool:

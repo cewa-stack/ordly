@@ -980,3 +980,71 @@ def event_out(event: EventRecord) -> EventOut:
     return EventOut(
         event_type=event.event_type, level=event.level, created_at=event.created_at
     )
+
+
+# --------------------------------------------------------------------------
+# Control Hub - hurtownie (kopia z desktopu)
+# --------------------------------------------------------------------------
+
+
+class HubWholesaleItemIn(BaseModel):
+    """Pozycja hurtowni - jak w `wholesalers.json` na desktopie."""
+
+    name: str = Field(min_length=1, max_length=200)
+    quantity: int = Field(ge=1, le=100000)
+
+
+class HubWholesalerIn(BaseModel):
+    """Hurtownia - pola jak w `wholesalers.json` na desktopie."""
+
+    id: str = Field(min_length=1, max_length=64)
+    name: str = Field(min_length=1, max_length=200)
+    email: str = Field(min_length=3, max_length=320)
+    contactPerson: str | None = Field(default=None, max_length=200)  # noqa: N815 - format desktopu
+    items: list[HubWholesaleItemIn] = Field(default_factory=list, max_length=500)
+    templateId: str | None = Field(default=None, max_length=64)  # noqa: N815 - format desktopu
+
+    @field_validator("email")
+    @classmethod
+    def validate_email_shape(cls, value: str) -> str:
+        """Ten sam prosty test adresu co przy wysyłce z desktopu."""
+        return WholesalerMailIn.validate_email_shape(value)
+
+
+class HubWholesaleTemplateIn(BaseModel):
+    """Szablon maila - pola jak w `wholesaler_templates.json` na desktopie."""
+
+    id: str = Field(min_length=1, max_length=64)
+    name: str = Field(min_length=1, max_length=200)
+    subject: str = Field(max_length=200)
+    body: str = Field(max_length=20000)
+    inquirySubject: str = Field(max_length=200)  # noqa: N815 - format desktopu
+    inquiryBody: str = Field(max_length=20000)  # noqa: N815 - format desktopu
+    isDefault: bool = False  # noqa: N815 - format desktopu
+
+
+class HubWholesaleCatalogIn(BaseModel):
+    """Ciało `PUT /api/v1/hub/wholesale/catalog` - komplet hurtowni i szablonów."""
+
+    wholesalers: list[HubWholesalerIn] = Field(default_factory=list, max_length=200)
+    templates: list[HubWholesaleTemplateIn] = Field(default_factory=list, max_length=100)
+
+
+class HubWholesaleCatalogOut(BaseModel):
+    """Odpowiedź `PUT /api/v1/hub/wholesale/catalog`."""
+
+    version: str
+    wholesalers: int
+    templates: int
+
+
+class HubWholesaleOrderOut(BaseModel):
+    """Zamówienie do hurtowni wysłane z Huba - `GET /api/v1/hub/wholesale/orders`."""
+
+    request_id: str
+    wholesaler_id: str
+    wholesaler_name: str
+    sent_at: UtcDatetime
+    subject: str
+    items_summary: str
+    test_mode: bool

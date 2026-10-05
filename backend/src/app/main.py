@@ -80,6 +80,11 @@ from app.scheduler.scheduler_setup import (
 from app.scheduler.sync_failure_tracker import SyncFailureTracker
 from app.services.hub_events_service import TOPIC_HUB_ACK, TOPIC_HUB_STATUS
 from app.services.hub_history_service import TOPIC_HISTORY_GET
+from app.services.hub_wholesale_service import (
+    TOPIC_WHOLESALE_GET,
+    TOPIC_WHOLESALE_PREVIEW_REQUEST,
+    TOPIC_WHOLESALE_SEND,
+)
 
 
 def _register_bot_routers(dispatcher: Dispatcher) -> None:
@@ -261,6 +266,10 @@ async def _run_application() -> None:
         hub_bridge.subscribe(TOPIC_HUB_STATUS, hub_events.handle_hub_status)
         if container.hub_history is not None:
             hub_bridge.subscribe(TOPIC_HISTORY_GET, container.hub_history.handle_request)
+        hub_wholesale = container.hub_wholesale
+        hub_bridge.subscribe(TOPIC_WHOLESALE_GET, hub_wholesale.handle_get)
+        hub_bridge.subscribe(TOPIC_WHOLESALE_PREVIEW_REQUEST, hub_wholesale.handle_preview)
+        hub_bridge.subscribe(TOPIC_WHOLESALE_SEND, hub_wholesale.handle_send)
 
         async def scheduled_hub_job() -> None:
             """Wrapper cyklicznej wysyłki do Control Huba (stan, statystyki, porządki)."""

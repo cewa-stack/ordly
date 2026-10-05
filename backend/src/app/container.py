@@ -57,6 +57,7 @@ from app.services.events_service import EventsService
 from app.services.health_service import HealthService, SyncStatus
 from app.services.hub_events_service import HubEventsService
 from app.services.hub_history_service import HubHistoryService
+from app.services.hub_wholesale_service import HubWholesaleService
 from app.services.issues_service import IssuesService
 from app.services.mail_service import MailService
 from app.services.mailbox_service import MailboxService
@@ -119,6 +120,14 @@ class Container:
             )
             if self.hub_bridge is not None
             else None
+        )
+        # Zawsze, także bez MQTT: desktop wysyła kopię hurtowni niezależnie od Huba.
+        self.hub_wholesale = HubWholesaleService(
+            session_scope_factory=self.session_scope,
+            mailer_factory=self.mail_service,
+            publisher=self.hub_bridge,
+            test_mode=settings.hub_mqtt.wholesale_test_mode,
+            test_recipient=settings.smtp.user,
         )
 
     @asynccontextmanager

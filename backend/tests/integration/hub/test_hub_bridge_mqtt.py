@@ -40,6 +40,11 @@ from app.services.hub_history_service import (
     TOPIC_HISTORY_GET,
     HubHistoryService,
 )
+from app.services.hub_wholesale_service import (
+    TOPIC_WHOLESALE_RESULT,
+    TOPIC_WHOLESALE_SEND,
+    HubWholesaleService,
+)
 from tests.fakes.mini_mqtt_broker import MiniMqttBroker
 from tests.integration.hub.conftest import make_database
 
@@ -216,6 +221,93 @@ def test_hub_prosi_o_historie_i_dostaje_dzien(tmp_path: Path, sample_order: Orde
             assert day["orders_count"] == 1
             assert day["rows"][0]["time"] == "12:00"
             assert day["rows"][0]["summary"] == "Kubek ceramiczny x2"
+
+            stop.set()
+            await asyncio.wait_for(task, 5)
+        await engine.dispose()
+
+    _run(scenario)
+
+
+def test_hub_zamawia_w_hurtowni_przez_mqtt(tmp_path: Path) -> None:
+    """Prośba z Huba po MQTT -> mail wychodzi raz, Hub dostaje wynik; powtórka nic nie wysyła."""
+    sent: list[tuple[str, str, str]] = []
+
+    class _Mailer:
+        async def send(self, to: str, subject: str, body: str) -> None:
+            sent.append((to, subject, body))
+
+    async def scenario() -> None:
+        engine, session_scope = await make_database(tmp_path / "hub.db")
+        async with MiniMqttBroker(USERS) as broker:
+            bridge = MqttHubBridge(_settings(broker.port))
+            wholesale = HubWholesaleService(
+                session_scope_factory=session_scope,
+                mailer_factory=_Mailer,
+                publisher=bridge,
+                test_mode=False,
+                test_recipient="sklep@example.com",
+            )
+            version = await wholesale.save_catalog(
+                {
+                    "wholesalers": [
+                        {
+                            "id": "w-1",
+                            "name": "Hurt-Pol",
+                            "email": "zamowienia@hurtpol.example",
+                            "items": [{"name": "Kubek", "quantity": 24}],
+                        }
+                    ],
+                    "templates": [
+                        {
+                            "id": "t",
+                            "name": "Std",
+                            "subject": "Zamówienie - {produkty}",
+                            "body": "{lista_pozycji}",
+                            "inquirySubject": "Zapytanie",
+                            "inquiryBody": "",
+                            "isDefault": True,
+                        }
+                    ],
+                }
+            )
+            bridge.subscribe(TOPIC_WHOLESALE_SEND, wholesale.handle_send)
+            stop = asyncio.Event()
+            task = asyncio.create_task(bridge.run(stop))
+            assert await bridge.wait_connected(5)
+
+            request = json.dumps(
+                {"request_id": "r-1", "version": version, "wholesaler_id": "w-1", "items": [0]}
+            )
+            async with aiomqtt.Client(
+                "127.0.0.1",
+                broker.port,
+                username="hub",
+                password="haslo-hub",
+                identifier="hub",
+            ) as hub:
+                await hub.subscribe(TOPIC_WHOLESALE_RESULT, qos=1)
+                await hub.publish(TOPIC_WHOLESALE_SEND, request, qos=1)
+                await hub.publish(TOPIC_WHOLESALE_SEND, request, qos=1)
+
+                results: list[dict[str, Any]] = []
+
+                async def _read() -> None:
+                    async for message in hub.messages:
+                        results.append(json.loads(message.payload))
+                        if len(results) == 2:
+                            return
+
+                await asyncio.wait_for(_read(), 5)
+
+            assert [r["status"] for r in results] == ["sent", "already_sent"]
+            assert sent == [
+                (
+                    "zamowienia@hurtpol.example",
+                    "Zamówienie - Kubek",
+                    "- Kubek - ilość: 24 szt.",
+                )
+            ]
 
             stop.set()
             await asyncio.wait_for(task, 5)

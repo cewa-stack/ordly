@@ -13,6 +13,7 @@ W `.env` na Pi:
 | `MQTT_USER` | `ordly` | użytkownik z `/etc/mosquitto/passwd` |
 | `MQTT_PASSWORD` | puste | **puste = most wyłączony**, ORDLY działa jak dotąd |
 | `HUB_PUBLISH_INTERVAL_SECONDS` | `60` | co ile stan systemu i statystyki |
+| `HUB_WHOLESALE_TEST_MODE` | `true` | zamówienia do hurtowni z Huba idą na adres `SMTP_USER` z dopiskiem, do kogo poszłyby; `false` = prawdziwa wysyłka |
 
 Bez brokera albo przy złym haśle ORDLY działa normalnie: most co 5–60 s próbuje się połączyć i pisze ostrzeżenie w logu.
 
@@ -30,6 +31,13 @@ Bez brokera albo przy złym haśle ORDLY działa normalnie: most co 5–60 s pr�
 | `ordly/hub/ack` | Hub → ORDLY | nie | `{event_id, action: "acknowledged"}` — przycisk OK |
 | `ordly/hub/history/get` | Hub → ORDLY | nie | `{date?: "RRRR-MM-DD", page?: 0}` — prośba o ekran historii (brak daty = dziś) |
 | `ordly/history/day` | ORDLY → Hub | nie | `{date, label, orders_count, revenue, page, pages, rows[], prev_date, next_date}` — jeden ekran historii |
+| `ordly/hub/wholesale/get` | Hub → ORDLY | nie | `{}` lista hurtowni albo `{wholesaler_id}` jej pozycje |
+| `ordly/wholesale/catalog` | ORDLY → Hub | nie | `{version, test_mode, wholesalers: [{id, name, template_id, items}], templates: [{id, name, default}]}` |
+| `ordly/wholesale/items` | ORDLY → Hub | nie | `{version, wholesaler_id, ok, items: [{name, qty}]}` |
+| `ordly/hub/wholesale/preview` | Hub → ORDLY | nie | `{request_id, version, wholesaler_id, template_id, items: [indeksy]}` |
+| `ordly/wholesale/preview` | ORDLY → Hub | nie | `{request_id, ok, wholesaler, to, send_to, test_mode, template, subject, inquiry, items, duplicate_minutes}` |
+| `ordly/hub/wholesale/send` | Hub → ORDLY | nie | jak preview + `confirm_duplicate` |
+| `ordly/wholesale/result` | ORDLY → Hub | nie | `{request_id, status: sent / already_sent / duplicate / error, message}` |
 
 `priority`: `red` zamówienia, `amber` zwroty / dyskusje / wiadomości, `blue` problem z systemem. Czas `ts` jest w strefie polskiej z przesunięciem (`2026-10-04T12:04:00+02:00`).
 
@@ -43,6 +51,19 @@ Ekran „Historia sprzedaży” na Hubie pokazuje jeden dzień naraz (polska dob
 - Sprzedaże z OLX (sam mail, bez kwoty) nie są zamówieniami w ORDLY, więc ich tu nie ma.
 
 Kod: `app/services/hub_history_service.py`, testy `tests/integration/hub/test_hub_history_service.py`.
+
+## Zamówienia do hurtowni
+
+Ekran „Zamów w hurtowni” na Hubie: hurtownia, szablon, pozycje (ilości jak zapisane w hurtowni), podgląd i wysyłka po przytrzymaniu OK. Hurtownie i szablony edytuje się na desktopie; desktop po każdej zmianie i po starcie wysyła ich kopię na `PUT /api/v1/hub/wholesale/catalog` (tabela `hub_wholesale_catalog`, migracja 0017). Mail składa ORDLY według tych samych reguł co desktop (`app/domain/wholesale_email.py` ↔ `desktop/src/renderer/src/lib/wholesalerTemplate.ts`) i wysyła przez SMTP z `.env`.
+
+Zabezpieczenia (mail jest nieodwracalny):
+- adres tylko z kopii hurtowni, nigdy z wiadomości Huba; Hub w ogóle nie dostaje adresów,
+- `request_id` unikalny (`hub_wholesale_orders`): powtórzona prośba → `already_sent`, bez drugiego maila; nieudaną (`failed`) można ponowić,
+- to samo zamówienie do tej samej hurtowni w ciągu 15 minut → `duplicate`, wysyłka dopiero z `confirm_duplicate`,
+- `version` katalogu w prośbie: po zmianie hurtowni na desktopie stara prośba jest odrzucana,
+- `HUB_WHOLESALE_TEST_MODE=true` (domyślnie): mail idzie do nadawcy SMTP z tematem `[TEST Hub -> <hurtownia>]`.
+
+Wysłane z Huba trafiają do historii na ekranie Hurtownia w desktopie (`GET /api/v1/hub/wholesale/orders`) i do tabeli `events` (`HubWholesaleOrderSent`).
 
 ## Skąd biorą się zdarzenia
 

@@ -12,6 +12,10 @@ from app.database.models.customer_case_model import (
 )
 from app.database.models.event_model import EventModel
 from app.database.models.hub_event_model import HubEventModel
+from app.database.models.hub_wholesale_model import (
+    HubWholesaleCatalogModel,
+    HubWholesaleOrderModel,
+)
 from app.database.models.mail_message_model import MailMessageModel
 from app.database.models.marketplace_offer_model import MarketplaceOfferModel
 from app.database.models.offer_stock_movement_model import OfferStockMovementModel
@@ -36,6 +40,8 @@ __all__ = [
     "CustomerCaseReasonChangeModel",
     "EventModel",
     "HubEventModel",
+    "HubWholesaleCatalogModel",
+    "HubWholesaleOrderModel",
     "MailMessageModel",
     "MarketplaceOfferModel",
     "OfferStockMovementModel",

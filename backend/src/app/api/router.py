@@ -23,6 +23,7 @@ from app.api.endpoints import (
     customer_cases,
     dashboard,
     health,
+    hub_wholesale,
     issues,
     logs,
     mail,
@@ -86,6 +87,9 @@ mobile_api_router.include_router(
 )
 mobile_api_router.include_router(
     push.router, tags=["mobile-push"], dependencies=[Depends(require_api_token)]
+)
+mobile_api_router.include_router(
+    hub_wholesale.router, tags=["hub-wholesale"], dependencies=[Depends(require_api_token)]
 )
 
 api_router.include_router(mobile_api_router)
