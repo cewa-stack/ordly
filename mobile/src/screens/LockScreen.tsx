@@ -6,8 +6,9 @@
  *
  * Górę ekranu zajmuje list przewozowy (`Waybill`) - sklep jest
  * "zapakowany". Etykieta mieszka w elastycznym obszarze NAD treścią,
- * a nie na sztywnych współrzędnych: na niskim telefonie zmniejsza się,
- * zamiast wchodzić pod powitanie.
+ * a nie na sztywnych współrzędnych: ma szerokość ekranu, stoi na środku
+ * tego obszaru, a na niskim telefonie zmniejsza się, zamiast wchodzić
+ * pod powitanie.
  *
  * Po udanym Face ID ekran nie znika od razu: taśmy się odklejają,
  * a Ordlak budzi się (mrugnięcie, podskok) i dopiero wtedy
@@ -30,6 +31,11 @@ import { FaceIdIcon } from "@/icons";
 /** Czasy budzenia: oczy się otwierają, potem podskok, potem wejście. */
 const WAKE_EYES_MS = 250;
 const WAKE_TOTAL_MS = 850;
+
+/** Górna granica etykiety - na szerokim oknie przeglądarki/tablecie. */
+const WAYBILL_MAX_WIDTH = 440;
+/** Dolny odstęp obszaru etykiety (styl `top`) - wchodzi w rachunek wysokości. */
+const TOP_PADDING_BOTTOM = spacing.sm;
 
 export function LockScreen() {
   const styles = useThemedStyles(createStyles);
@@ -82,11 +88,17 @@ export function LockScreen() {
     const { width, height } = event.nativeEvent.layout;
     setTopArea({ width, height });
   };
-  // Etykieta nie szersza niż 340 px i zawsze mieszcząca się w pionie.
+  // Etykieta na całą szerokość ekranu - jej własny układ (370 x 230) ma już
+  // ok. 30 px marginesu na taśmy i znaczniki drukarskie, więc dodatkowy
+  // odstęp tylko ją pomniejszał (stały limit 340 px + 2 x 20 px dawał na
+  // iPhonie ~73% szerokości). W pionie liczy się wnętrze obszaru BEZ
+  // paddingów, żeby na niskim telefonie etykieta się zmniejszała, zamiast
+  // wychodzić pod pasek stanu.
+  const topPaddingTop = insets.top + spacing.md;
   const waybillWidth = Math.min(
-    340,
-    topArea.width - 2 * spacing.xl,
-    (topArea.height - spacing.lg) / WAYBILL_ASPECT
+    WAYBILL_MAX_WIDTH,
+    topArea.width,
+    (topArea.height - topPaddingTop - TOP_PADDING_BOTTOM) / WAYBILL_ASPECT
   );
   const unlocked = waking !== null;
 
@@ -99,7 +111,7 @@ export function LockScreen() {
   return (
     <View style={styles.screen}>
       <StatusBar style={mode === "day" ? "dark" : "light"} />
-      <View style={[styles.top, { paddingTop: insets.top + spacing.md }]} onLayout={onTopLayout}>
+      <View style={[styles.top, { paddingTop: topPaddingTop }]} onLayout={onTopLayout}>
         {waybillWidth >= 160 ? (
           <Waybill width={waybillWidth} recipient={username} opened={unlocked} />
         ) : null}
@@ -159,8 +171,11 @@ const createStyles = (c: Palette) =>
     flex: 1,
     minHeight: 0,
     alignItems: "center",
-    justifyContent: "flex-end",
-    paddingBottom: spacing.sm,
+    // Środek wolnego miejsca nad powitaniem. Przy "flex-end" etykieta
+    // siedziała tuż nad Ordlakiem, a na wysokim telefonie nad nią
+    // zostawała pusta jedna czwarta ekranu.
+    justifyContent: "center",
+    paddingBottom: TOP_PADDING_BOTTOM,
   },
   content: {
     alignItems: "center",
