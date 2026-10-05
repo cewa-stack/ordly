@@ -20,6 +20,7 @@ dependencies = [
     "aiosmtplib>=5.1.2",
     "aioimaplib>=2.0.1",
     "anthropic>=0.69.0",
+    "aiomqtt>=2.3",
 ]
 
 [tool.uv]

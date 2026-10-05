@@ -59,7 +59,7 @@ from app.bot.middlewares.message_tracking_middleware import MessageTrackingMiddl
 from app.container import Container
 from app.core.config import Settings, get_settings
 from app.core.logging import configure_logging
-from app.event_subscriptions import register_event_subscriptions
+from app.event_subscriptions import register_event_subscriptions, register_hub_subscriptions
 from app.scheduler.jobs.backup_job import run_backup_job
 from app.scheduler.jobs.check_waybills_job import run_check_waybills_job
 from app.scheduler.jobs.shipping_reminder_job import run_shipping_reminder_job
@@ -70,6 +70,7 @@ from app.scheduler.scheduler_setup import (
     create_scheduler,
     register_backup_job,
     register_check_waybills_job,
+    register_hub_job,
     register_mail_sync_job,
     register_morning_brief_job,
     register_shipping_reminder_job,
@@ -77,6 +78,7 @@ from app.scheduler.scheduler_setup import (
     register_telegram_cleanup_job,
 )
 from app.scheduler.sync_failure_tracker import SyncFailureTracker
+from app.services.hub_events_service import TOPIC_HUB_ACK, TOPIC_HUB_STATUS
 
 
 def _register_bot_routers(dispatcher: Dispatcher) -> None:
@@ -154,6 +156,7 @@ async def _run_application() -> None:
     container = Container(settings=settings, bot=bot)
 
     register_event_subscriptions(container)
+    register_hub_subscriptions(container)
     _register_bot_routers(dispatcher)
 
     dispatcher.update.middleware(AdminOnlyMiddleware(settings.telegram.admin_chat_id))
@@ -250,6 +253,25 @@ async def _run_application() -> None:
     register_telegram_cleanup_job(scheduler, scheduled_telegram_cleanup_job)
     register_mail_sync_job(scheduler, scheduled_mail_sync_job)
 
+    hub_events = container.hub_events
+    hub_bridge = container.hub_bridge
+    if hub_events is not None and hub_bridge is not None:
+        hub_bridge.subscribe(TOPIC_HUB_ACK, hub_events.handle_ack)
+        hub_bridge.subscribe(TOPIC_HUB_STATUS, hub_events.handle_hub_status)
+
+        async def scheduled_hub_job() -> None:
+            """Wrapper cyklicznej wysyłki do Control Huba (stan, statystyki, porządki)."""
+            try:
+                await hub_events.run_periodic(sync_failure_tracker.alerted_channels)
+            except Exception:  # noqa: BLE001 - job nie może wywrócić schedulera
+                logger.exception("Control Hub: cykliczna wysyłka nie wyszła")
+
+        register_hub_job(
+            scheduler,
+            scheduled_hub_job,
+            interval_seconds=settings.hub_mqtt.publish_interval_seconds,
+        )
+
     fastapi_app = _create_fastapi_app(container, settings)
     uvicorn_config = uvicorn.Config(
         fastapi_app,
@@ -285,6 +307,11 @@ async def _run_application() -> None:
 
     bot_polling_task = asyncio.create_task(dispatcher.start_polling(bot, handle_signals=False))
     api_task = asyncio.create_task(uvicorn_server.serve())
+    hub_task = (
+        asyncio.create_task(container.hub_bridge.run(stop_event))
+        if container.hub_bridge is not None
+        else None
+    )
 
     logger.info("ORDLY został w pełni uruchomiony i jest gotowy do pracy")
 
@@ -293,6 +320,13 @@ async def _run_application() -> None:
     logger.info("Zamykanie aplikacji ORDLY...")
 
     scheduler.shutdown(wait=False)
+
+    if hub_task is not None:
+        # Most sam kończy pracę po stop_event (ogłasza Hubowi "ORDLY offline").
+        try:
+            await asyncio.wait_for(hub_task, timeout=5)
+        except (TimeoutError, asyncio.CancelledError):
+            logger.warning("Control Hub: most MQTT nie zamknął się w 5 s")
 
     await dispatcher.stop_polling()
     bot_polling_task.cancel()
