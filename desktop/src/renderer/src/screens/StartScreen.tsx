@@ -123,6 +123,90 @@ function MicroStat({
 }
 
 /**
+ * Tarcza dyzuru za Ordlakiem na karcie powitalnej - zamiast poswiaty.
+ * Dysk pod postacia, kropkowana orbita z sekundnikiem (pelny obrot co
+ * 60 s) i obwodka z dwunastoma kreskami godzin.
+ *
+ * Wszystkie okregi maja JEDEN srodek - srodek pudelka Ordlaka - bo SVG jest
+ * w tym pudelku centrowane translacja -50%/-50%. Nie da sie go przesunac
+ * wzgledem postaci zmiana szerokosci okna ani wysokosci karty.
+ *
+ * Zewnetrzny promien 88 px: srodek pudelka lezy ~102 px od prawej krawedzi
+ * wnetrza karty (24 padding + 79), a karta ma min. 204 px wysokosci, wiec
+ * obwodka ma ~14 px luzu do prawej krawedzi i do gory/dolu - rowno z
+ * kazdej strony, nigdy nie jest ucieta. W lewo siega ~190 px od prawej
+ * krawedzi, a tekst konczy sie 202 px od niej (24 + 158 pudelko + 20
+ * odstep) - tarcza nie wchodzi pod tekst przy zadnej szerokosci okna.
+ *
+ * Bez `id` (gradienty, maski) - ta sama zasada co w Ordlaku. Kolory sa
+ * w global.css (`.o-dial-*`), ruch wylacza prefers-reduced-motion.
+ */
+const DIAL_C = 120;
+const DIAL_ORBIT_R = 70;
+const DIAL_RIM_R = 88;
+/** Ogon sekundnika (px po obwodzie orbity) i kat, na ktorym stoi kropka. */
+const DIAL_TAIL = 38;
+const DIAL_DOT_ANGLE = DIAL_TAIL / DIAL_ORBIT_R;
+
+function DutyDial() {
+  return (
+    <svg
+      aria-hidden="true"
+      viewBox="0 0 240 240"
+      className="pointer-events-none absolute left-1/2 top-1/2 h-[240px] w-[240px] -translate-x-1/2 -translate-y-1/2"
+    >
+      <circle className="o-dial-rim" cx={DIAL_C} cy={DIAL_C} r={DIAL_RIM_R} />
+      {Array.from({ length: 12 }, (_, i) => {
+        const major = i % 3 === 0;
+        const a = (i / 12) * Math.PI * 2;
+        const r1 = DIAL_RIM_R - (major ? 8 : 4.5);
+        return (
+          <line
+            key={i}
+            className={major ? "o-dial-tick o-dial-tick-major" : "o-dial-tick"}
+            x1={DIAL_C + Math.sin(a) * r1}
+            y1={DIAL_C - Math.cos(a) * r1}
+            x2={DIAL_C + Math.sin(a) * DIAL_RIM_R}
+            y2={DIAL_C - Math.cos(a) * DIAL_RIM_R}
+          />
+        );
+      })}
+      <circle className="o-dial-orbit" cx={DIAL_C} cy={DIAL_C} r={DIAL_ORBIT_R} />
+      <circle className="o-dial-face" cx={DIAL_C} cy={DIAL_C} r={54} />
+      <g className="o-dial-hand">
+        {/* Ogon startuje z godziny 12 (obrot -90) i konczy sie na kropce;
+            krotszy, jasniejszy odcinek przy kropce daje wygaszenie bez
+            gradientu. */}
+        <circle
+          className="o-dial-tail"
+          cx={DIAL_C}
+          cy={DIAL_C}
+          r={DIAL_ORBIT_R}
+          transform={`rotate(-90 ${DIAL_C} ${DIAL_C})`}
+          strokeDasharray={`${DIAL_TAIL} 9999`}
+          opacity={0.22}
+        />
+        <circle
+          className="o-dial-tail"
+          cx={DIAL_C}
+          cy={DIAL_C}
+          r={DIAL_ORBIT_R}
+          transform={`rotate(-90 ${DIAL_C} ${DIAL_C})`}
+          strokeDasharray={`0 ${DIAL_TAIL / 2} ${DIAL_TAIL / 2} 9999`}
+          opacity={0.45}
+        />
+        <circle
+          className="o-dial-dot"
+          cx={DIAL_C + Math.sin(DIAL_DOT_ANGLE) * DIAL_ORBIT_R}
+          cy={DIAL_C - Math.cos(DIAL_DOT_ANGLE) * DIAL_ORBIT_R}
+          r={2.6}
+        />
+      </g>
+    </svg>
+  );
+}
+
+/**
  * Wiersz listy "Wymaga uwagi" (sekcja 7). Szerokosci stale, w tej
  * kolejnosci: kanal 68 · nazwisko i pozycje flex-1 · czas czekania 50
  * prawo · kwota 94 prawo · status 96. Dzieki temu prawa krawedz listy
@@ -348,15 +432,6 @@ export function StartScreen({ onNavigate, onAsk, username }: StartScreenProps) {
           ucinal ja rowno z krawedzia - przyciski stykaly sie z obwodka. */}
       <section className="relative flex min-h-[204px] shrink-0 items-center gap-5 overflow-hidden rounded-xl border border-line bg-panel px-6 py-5">
         <SyncSweep phase={phase} />
-        {/* Jedno zrodlo swiatla na karcie - bez zmywu na cala powierzchnie. */}
-        <span
-          aria-hidden="true"
-          className="pointer-events-none absolute -top-[90px] right-[-40px] h-[340px] w-[460px]"
-          style={{
-            background:
-              "radial-gradient(closest-side, var(--teal-glow), transparent 72%)",
-          }}
-        />
         <div className="relative z-[1] flex min-w-0 flex-1 flex-col">
           <div className="o-mono text-[10.5px] uppercase tracking-[.15em] text-text-3">
             {lastSyncAt || dashboard ? `Dyżur otwarty · ${subtitle}` : "Dyżur otwarty"}
@@ -409,8 +484,15 @@ export function StartScreen({ onNavigate, onAsk, username }: StartScreenProps) {
           </div>
         </div>
 
+        {/* Tarcza siedzi W pudelku Ordlaka i jest centrowana na nim, a nie
+            na karcie. Wczesniej poswiata miala sztywne przesuniecia wzgledem
+            karty (right -40 / top -90), a Ordlak byl centrowany w swoim
+            pudelku - nie mialy wspolnego punktu odniesienia, wiec swiatlo
+            wisialo ~90 px na lewo i nad postacia, a od kiedy karta rosnie
+            z trescia, rozjezdzalo sie tez w pionie. */}
         <div className="relative z-[1] flex h-[140px] w-[158px] shrink-0 items-center justify-center">
-          <Ordlak state={ordlakState} size={134} />
+          <DutyDial />
+          <Ordlak state={ordlakState} size={134} className="relative" />
         </div>
       </section>
 

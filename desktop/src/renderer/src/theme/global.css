@@ -312,6 +312,58 @@ input[type="number"]::-webkit-inner-spin-button {
   animation: o-row-flash 1.6s ease-out 0.2s backwards;
 }
 
+/*
+ * Tarcza dyzuru za Ordlakiem na karcie powitalnej (`DutyDial` w
+ * StartScreen.tsx). Zastepuje poswiate, ktora miala sztywne przesuniecia
+ * wzgledem karty i wisiala obok postaci zamiast za nia.
+ */
+.o-dial-rim {
+  fill: none;
+  stroke: var(--line-2);
+  stroke-width: 1;
+}
+.o-dial-tick {
+  stroke: var(--line-2);
+  stroke-width: 1.4;
+  stroke-linecap: round;
+}
+.o-dial-tick-major {
+  stroke: color-mix(in srgb, var(--teal) 50%, transparent);
+  stroke-width: 2;
+}
+.o-dial-orbit {
+  fill: none;
+  stroke: var(--line-2);
+  stroke-width: 1.4;
+  stroke-linecap: round;
+  stroke-dasharray: 0.1 6.5;
+}
+.o-dial-face {
+  fill: color-mix(in srgb, var(--teal) 6%, transparent);
+  stroke: color-mix(in srgb, var(--teal) 22%, transparent);
+  stroke-width: 1;
+}
+.o-dial-tail {
+  fill: none;
+  stroke: var(--teal);
+  stroke-width: 1.8;
+  stroke-linecap: round;
+}
+.o-dial-dot {
+  fill: var(--teal);
+}
+/* Sekundnik - pelny obrot na minute; srodek obrotu = srodek viewBoxa. */
+.o-dial-hand {
+  transform-box: view-box;
+  transform-origin: 120px 120px;
+  animation: o-dial-sweep 60s linear infinite;
+}
+@keyframes o-dial-sweep {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
 /* =====================================================================
  * ORDLAK - maskotka jako komponent SVG (sekcja 6 instrukcji).
  *
