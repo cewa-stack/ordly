@@ -28,8 +28,21 @@ Bez brokera albo przy złym haśle ORDLY działa normalnie: most co 5–60 s pr�
 | `ordly/backend/status` | ORDLY → Hub | tak, LWT | `{online}` — Hub miga niebieską, gdy ORDLY nie działa |
 | `ordly/hub/status` | Hub → ORDLY | tak, LWT | `{online, fw_version, etap, ip, rssi, uptime_s}` |
 | `ordly/hub/ack` | Hub → ORDLY | nie | `{event_id, action: "acknowledged"}` — przycisk OK |
+| `ordly/hub/history/get` | Hub → ORDLY | nie | `{date?: "RRRR-MM-DD", page?: 0}` — prośba o ekran historii (brak daty = dziś) |
+| `ordly/history/day` | ORDLY → Hub | nie | `{date, label, orders_count, revenue, page, pages, rows[], prev_date, next_date}` — jeden ekran historii |
 
 `priority`: `red` zamówienia, `amber` zwroty / dyskusje / wiadomości, `blue` problem z systemem. Czas `ts` jest w strefie polskiej z przesunięciem (`2026-10-04T12:04:00+02:00`).
+
+## Historia sprzedaży
+
+Ekran „Historia sprzedaży” na Hubie pokazuje jeden dzień naraz (polska doba), od najnowszego zamówienia: godzina, kanał, pierwszy produkt (`+N`, gdy pozycji jest więcej), kwota i login kupującego. Hub nie trzyma historii: o każdy ekran prosi na `ordly/hub/history/get`, a ORDLY odpowiada na `ordly/history/day` (najwyżej 5 wierszy na stronę, `pages` mówi, ile stron ma dzień).
+
+- `orders_count` i `revenue` liczą się tak jak Statystyki i ekran Start: bez zamówień ze statusem `CANCELLED`. Anulowane są na liście z `cancelled: true`.
+- `prev_date` / `next_date` to najbliższy starszy / nowszy dzień, w którym coś się sprzedało (puste dni są pomijane). `next_date` = `null` na dziś; po ostatnim dniu ze sprzedażą wskazuje dziś.
+- Zła data, data z przyszłości albo zły numer strony = dziś / ostatnia strona.
+- Sprzedaże z OLX (sam mail, bez kwoty) nie są zamówieniami w ORDLY, więc ich tu nie ma.
+
+Kod: `app/services/hub_history_service.py`, testy `tests/integration/hub/test_hub_history_service.py`.
 
 ## Skąd biorą się zdarzenia
 

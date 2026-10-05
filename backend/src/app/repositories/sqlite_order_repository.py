@@ -321,6 +321,32 @@ class SqliteOrderRepository(OrderRepository):
         result = await self._session.execute(stmt)
         return {str(row[0]): float(row[1]) for row in result.all()}
 
+    async def get_between(self, start: datetime, end: datetime) -> list[Order]:
+        """
+        Zamówienia z przedziału [start, end) od najnowszego, razem z
+        anulowanymi (historia na Control Hubie pokazuje je wyszarzone).
+        """
+        stmt = (
+            select(OrderModel)
+            .options(selectinload(OrderModel.products), selectinload(OrderModel.shipment))
+            .where(OrderModel.order_date >= start, OrderModel.order_date < end)
+            .order_by(OrderModel.order_date.desc(), OrderModel.id.desc())
+        )
+        result = await self._session.execute(stmt)
+        return [self._to_domain(m) for m in result.scalars().all()]
+
+    async def latest_order_date_before(self, before: datetime) -> datetime | None:
+        """Data najnowszego zamówienia sprzed podanej chwili (None, gdy nie ma)."""
+        stmt = select(func.max(OrderModel.order_date)).where(OrderModel.order_date < before)
+        result = await self._session.execute(stmt)
+        return result.scalar_one_or_none()
+
+    async def earliest_order_date_since(self, since: datetime) -> datetime | None:
+        """Data najstarszego zamówienia od podanej chwili (None, gdy nie ma)."""
+        stmt = select(func.min(OrderModel.order_date)).where(OrderModel.order_date >= since)
+        result = await self._session.execute(stmt)
+        return result.scalar_one_or_none()
+
     async def update_status(self, marketplace: str, external_id: str, status: str) -> None:
         """Aktualizuje status zamówienia wykryty podczas synchronizacji."""
         stmt = (

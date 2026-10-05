@@ -27,12 +27,18 @@ from app.core.config import HubMqttSettings
 from app.domain.entities.order import Order
 from app.infrastructure.mqtt.hub_bridge import TOPIC_BACKEND_STATUS, MqttHubBridge
 from app.repositories.sqlite_hub_event_repository import SqliteHubEventRepository
+from app.repositories.sqlite_order_repository import SqliteOrderRepository
 from app.services.hub_events_service import (
     TOPIC_EVENT_NEW,
     TOPIC_EVENT_SNAPSHOT,
     TOPIC_HUB_ACK,
     TOPIC_HUB_STATUS,
     HubEventsService,
+)
+from app.services.hub_history_service import (
+    TOPIC_HISTORY_DAY,
+    TOPIC_HISTORY_GET,
+    HubHistoryService,
 )
 from tests.fakes.mini_mqtt_broker import MiniMqttBroker
 from tests.integration.hub.conftest import make_database
@@ -170,5 +176,49 @@ def test_zle_haslo_nie_wywraca_ordly() -> None:
 
             stop.set()
             await asyncio.wait_for(task, 10)
+
+    _run(scenario)
+
+
+def test_hub_prosi_o_historie_i_dostaje_dzien(tmp_path: Path, sample_order: Order) -> None:
+    async def scenario() -> None:
+        engine, session_scope = await make_database(tmp_path / "hub.db")
+        async with session_scope() as session:
+            await SqliteOrderRepository(session).save(
+                sample_order
+            )  # 1.07.2026, 12:00 w Polsce
+        async with MiniMqttBroker(USERS) as broker:
+            bridge = MqttHubBridge(_settings(broker.port))
+            history = HubHistoryService(session_scope_factory=session_scope, publisher=bridge)
+            bridge.subscribe(TOPIC_HISTORY_GET, history.handle_request)
+            stop = asyncio.Event()
+            task = asyncio.create_task(bridge.run(stop))
+            assert await bridge.wait_connected(5)
+
+            async with aiomqtt.Client(
+                "127.0.0.1",
+                broker.port,
+                username="hub",
+                password="haslo-hub",
+                identifier="hub",
+            ) as hub:
+                await hub.subscribe(TOPIC_HISTORY_DAY, qos=1)
+                await hub.publish(TOPIC_HISTORY_GET, '{"date":"2026-07-01","page":0}', qos=1)
+
+                async def _read() -> dict[str, Any]:
+                    async for message in hub.messages:
+                        return dict(json.loads(message.payload))
+                    raise AssertionError("brak odpowiedzi")
+
+                day = await asyncio.wait_for(_read(), 5)
+
+            assert day["date"] == "2026-07-01"
+            assert day["orders_count"] == 1
+            assert day["rows"][0]["time"] == "12:00"
+            assert day["rows"][0]["summary"] == "Kubek ceramiczny x2"
+
+            stop.set()
+            await asyncio.wait_for(task, 5)
+        await engine.dispose()
 
     _run(scenario)

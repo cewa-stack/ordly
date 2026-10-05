@@ -56,6 +56,7 @@ from app.services.dashboard_service import DashboardService
 from app.services.events_service import EventsService
 from app.services.health_service import HealthService, SyncStatus
 from app.services.hub_events_service import HubEventsService
+from app.services.hub_history_service import HubHistoryService
 from app.services.issues_service import IssuesService
 from app.services.mail_service import MailService
 from app.services.mailbox_service import MailboxService
@@ -108,6 +109,13 @@ class Container:
                 session_scope_factory=self.session_scope,
                 publisher=self.hub_bridge,
                 last_sync_at=lambda: self.sync_status.last_sync_at,
+            )
+            if self.hub_bridge is not None
+            else None
+        )
+        self.hub_history: HubHistoryService | None = (
+            HubHistoryService(
+                session_scope_factory=self.session_scope, publisher=self.hub_bridge
             )
             if self.hub_bridge is not None
             else None
