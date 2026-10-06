@@ -22,6 +22,7 @@ from app.domain.interfaces.notifier import Notifier
 from app.infrastructure.mail.imap_watcher import ImapConnectionError, ImapLoginRejectedError
 from app.scheduler.sync_failure_tracker import SyncFailureTracker
 from app.services.mailbox_service import MailboxService
+from app.services.wholesale_parcel_service import WholesaleParcelService
 
 #: Klucz serii awarii w `SyncFailureTracker` - tracker jest wspólny
 #: z synchronizacją zamówień, więc kanały muszą mieć różne nazwy.
@@ -34,6 +35,7 @@ async def run_mail_sync_job(
     failure_tracker: SyncFailureTracker | None = None,
     notifier: Notifier | None = None,
     retry_in_minutes: int = 5,
+    build_parcel_service: Callable[[AsyncSession], WholesaleParcelService] | None = None,
 ) -> None:
     """
     Wykonuje jeden cykl synchronizacji skrzynki w bezpiecznej sesji bazy.
@@ -50,6 +52,9 @@ async def run_mail_sync_job(
             niedziałającej poczcie nie jest wysyłany.
         notifier: Kanał powiadomień dla tego alertu.
         retry_in_minutes: Za ile minut job ruszy ponownie - trafia do treści.
+        build_parcel_service: Alert o paczce od hurtowni ([FEAT-MAIL]) -
+            uruchamiany po udanej synchronizacji skrzynki, w osobnej sesji.
+            Jego awaria tylko trafia do logów.
     """
     try:
         async with session_scope_factory() as session:
@@ -79,6 +84,27 @@ async def run_mail_sync_job(
         logger.exception("Nie udało się opublikować zdarzeń z nowych maili")
     if saved:
         logger.info("Skrzynka: wykryto {} nowych maili", len(saved))
+
+    if build_parcel_service is not None:
+        await _run_parcel_sync(session_scope_factory, build_parcel_service)
+
+
+async def _run_parcel_sync(
+    session_scope_factory: Callable[[], AbstractAsyncContextManager[AsyncSession]],
+    build_parcel_service: Callable[[AsyncSession], WholesaleParcelService],
+) -> None:
+    """
+    Maile InPost o paczce od hurtowni - po zamknięciu sesji publikuje
+    alerty (Hub i push piszą do bazy we własnych sesjach). Żaden błąd
+    nie wychodzi poza ten krok: pozostałe funkcje ORDLY działają dalej.
+    """
+    try:
+        async with session_scope_factory() as session:
+            parcel_service = build_parcel_service(session)
+            notices = await parcel_service.sync()
+        await parcel_service.publish(notices)
+    except Exception:
+        logger.exception("Nieoczekiwany błąd przy sprawdzaniu maili InPost o paczkach z hurtowni")
 
 
 async def _maybe_alert(

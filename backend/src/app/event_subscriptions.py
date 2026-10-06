@@ -25,6 +25,7 @@ from app.core.event_bus.events import (
     ReturnStatusChanged,
     SyncFinished,
     SyncStarted,
+    WholesaleParcelShipped,
 )
 from app.domain.customer_cases import SOURCE_ALLEGRO_ORDER, SOURCE_APP_STATUS
 from app.domain.order_status import APP_STATUS_CANCELLED
@@ -413,6 +414,37 @@ def register_event_subscriptions(container: Container) -> None:
                 },
             )
 
+    async def handle_wholesale_parcel(event: WholesaleParcelShipped) -> None:
+        """
+        Paczka od hurtowni ([FEAT-MAIL]): jednorazowy push na telefon
+        (tylko Web Push - bez Telegrama, decyzja M5-a) i wpis w audycie.
+        Control Hub dostaje swój wpis w `register_hub_subscriptions`.
+        Nic poza tym: bez zmiany statusów i bez przypisywania do zamówień.
+        """
+        notice = event.notice
+        push_sent = False
+        push = container.web_push_notifier()
+        if push is not None:
+            try:
+                await push.notify_wholesale_parcel(notice)
+                push_sent = True
+            except Exception:
+                logger.exception(
+                    "Nie udało się wysłać push o paczce od hurtowni {}", notice.tracking_number
+                )
+
+        async with container.session_scope() as session:
+            await SqliteEventRepository(session).record(
+                event_type="WholesaleParcelShipped",
+                level="INFO",
+                payload={
+                    "message_id": notice.message_id,
+                    "tracking_number": notice.tracking_number,
+                    "wholesaler": notice.wholesaler_name,
+                    "push_sent": push_sent,
+                },
+            )
+
     async def handle_sync_finished(event: SyncFinished) -> None:
         """Zapisuje w audycie podsumowanie zakończonej synchronizacji."""
         async with container.session_scope() as session:
@@ -440,6 +472,10 @@ def register_event_subscriptions(container: Container) -> None:
     container.event_bus.subscribe(AllegroLokalnieEventDetected, handle_allegro_lokalnie_event)
     container.event_bus.subscribe(OlxEventDetected, handle_olx_event)
     container.event_bus.subscribe(DisputeNoticeDetected, handle_dispute_notice)
+    container.event_bus.subscribe(
+        WholesaleParcelShipped,
+        handle_wholesale_parcel,  # type: ignore[arg-type]
+    )
 
     logger.info("Zarejestrowano subskrybentów Event Busa")
 
@@ -480,6 +516,9 @@ def register_hub_subscriptions(container: Container) -> None:
     async def on_olx(event: OlxEventDetected) -> None:
         await hub.on_olx(event.event)
 
+    async def on_wholesale_parcel(event: WholesaleParcelShipped) -> None:
+        await hub.on_wholesale_parcel(event.notice)
+
     bus = container.event_bus
     bus.subscribe(OrderCreated, on_order_created)  # type: ignore[arg-type]
     bus.subscribe(OrderCancelled, on_order_closed)  # type: ignore[arg-type]
@@ -489,4 +528,5 @@ def register_hub_subscriptions(container: Container) -> None:
     bus.subscribe(DisputeNoticeDetected, on_dispute)  # type: ignore[arg-type]
     bus.subscribe(AllegroLokalnieEventDetected, on_allegro_lokalnie)  # type: ignore[arg-type]
     bus.subscribe(OlxEventDetected, on_olx)  # type: ignore[arg-type]
+    bus.subscribe(WholesaleParcelShipped, on_wholesale_parcel)  # type: ignore[arg-type]
     logger.info("Control Hub: zarejestrowano subskrybentów zdarzeń")

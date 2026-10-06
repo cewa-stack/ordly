@@ -15,6 +15,7 @@ from app.domain.entities.dispute_notice import DisputeNotice
 from app.domain.entities.olx_event import OlxEvent
 from app.domain.entities.order import Order
 from app.domain.entities.order_return import OrderReturn
+from app.domain.entities.wholesale_parcel import WholesaleParcelNotice
 from app.domain.returns import ReturnStatusChange
 
 
@@ -195,3 +196,14 @@ class OrderAppStatusChanged(DomainEvent):
     order: Order
     previous_status: str | None
     new_status: str | None
+
+
+@dataclass(frozen=True, slots=True)
+class WholesaleParcelShipped(DomainEvent):
+    """
+    InPost potwierdził nadanie paczki od hurtowni (F.H.P. MAIK-POL) -
+    jednorazowy alert informacyjny na Control Hub i telefon ([FEAT-MAIL]).
+    Wysyłane najwyżej raz na mail (`processed_parcel_mails`).
+    """
+
+    notice: WholesaleParcelNotice

@@ -36,6 +36,9 @@ from app.repositories.sqlite_order_repository import SqliteOrderRepository
 from app.repositories.sqlite_ordlak_conversation_repository import (
     SqliteOrdlakConversationRepository,
 )
+from app.repositories.sqlite_processed_parcel_mail_repository import (
+    SqliteProcessedParcelMailRepository,
+)
 from app.repositories.sqlite_push_subscription_repository import (
     SqlitePushSubscriptionRepository,
 )
@@ -73,6 +76,7 @@ from app.services.sync_orders_service import SyncOrdersService
 from app.services.telegram_cleanup_service import TelegramCleanupService
 from app.services.tracking_service import TrackingService
 from app.services.waybill_check_service import WaybillCheckService
+from app.services.wholesale_parcel_service import WholesaleParcelService
 
 
 class Container:
@@ -224,6 +228,14 @@ class Container:
         """Buduje MailboxService dla /api/v1/mail/messages (Skrzynka) i joba IMAP."""
         return MailboxService(
             SqliteMailRepository(session),
+            self._settings.mail_watch,
+            event_bus=self.event_bus,
+        )
+
+    def wholesale_parcel_service(self, session: AsyncSession) -> WholesaleParcelService:
+        """Buduje WholesaleParcelService - alert o paczce od hurtowni ([FEAT-MAIL])."""
+        return WholesaleParcelService(
+            SqliteProcessedParcelMailRepository(session),
             self._settings.mail_watch,
             event_bus=self.event_bus,
         )

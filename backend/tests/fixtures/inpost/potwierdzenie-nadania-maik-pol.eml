@@ -1,0 +1,60 @@
+From: InPost <info@paczkomaty.pl>
+To: sklep.testowy@example.com
+Subject: InPost - Potwierdzenie nadania =?utf-8?q?przesy=C5=82ki?=
+Date: Mon, 05 Oct 2026 12:43:00 +0000
+Message-ID: <20261005124300.maikpol.test@paczkomaty.pl>
+MIME-Version: 1.0
+Content-Type: multipart/alternative;
+ boundary="===============0439912818089606759=="
+
+--===============0439912818089606759==
+Content-Type: text/plain; charset="utf-8"
+Content-Transfer-Encoding: quoted-printable
+
+Posz=C5=82o!
+
+Sprawy nabieraj=C4=85 tempa.
+Twoja paczka od F.H.P. MAIK-POL wyruszy=C5=82a w podr=C3=B3=C5=BC do Ciebie.
+
+Numer paczki: 620999672171521435976372
+
+Tw=C3=B3j Paczkomat
+Paczkomat TST01M, ul. Testowa 1, 00-001 Miasto
+
+--===============0439912818089606759==
+Content-Type: text/html; charset="utf-8"
+Content-Transfer-Encoding: quoted-printable
+MIME-Version: 1.0
+
+<!DOCTYPE html>
+<html lang=3D"pl"><head><meta charset=3D"utf-8"><title>InPost</title>
+<style>body{margin:0;background:#f4f4f4;font-family:Arial,sans-serif}</style>=
+</head>
+<body>
+<div style=3D"display:none;max-height:0;overflow:hidden">Twoja paczka jest w =
+drodze.</div>
+<table width=3D"100%" cellpadding=3D"0" cellspacing=3D"0" role=3D"presentatio=
+n">
+<tr><td style=3D"background:#ffcd00;padding:32px"><img src=3D"https://inpost.=
+pl/logo.png" alt=3D"InPost" width=3D"160"></td></tr>
+<tr><td style=3D"padding:24px"><h1 style=3D"font-size:40px">Posz&#322;o!</h1>=
+</td></tr>
+<tr><td style=3D"background:#ffffff;padding:24px">
+  <table role=3D"presentation"><tr>
+    <td><img src=3D"https://inpost.pl/smile.png" alt=3D"" width=3D"66"></td>
+    <td><b>Sprawy nabieraj&#261; tempa.</b><br>
+    Twoja paczka od <b>F.H.P. MAIK-POL</b> wyruszy&#322;a w podr&#243;&#380; =
+do Ciebie.</td>
+  </tr></table>
+</td></tr>
+<tr><td style=3D"text-align:center;padding:16px">Numer paczki: <a href=3D"htt=
+ps://inpost.pl/sledzenie-przesylek?number=3D620999672171521435976372">6209996=
+72171521435976372</a></td></tr>
+<tr><td style=3D"text-align:center"><a href=3D"https://inpost.pl/chatbot"><b>=
+&#346;led&#378; paczk&#281; z chatbotem!</b></a></td></tr>
+<tr><td style=3D"background:#ffffff;padding:24px"><h2>Tw&#243;j Paczkomat</h2>
+<p>Paczkomat TST01M<br>ul. Testowa 1, 00-001 Miasto</p></td></tr>
+</table>
+</body></html>
+
+--===============0439912818089606759==--

@@ -188,6 +188,23 @@ def _karty() -> list[Karta]:
             czas="14:20",
         ),
         Karta(
+            builder="wholesale_parcel_shipped",
+            kiedy=(
+                "Raz na paczkę: gdy InPost (info@paczkomaty.pl) przyśle „Potwierdzenie "
+                "nadania przesyłki” dla paczki od F.H.P. MAIK-POL."
+            ),
+            payload=push_payload.wholesale_parcel_shipped(
+                # Dane z załączonego zrzutu maila (Notion, [FEAT-MAIL]).
+                wholesaler_name="F.H.P. MAIK-POL",
+                tracking_number="620999672171521435976372",
+            ),
+            czas="14:43",
+            uwaga=(
+                "NOWE - do akceptacji. Tylko informacja: bez akcji „Potwierdź”, nie rusza "
+                "zamówień ani plakietki. Dotknięcie otwiera Start."
+            ),
+        ),
+        Karta(
             builder="allegro_lokalnie_event",
             kiedy="Gdy przyjdzie powiadomienie e-mail z Allegro Lokalnie (kanał bez API).",
             payload=push_payload.allegro_lokalnie_event(

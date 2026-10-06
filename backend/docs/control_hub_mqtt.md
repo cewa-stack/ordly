@@ -75,6 +75,7 @@ Wysłane z Huba trafiają do historii na ekranie Hurtownia w desktopie (`GET /ap
 | `DisputeNoticeDetected` | pomarańczowe `dispute` | tylko OK |
 | wiadomość z Allegro Lokalnie / OLX | pomarańczowe `message` | tylko OK |
 | alert `SyncFailureTracker` (Allegro, poczta) | niebieskie `system_problem` | kanał znów odpowiada |
+| `WholesaleParcelShipped` - mail InPost „Potwierdzenie nadania przesyłki” dla paczki od F.H.P. MAIK-POL ([FEAT-MAIL]) | pomarańczowe `wholesale_parcel`, `data`: `carrier`, `tracking_number`, `wholesaler`, `summary` | tylko OK |
 
 Stan leży w tabeli `hub_events` (migracja 0014). Klucz źródła (`order:allegro:<id>` itd.) jest unikalny: zamówienie potwierdzone OK nie wraca na Hub przy kolejnej synchronizacji. Potwierdzony problem z systemem nie wraca, dopóki trwa ta sama seria awarii.
 

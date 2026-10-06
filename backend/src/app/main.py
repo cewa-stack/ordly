@@ -241,6 +241,7 @@ async def _run_application() -> None:
             failure_tracker=sync_failure_tracker,
             notifier=container.notifier(),
             retry_in_minutes=5,
+            build_parcel_service=container.wholesale_parcel_service,
         )
 
     register_sync_orders_job(

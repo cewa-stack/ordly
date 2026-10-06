@@ -28,6 +28,10 @@ TYPE_RETURN = "return_requested"
 TYPE_DISPUTE = "dispute"
 TYPE_MESSAGE = "message"
 TYPE_SYSTEM_PROBLEM = "system_problem"
+#: InPost nadał paczkę od hurtowni do sklepu - sama informacja ([FEAT-MAIL]).
+#: Inny typ niż zamówienia, zwroty i wiadomości, żeby Hub pokazał go
+#: własnym tytułem („Paczka z hurtowni”).
+TYPE_WHOLESALE_PARCEL = "wholesale_parcel"
 
 #: Zamknięte przyciskiem OK na Hubie.
 REASON_ACKNOWLEDGED = "acknowledged"

@@ -80,7 +80,9 @@ class MailWatcherProtocol(Protocol):
 WatcherFactory = Callable[[], MailWatcherProtocol]
 
 
-def _default_watcher_factory(settings: MailWatchSettings) -> WatcherFactory:
+def default_watcher_factory(settings: MailWatchSettings) -> WatcherFactory:
+    """Fabryka prawdziwego `ImapWatcher` z ustawień skrzynki."""
+
     def factory() -> MailWatcherProtocol:
         return ImapWatcher(
             host=settings.host,
@@ -126,7 +128,7 @@ class MailboxService:
         """
         self._mail_repository = mail_repository
         self._settings = settings
-        self._watcher_factory = watcher_factory or _default_watcher_factory(settings)
+        self._watcher_factory = watcher_factory or default_watcher_factory(settings)
         self._event_bus = event_bus
 
     async def sync_new_mail(self) -> int:

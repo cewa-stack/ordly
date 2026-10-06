@@ -43,12 +43,14 @@ from app.domain.entities.hub_event import (
     TYPE_NEW_ORDER,
     TYPE_RETURN,
     TYPE_SYSTEM_PROBLEM,
+    TYPE_WHOLESALE_PARCEL,
     HubEvent,
     parse_event_id,
 )
 from app.domain.entities.olx_event import OlxEvent
 from app.domain.entities.order import Order
 from app.domain.entities.order_return import OrderReturn
+from app.domain.entities.wholesale_parcel import WholesaleParcelNotice
 from app.domain.fulfillment import is_cancelled_order
 from app.domain.returns import ReturnStatusChange, return_requires_action
 from app.repositories.sqlite_event_repository import SqliteEventRepository
@@ -224,6 +226,25 @@ class HubEventsService:
                 "marketplace": "olx",
                 "value": None,
                 "summary": _short(event.listing_title or event.subject),
+            },
+        )
+
+    async def on_wholesale_parcel(self, notice: WholesaleParcelNotice) -> None:
+        """
+        Paczka od hurtowni nadana przez InPost ([FEAT-MAIL]) - pomarańczowa
+        dioda (decyzja M3-a), tylko informacja. Zamknięcie = OK na Hubie;
+        nic w ORDLY nie zamyka jej samo. Klucz per mail: ponowne pobranie
+        tego samego maila nie da drugiego wpisu.
+        """
+        await self._open(
+            source_key=f"parcel_mail:{notice.message_id}",
+            type_=TYPE_WHOLESALE_PARCEL,
+            priority=PRIORITY_AMBER,
+            data={
+                "carrier": "InPost",
+                "tracking_number": notice.tracking_number,
+                "wholesaler": notice.wholesaler_name,
+                "summary": _short(f"{notice.wholesaler_name} · InPost {notice.tracking_number}"),
             },
         )
 

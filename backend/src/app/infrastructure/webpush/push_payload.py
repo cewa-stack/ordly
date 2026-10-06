@@ -411,6 +411,30 @@ def wholesaler_confirmed(
     )
 
 
+def wholesale_parcel_shipped(
+    *,
+    wholesaler_name: str,
+    tracking_number: str,
+) -> PushPayload:
+    """
+    InPost potwierdził nadanie paczki OD HURTOWNI do sklepu - pozycja
+    z Notion [FEAT-MAIL]. Jednorazowa informacja: nie wymaga reakcji,
+    niczego nie potwierdza i nie zmienia żadnego zamówienia.
+
+    Numer paczki w całości (24 cyfry mieszczą się w drugiej linii) - po
+    nim paczkę znajdziesz w aplikacji InPost. Kolejne paczki z tej samej
+    hurtowni NIE zastępują się (klucz per numer paczki).
+    """
+    return PushPayload(
+        title="Paczka z hurtowni",
+        body=f"{wholesaler_name} nadała paczkę InPost.\nNumer: {tracking_number}",
+        thread="mail",
+        url="/start",
+        collapse_key=f"parcel:{tracking_number}",
+        actions=[_ACTION_SHOW],
+    )
+
+
 #: Tytuły zdarzeń z Allegro Lokalnie. Klucze pochodzą z
 #: `domain/entities/allegro_lokalnie_event.py`. Nazwa kanału NIE jest tu
 #: doklejana - „Nowe zamówienie · Allegro Lokalnie” ucinało się na

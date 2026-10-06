@@ -24,6 +24,7 @@ from app.domain.entities.olx_event import OlxEvent
 from app.domain.entities.order import Order
 from app.domain.entities.order_return import OrderReturn
 from app.domain.entities.push_subscription import PushSubscription
+from app.domain.entities.wholesale_parcel import WholesaleParcelNotice
 from app.domain.interfaces.notifier import Notifier
 from app.domain.returns import return_status_label
 from app.infrastructure.webpush import push_payload
@@ -253,6 +254,19 @@ class WebPushNotifier(Notifier):
                 reason=notice.reason,
                 respond_by=notice.respond_by,
                 issue_id=notice.issue_id,
+            )
+        )
+
+    async def notify_wholesale_parcel(self, notice: WholesaleParcelNotice) -> None:
+        """
+        Paczka od hurtowni - katalog, pozycja `wholesale_parcel_shipped`
+        (treść zaakceptowana 2026-10-06). Tylko Web Push: Telegram tej
+        informacji nie dostaje (decyzja M5-a).
+        """
+        await self._send(
+            push_payload.wholesale_parcel_shipped(
+                wholesaler_name=notice.wholesaler_name,
+                tracking_number=notice.tracking_number,
             )
         )
 
